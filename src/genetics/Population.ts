@@ -127,7 +127,7 @@ export class Population {
       } else {
         // Clone and mutate
         const parent = weightedRandomSelect(survivors, probabilities);
-        const child = mutateGenome(cloneGenome(parent.genome), this.mutationConfig, this.genomeConstraints);
+        const child = mutateGenome(cloneGenome(parent.genome, this.genomeConstraints), this.mutationConfig, this.genomeConstraints);
         newGenomes.push(child);
       }
     }

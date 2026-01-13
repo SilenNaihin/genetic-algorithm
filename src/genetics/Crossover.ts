@@ -52,13 +52,17 @@ function lerpHSL(a: HSL, b: HSL, t: number): HSL {
 export function singlePointCrossover(
   parent1: CreatureGenome,
   parent2: CreatureGenome,
-  _constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
+  constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
 ): CreatureGenome {
-  // Use parent1's structure as the base
+  // Limit nodes based on muscle constraint (need N-1 muscles for N nodes)
+  const effectiveMaxNodes = Math.min(constraints.maxNodes, constraints.maxMuscles + 1);
+  const nodeCount = Math.min(parent1.nodes.length, effectiveMaxNodes);
+
+  // Use parent1's structure as the base (limited by constraints)
   const childNodes: NodeGene[] = [];
   const childMuscles: MuscleGene[] = [];
 
-  for (let i = 0; i < parent1.nodes.length; i++) {
+  for (let i = 0; i < nodeCount; i++) {
     const node1 = parent1.nodes[i];
     const node2 = parent2.nodes[i % parent2.nodes.length];
     const t = Math.random();
@@ -71,13 +75,14 @@ export function singlePointCrossover(
     });
   }
 
-  // Create muscles based on parent1's topology
+  // Create muscles based on parent1's topology (limited by constraints)
   const oldToNewNodeId = new Map<string, string>();
-  for (let i = 0; i < parent1.nodes.length; i++) {
+  for (let i = 0; i < nodeCount; i++) {
     oldToNewNodeId.set(parent1.nodes[i].id, childNodes[i].id);
   }
 
-  for (let i = 0; i < parent1.muscles.length; i++) {
+  // Only copy muscles that connect nodes we kept, up to maxMuscles
+  for (let i = 0; i < parent1.muscles.length && childMuscles.length < constraints.maxMuscles; i++) {
     const muscle1 = parent1.muscles[i];
     const muscle2 = parent2.muscles[i % parent2.muscles.length];
     const t = Math.random();
@@ -85,6 +90,7 @@ export function singlePointCrossover(
     const nodeA = oldToNewNodeId.get(muscle1.nodeA);
     const nodeB = oldToNewNodeId.get(muscle1.nodeB);
 
+    // Skip if either node wasn't included in the child
     if (!nodeA || !nodeB) continue;
 
     // Calculate new rest length based on actual node positions
@@ -130,17 +136,21 @@ export function singlePointCrossover(
 export function uniformCrossover(
   parent1: CreatureGenome,
   parent2: CreatureGenome,
-  _constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
+  constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
 ): CreatureGenome {
   // Randomly choose which parent provides the structure
   const structureParent = Math.random() < 0.5 ? parent1 : parent2;
   const otherParent = structureParent === parent1 ? parent2 : parent1;
 
+  // Limit nodes based on muscle constraint (need N-1 muscles for N nodes)
+  const effectiveMaxNodes = Math.min(constraints.maxNodes, constraints.maxMuscles + 1);
+  const nodeCount = Math.min(structureParent.nodes.length, effectiveMaxNodes);
+
   const childNodes: NodeGene[] = [];
   const childMuscles: MuscleGene[] = [];
 
-  // Create nodes
-  for (let i = 0; i < structureParent.nodes.length; i++) {
+  // Create nodes (limited by constraints)
+  for (let i = 0; i < nodeCount; i++) {
     const useOther = Math.random() < 0.5 && i < otherParent.nodes.length;
     const sourceNode = useOther ? otherParent.nodes[i] : structureParent.nodes[i];
 
@@ -154,18 +164,19 @@ export function uniformCrossover(
 
   // Map old node IDs to new ones
   const oldToNewNodeId = new Map<string, string>();
-  for (let i = 0; i < structureParent.nodes.length; i++) {
+  for (let i = 0; i < nodeCount; i++) {
     oldToNewNodeId.set(structureParent.nodes[i].id, childNodes[i].id);
   }
 
-  // Create muscles
-  for (let i = 0; i < structureParent.muscles.length; i++) {
+  // Create muscles (limited by constraints)
+  for (let i = 0; i < structureParent.muscles.length && childMuscles.length < constraints.maxMuscles; i++) {
     const muscle = structureParent.muscles[i];
     const otherMuscle = otherParent.muscles[i % otherParent.muscles.length];
 
     const nodeA = oldToNewNodeId.get(muscle.nodeA);
     const nodeB = oldToNewNodeId.get(muscle.nodeB);
 
+    // Skip if either node wasn't included in the child
     if (!nodeA || !nodeB) continue;
 
     childMuscles.push({
@@ -199,24 +210,43 @@ export function uniformCrossover(
 /**
  * Clone a genome (no crossover)
  */
-export function cloneGenome(genome: CreatureGenome): CreatureGenome {
-  const newNodes = genome.nodes.map(n => ({
+export function cloneGenome(
+  genome: CreatureGenome,
+  constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
+): CreatureGenome {
+  // Limit nodes based on muscle constraint (need N-1 muscles for N nodes)
+  const effectiveMaxNodes = Math.min(constraints.maxNodes, constraints.maxMuscles + 1);
+  const nodeCount = Math.min(genome.nodes.length, effectiveMaxNodes);
+
+  const newNodes = genome.nodes.slice(0, nodeCount).map(n => ({
     ...n,
     id: generateId('node'),
     position: { ...n.position }
   }));
 
   const oldToNewNodeId = new Map<string, string>();
-  for (let i = 0; i < genome.nodes.length; i++) {
+  for (let i = 0; i < nodeCount; i++) {
     oldToNewNodeId.set(genome.nodes[i].id, newNodes[i].id);
   }
 
-  const newMuscles = genome.muscles.map(m => ({
-    ...m,
-    id: generateId('muscle'),
-    nodeA: oldToNewNodeId.get(m.nodeA) || m.nodeA,
-    nodeB: oldToNewNodeId.get(m.nodeB) || m.nodeB
-  }));
+  // Only clone muscles that connect to included nodes, up to maxMuscles
+  const newMuscles: MuscleGene[] = [];
+  for (const m of genome.muscles) {
+    if (newMuscles.length >= constraints.maxMuscles) break;
+
+    const nodeA = oldToNewNodeId.get(m.nodeA);
+    const nodeB = oldToNewNodeId.get(m.nodeB);
+
+    // Skip if either node wasn't included
+    if (!nodeA || !nodeB) continue;
+
+    newMuscles.push({
+      ...m,
+      id: generateId('muscle'),
+      nodeA,
+      nodeB
+    });
+  }
 
   return {
     ...genome,

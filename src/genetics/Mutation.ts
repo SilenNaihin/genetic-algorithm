@@ -140,7 +140,8 @@ export function addNode(
   genome: CreatureGenome,
   constraints: GenomeConstraints
 ): { node: NodeGene; muscle: MuscleGene } | null {
-  if (genome.nodes.length >= constraints.maxNodes) {
+  // Check both node and muscle limits (adding a node also requires adding a muscle)
+  if (genome.nodes.length >= constraints.maxNodes || genome.muscles.length >= constraints.maxMuscles) {
     return null;
   }
 
