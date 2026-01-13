@@ -1,0 +1,40 @@
+{
+  "name": "genetic-algorithm",
+  "version": "1.0.0",
+  "description": "3D Evolutionary Algorithm Simulation",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SilenNaihin/genetic-algorithm.git"
+  },
+  "keywords": [
+    "genetic-algorithm",
+    "evolution",
+    "3d",
+    "simulation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SilenNaihin/genetic-algorithm/issues"
+  },
+  "homepage": "https://github.com/SilenNaihin/genetic-algorithm#readme",
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "chart.js": "^4.5.1",
+    "dat.gui": "^0.7.9",
+    "three": "^0.182.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@types/dat.gui": "^0.7.13",
+    "@types/three": "^0.182.0"
+  }
+}

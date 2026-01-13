@@ -1,0 +1,109 @@
+import type { CreatureGenome, Vector3 } from './genome';
+
+export enum SimulationPhase {
+  MENU = 'menu',
+  GENERATING = 'generating',
+  SIMULATING = 'simulating',
+  DISPLAYING = 'displaying',
+  EVOLVING = 'evolving',
+  PAUSED = 'paused'
+}
+
+export interface SimulationConfig {
+  // Physics
+  gravity: number;              // -9.8 to -30
+  groundFriction: number;       // 0.3 to 1.0
+  timeStep: number;             // Physics timestep (1/60)
+  simulationDuration: number;   // Seconds per generation
+
+  // Evolution
+  populationSize: number;       // 100
+  cullPercentage: number;       // 0.5 (bottom 50%)
+  mutationRate: number;         // 0.1-0.5
+  mutationMagnitude: number;    // How much values change
+  crossoverRate: number;        // Probability of crossover vs cloning
+  eliteCount: number;           // Number of top performers to keep unchanged
+
+  // Creature constraints
+  minNodes: number;
+  maxNodes: number;
+  maxMuscles: number;
+  maxAllowedFrequency: number;  // Max muscle frequency before creature is penalized
+
+  // Environment
+  pelletCount: number;          // Number of pellets per arena
+  arenaSize: number;            // Size of simulation arena
+}
+
+export const DEFAULT_CONFIG: SimulationConfig = {
+  gravity: -9.8,
+  groundFriction: 0.5,
+  timeStep: 1 / 60,
+  simulationDuration: 10,
+
+  populationSize: 100,
+  cullPercentage: 0.5,
+  mutationRate: 0.1,
+  mutationMagnitude: 0.3,
+  crossoverRate: 0.3,
+  eliteCount: 5,
+
+  minNodes: 3,
+  maxNodes: 8,
+  maxMuscles: 15,
+  maxAllowedFrequency: 3.0,
+
+  pelletCount: 3,
+  arenaSize: 10
+};
+
+export interface CreatureState {
+  genome: CreatureGenome;
+
+  // Physics state
+  nodePositions: Map<string, Vector3>;
+  nodeVelocities: Map<string, Vector3>;
+  centerOfMass: Vector3;
+
+  // Simulation results
+  fitness: number;
+  pelletsCollected: number;
+  distanceTraveled: number;
+  closestPelletDistance: number;
+
+  // Grid position for display
+  gridX: number;
+  gridY: number;
+
+  // Selection state
+  isSelected: boolean;
+}
+
+export interface PelletState {
+  id: string;
+  position: Vector3;
+  collected: boolean;
+}
+
+export interface FitnessHistoryEntry {
+  generation: number;
+  best: number;
+  average: number;
+  worst: number;
+}
+
+export interface ConfigHistoryEntry {
+  generation: number;
+  avgNodes: number;
+  avgMuscles: number;
+  avgBodySize: number;
+}
+
+export interface PopulationStats {
+  generation: number;
+  bestFitness: number;
+  averageFitness: number;
+  worstFitness: number;
+  avgNodes: number;
+  avgMuscles: number;
+}
