@@ -193,14 +193,14 @@ class EvolutionApp {
               <span class="param-name">Max Nodes</span>
               <span class="param-value" id="maxnodes-value">8</span>
             </div>
-            <input type="range" class="param-slider" id="maxnodes-slider" min="3" max="15" value="8">
+            <input type="range" class="param-slider" id="maxnodes-slider" min="2" max="15" value="8">
           </div>
           <div class="param-group" style="width: 200px;">
             <div class="param-label">
               <span class="param-name">Max Muscles</span>
               <span class="param-value" id="maxmuscles-value">15</span>
             </div>
-            <input type="range" class="param-slider" id="maxmuscles-slider" min="5" max="30" value="15">
+            <input type="range" class="param-slider" id="maxmuscles-slider" min="1" max="30" value="15">
           </div>
         </div>
         <button class="btn btn-primary" id="start-btn">
@@ -349,17 +349,32 @@ class EvolutionApp {
   private createCreatureMesh(genome: CreatureGenome): THREE.Group {
     const group = new THREE.Group();
 
+    // Find min/max for normalization
     let maxStiffness = 0, minStiffness = Infinity;
+    let maxFreq = 0, minFreq = Infinity;
     for (const muscle of genome.muscles) {
       if (muscle.stiffness > maxStiffness) maxStiffness = muscle.stiffness;
       if (muscle.stiffness < minStiffness) minStiffness = muscle.stiffness;
+      const effectiveFreq = muscle.frequency * genome.globalFrequencyMultiplier;
+      if (effectiveFreq > maxFreq) maxFreq = effectiveFreq;
+      if (effectiveFreq < minFreq) minFreq = effectiveFreq;
     }
 
     const nodeMeshes = new Map<string, THREE.Mesh>();
     for (const node of genome.nodes) {
-      const frictionHue = THREE.MathUtils.lerp(0.5, 0.08, node.friction);
-      const nodeColor = new THREE.Color().setHSL(frictionHue, 0.7, 0.5);
-      const nodeMaterial = new THREE.MeshStandardMaterial({ color: nodeColor, roughness: 0.4, metalness: 0.2 });
+      // NODE COLOR BY FRICTION:
+      // Low friction (0.3) = bright cyan (slippery, icy)
+      // High friction (0.9) = dark orange/brown (grippy, rubber)
+      const frictionNorm = (node.friction - 0.3) / 0.6; // Normalize 0.3-0.9 to 0-1
+      const frictionHue = THREE.MathUtils.lerp(0.5, 0.08, frictionNorm); // Cyan to orange
+      const frictionSat = THREE.MathUtils.lerp(0.9, 0.7, frictionNorm);
+      const frictionLight = THREE.MathUtils.lerp(0.6, 0.35, frictionNorm); // Brighter when slippery
+      const nodeColor = new THREE.Color().setHSL(frictionHue, frictionSat, frictionLight);
+      const nodeMaterial = new THREE.MeshStandardMaterial({
+        color: nodeColor,
+        roughness: THREE.MathUtils.lerp(0.2, 0.8, frictionNorm), // Shiny when slippery
+        metalness: THREE.MathUtils.lerp(0.4, 0.1, frictionNorm)
+      });
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(node.size * 0.5, 16, 16), nodeMaterial);
       mesh.position.set(node.position.x, node.position.y, node.position.z);
       mesh.userData = { nodeId: node.id, friction: node.friction, originalPos: { ...node.position } };
@@ -372,19 +387,32 @@ class EvolutionApp {
       const nodeB = nodeMeshes.get(muscle.nodeB);
       if (!nodeA || !nodeB) continue;
 
+      // MUSCLE COLOR BY FREQUENCY:
+      // Slow frequency = deep blue (calm)
+      // Fast frequency = bright red/orange (energetic)
+      const effectiveFreq = muscle.frequency * genome.globalFrequencyMultiplier;
+      const freqNorm = maxFreq > minFreq
+        ? (effectiveFreq - minFreq) / (maxFreq - minFreq)
+        : 0.5;
+      // Blue (0.6) to Red (0.0)
+      const freqHue = THREE.MathUtils.lerp(0.6, 0.0, freqNorm);
+      const muscleColor = new THREE.Color().setHSL(freqHue, 0.9, 0.5);
+
+      // MUSCLE THICKNESS BY STIFFNESS:
+      // Low stiffness = thin (0.03)
+      // High stiffness = thick (0.12)
       const stiffnessNorm = maxStiffness > minStiffness
         ? (muscle.stiffness - minStiffness) / (maxStiffness - minStiffness)
         : 0.5;
-      const stiffnessHue = THREE.MathUtils.lerp(0.75, 0.0, stiffnessNorm);
-      const muscleColor = new THREE.Color().setHSL(stiffnessHue, 0.8, 0.4 + stiffnessNorm * 0.2);
+      const thickness = 0.03 + stiffnessNorm * 0.09;
+
       const muscleMaterial = new THREE.MeshStandardMaterial({
         color: muscleColor,
-        roughness: 0.5,
+        roughness: 0.4,
         emissive: muscleColor,
-        emissiveIntensity: 0.1
+        emissiveIntensity: 0.15
       });
 
-      const thickness = 0.05 + stiffnessNorm * 0.03;
       const mesh = new THREE.Mesh(
         new THREE.CylinderGeometry(thickness, thickness, 1, 8),
         muscleMaterial
@@ -1676,9 +1704,11 @@ class EvolutionApp {
         finalFitness: NaN,
         pelletsCollected: 0,
         distanceTraveled: 0,
+        netDisplacement: 0,
         closestPelletDistance: Infinity,
         pellets: [],
-        fitnessOverTime: []
+        fitnessOverTime: [],
+        disqualified: null
       };
 
       // Create card at parent/start position

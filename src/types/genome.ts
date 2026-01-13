@@ -60,6 +60,7 @@ export interface CreatureGenome {
 export interface GenomeConstraints {
   minNodes: number;
   maxNodes: number;
+  minMuscles: number;
   maxMuscles: number;
   minSize: number;
   maxSize: number;
@@ -72,8 +73,9 @@ export interface GenomeConstraints {
 }
 
 export const DEFAULT_GENOME_CONSTRAINTS: GenomeConstraints = {
-  minNodes: 3,
+  minNodes: 2,
   maxNodes: 8,
+  minMuscles: 1,
   maxMuscles: 15,
   minSize: 0.2,
   maxSize: 0.8,

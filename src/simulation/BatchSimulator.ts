@@ -74,7 +74,7 @@ function generatePelletPosition(arenaSize: number, pelletIndex: number): Vector3
 export function simulateCreature(
   genome: CreatureGenome,
   config: SimulationConfig = DEFAULT_CONFIG,
-  frameRate: number = 30
+  frameRate: number = 15  // Reduced from 30 to lower memory usage
 ): CreatureSimulationResult {
   // Check if any muscle frequency exceeds the allowed maximum
   // Effective frequency = muscle.frequency * globalFrequencyMultiplier
@@ -468,10 +468,9 @@ export async function simulatePopulation(
       onProgress(i + 1, genomes.length);
     }
 
-    // Yield to UI every few creatures
-    if (i % 5 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
+    // Yield to UI every creature to prevent long GC pauses
+    // This gives the garbage collector smaller chunks to work with
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   return results;
