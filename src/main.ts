@@ -326,11 +326,13 @@ class EvolutionApp {
     }
 
     // Generate creature at MAX complexity so user can see what the limits look like
-    // Use maxNodes as both min and max to force maximum node count
+    // Node count is limited by muscle count (need N-1 muscles to connect N nodes)
+    const effectiveMaxNodes = Math.min(this.config.maxNodes, this.config.maxMuscles + 1);
     const constraints = {
-      minNodes: this.config.maxNodes,  // Force max nodes
-      maxNodes: this.config.maxNodes,
-      maxMuscles: this.config.maxMuscles,  // Will try to create up to this many
+      minNodes: effectiveMaxNodes,  // Force max nodes (within muscle limit)
+      maxNodes: effectiveMaxNodes,
+      minMuscles: 1,
+      maxMuscles: this.config.maxMuscles,
       minSize: 0.2,
       maxSize: 0.8,
       minStiffness: 50,
@@ -1546,7 +1548,24 @@ class EvolutionApp {
     this.generation = 0;
     this.fitnessHistory = [];
     this.evolutionStep = 'idle';
-    this.population = Population.createInitial(this.config);
+
+    // Create genome constraints from config
+    const genomeConstraints = {
+      minNodes: 2,
+      maxNodes: this.config.maxNodes,
+      minMuscles: 1,
+      maxMuscles: this.config.maxMuscles,
+      minSize: 0.2,
+      maxSize: 0.8,
+      minStiffness: 50,
+      maxStiffness: 500,
+      minFrequency: 0.5,
+      maxFrequency: this.config.maxAllowedFrequency,
+      maxAmplitude: 0.4,
+      spawnRadius: 2.0
+    };
+
+    this.population = Population.createInitial(this.config, genomeConstraints);
 
     this.state = 'grid';
     if (this.menuScreen) this.menuScreen.style.display = 'none';

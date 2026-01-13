@@ -50,8 +50,13 @@ export function generateRandomGenome(
 ): CreatureGenome {
   const id = generateId('creature');
 
+  // To connect N nodes, we need at least N-1 muscles (spanning tree)
+  // So maxNodes is limited by maxMuscles + 1
+  const effectiveMaxNodes = Math.min(constraints.maxNodes, constraints.maxMuscles + 1);
+  const effectiveMinNodes = Math.min(constraints.minNodes, effectiveMaxNodes);
+
   // Generate nodes
-  const nodeCount = randomInt(constraints.minNodes, constraints.maxNodes);
+  const nodeCount = randomInt(effectiveMinNodes, effectiveMaxNodes);
   const nodes: NodeGene[] = [];
 
   for (let i = 0; i < nodeCount; i++) {
