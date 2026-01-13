@@ -15,8 +15,8 @@ export class GraphPanel {
     this.container = document.createElement('div');
     this.container.id = 'graph-panel';
     this.container.style.cssText = `
-      position: absolute;
-      bottom: 80px;
+      position: fixed;
+      bottom: 20px;
       right: 20px;
       width: 380px;
       height: 280px;
@@ -27,6 +27,7 @@ export class GraphPanel {
       display: none;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(10px);
+      z-index: 100;
     `;
 
     // Create title bar
