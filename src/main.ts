@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { generateRandomGenome } from './core/Genome';
 import { simulatePopulation, CreatureSimulationResult, PelletData, SimulationFrame } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
+import { Creature } from './core/Creature';
 import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3, FitnessWeights } from './types';
 import { GraphPanel } from './ui/GraphPanel';
 
@@ -15,6 +16,7 @@ interface SavedRun {
   config: SimulationConfig;
   thumbnail?: string;
   generationCount: number;
+  fitnessHistory?: FitnessHistoryEntry[];
 }
 
 interface GenerationData {
@@ -377,6 +379,15 @@ class RunStorage {
     const run = await this.getRun(this.currentRunId);
     if (run) {
       run.thumbnail = thumbnail;
+      await this.putRun(run);
+    }
+  }
+
+  async updateFitnessHistory(fitnessHistory: FitnessHistoryEntry[]): Promise<void> {
+    if (!this.currentRunId) return;
+    const run = await this.getRun(this.currentRunId);
+    if (run) {
+      run.fitnessHistory = fitnessHistory;
       await this.putRun(run);
     }
   }
@@ -2171,17 +2182,39 @@ class EvolutionApp {
       this.config = { ...this.config, ...run.config };
       this.generation = maxGen;
       this.maxGeneration = maxGen;
-      this.viewingGeneration = maxGen;  // Viewing loaded generation
+      this.viewingGeneration = null;  // NOT viewing history - we're at current generation
       this.simulationResults = results;
-      this.fitnessHistory = [];  // Will be rebuilt if needed
+
+      // Restore fitness history from storage, or initialize empty
+      this.fitnessHistory = run.fitnessHistory || [];
+
+      // Update graph if we have history
+      if (this.graphPanel && this.fitnessHistory.length > 0) {
+        this.graphPanel.updateData(this.fitnessHistory);
+      }
+
+      // Create Population object from loaded genomes so evolution can continue
+      this.population = new Population(this.config);
+      this.population.generation = maxGen;
+
+      // Create Creature objects from loaded genomes
+      for (const result of results) {
+        const creature = new Creature(result.genome);
+        creature.state.fitness = result.finalFitness;
+        creature.state.pelletsCollected = result.pelletsCollected;
+        creature.state.distanceTraveled = result.distanceTraveled;
+        this.population.creatures.push(creature);
+      }
 
       // Switch to grid view
       this.state = 'grid';
       if (this.menuScreen) this.menuScreen.style.display = 'none';
       if (this.gridUI) this.gridUI.style.display = 'block';
 
-      // Create cards from loaded results
-      this.createCreatureCardsFromResults(results);
+      // Create cards from loaded results (already sorted)
+      this.createCreatureCardsFromResults(results, false);
+
+      // Set evolution step - we're ready to mutate (start next generation)
       this.evolutionStep = 'idle';
       this.updateNextButton();
       this.updateStats();
@@ -3036,6 +3069,9 @@ class EvolutionApp {
       average: avg,
       worst
     });
+
+    // Save fitness history to storage
+    runStorage.updateFitnessHistory(this.fitnessHistory);
 
     if (this.graphPanel) {
       this.graphPanel.updateData(this.fitnessHistory);
