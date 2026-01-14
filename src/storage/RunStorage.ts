@@ -3,9 +3,9 @@ import { DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHisto
 
 export interface SavedRun {
   id: string;
+  name?: string;
   startTime: number;
   config: SimulationConfig;
-  thumbnail?: string;
   generationCount: number;
   fitnessHistory?: FitnessHistoryEntry[];
 }
@@ -353,20 +353,19 @@ export class RunStorage {
     });
   }
 
-  async updateRunThumbnail(thumbnail: string): Promise<void> {
-    if (!this.currentRunId) return;
-    const run = await this.getRun(this.currentRunId);
-    if (run) {
-      run.thumbnail = thumbnail;
-      await this.putRun(run);
-    }
-  }
-
   async updateFitnessHistory(fitnessHistory: FitnessHistoryEntry[]): Promise<void> {
     if (!this.currentRunId) return;
     const run = await this.getRun(this.currentRunId);
     if (run) {
       run.fitnessHistory = fitnessHistory;
+      await this.putRun(run);
+    }
+  }
+
+  async updateRunName(runId: string, name: string): Promise<void> {
+    const run = await this.getRun(runId);
+    if (run) {
+      run.name = name;
       await this.putRun(run);
     }
   }

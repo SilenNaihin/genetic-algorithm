@@ -79,6 +79,7 @@ class EvolutionApp {
   // History navigation
   private viewingGeneration: number | null = null;  // null = viewing current live generation
   private maxGeneration: number = 0;  // Highest generation number for current run
+  private runName: string = '';  // User-defined name for the current run
 
   // Best creature tracking
   private bestCreatureEver: CreatureSimulationResult | null = null;
@@ -805,6 +806,24 @@ class EvolutionApp {
     const canGoNext = isViewingHistory && (this.viewingGeneration! < this.maxGeneration || this.viewingGeneration! < this.generation);
 
     return `
+      <div class="run-name-container" style="margin-bottom: 8px;">
+        <input type="text" id="run-name-input"
+          value="${this.runName || ''}"
+          placeholder="Name this run..."
+          style="
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid transparent;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 0;
+            outline: none;
+            transition: border-color 0.2s;
+          "
+        >
+      </div>
       <div class="stats-title gen-nav">
         <button class="gen-nav-btn" id="prev-gen-btn" ${canGoPrev ? '' : 'disabled'}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1012,6 +1031,24 @@ class EvolutionApp {
         e.stopPropagation();
         await this.goToCurrentGeneration();
       });
+
+      // Run name input handler
+      const runNameInput = document.getElementById('run-name-input') as HTMLInputElement;
+      if (runNameInput) {
+        runNameInput.addEventListener('focus', () => {
+          runNameInput.style.borderBottomColor = 'var(--accent)';
+        });
+        runNameInput.addEventListener('blur', () => {
+          runNameInput.style.borderBottomColor = 'transparent';
+        });
+        runNameInput.addEventListener('change', async () => {
+          this.runName = runNameInput.value;
+          const currentRunId = runStorage.getCurrentRunId();
+          if (currentRunId) {
+            await runStorage.updateRunName(currentRunId, this.runName);
+          }
+        });
+      }
 
       // Render longest surviving creature thumbnail and add event listeners
       if (this.longestSurvivingCreature) {
@@ -1683,20 +1720,24 @@ class EvolutionApp {
               opacity: 0.6;
               transition: opacity 0.2s;
             ">&times;</button>
-            <div style="
-              width: 100%;
-              height: 100px;
-              background: var(--bg-tertiary);
-              border-radius: 8px;
-              margin-bottom: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: var(--text-muted);
-              font-size: 12px;
-            ">${run.thumbnail ? `<img src="${run.thumbnail}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` : 'No preview'}</div>
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Generation ${run.generationCount - 1}</div>
-            <div style="font-size: 12px; color: var(--text-muted);">${dateStr}</div>
+            <input type="text" class="run-name-edit" data-run-id="${run.id}"
+              value="${(run.name || '').replace(/"/g, '&quot;')}"
+              placeholder="Name this run..."
+              style="
+                width: 100%;
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid transparent;
+                color: var(--text);
+                font-size: 13px;
+                font-weight: 600;
+                padding: 2px 0;
+                margin-bottom: 4px;
+                outline: none;
+                cursor: text;
+              "
+            >
+            <div style="font-size: 12px; color: var(--text-muted);">Gen ${run.generationCount - 1} | ${dateStr}</div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
               Gravity: ${run.config.gravity} | Mut: ${Math.round((run.config.mutationRate || 0.1) * 100)}%
             </div>
@@ -1709,6 +1750,7 @@ class EvolutionApp {
         card.addEventListener('click', async (e) => {
           const target = e.target as HTMLElement;
           if (target.classList.contains('delete-run-btn')) return;
+          if (target.classList.contains('run-name-edit')) return;
 
           const runId = card.getAttribute('data-run-id');
           if (runId) {
@@ -1724,6 +1766,24 @@ class EvolutionApp {
         card.addEventListener('mouseleave', () => {
           (card as HTMLElement).style.borderColor = 'var(--border)';
           (card as HTMLElement).style.transform = 'translateY(0)';
+        });
+      });
+
+      // Add name edit handlers
+      runsGrid.querySelectorAll('.run-name-edit').forEach(input => {
+        const inputEl = input as HTMLInputElement;
+        inputEl.addEventListener('click', (e) => e.stopPropagation());
+        inputEl.addEventListener('focus', () => {
+          inputEl.style.borderBottomColor = 'var(--accent)';
+        });
+        inputEl.addEventListener('blur', () => {
+          inputEl.style.borderBottomColor = 'transparent';
+        });
+        inputEl.addEventListener('change', async () => {
+          const runId = inputEl.getAttribute('data-run-id');
+          if (runId) {
+            await runStorage.updateRunName(runId, inputEl.value);
+          }
         });
       });
 
@@ -1793,6 +1853,7 @@ class EvolutionApp {
       this.maxGeneration = maxGen;
       this.viewingGeneration = null;  // NOT viewing history - we're at current generation
       this.simulationResults = results;
+      this.runName = run.name || '';
 
       // Restore fitness history from storage, or initialize empty
       this.fitnessHistory = run.fitnessHistory || [];
@@ -2264,6 +2325,7 @@ class EvolutionApp {
     this.fitnessHistory = [];
     this.evolutionStep = 'idle';
     this.viewingGeneration = null;  // Viewing current (live) generation
+    this.runName = '';  // Reset run name for new run
 
     // Create a new run in storage
     await runStorage.createRun(this.config);

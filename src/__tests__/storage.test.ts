@@ -7,9 +7,9 @@ import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, type FitnessHistoryEntry, type
 
 interface MockSavedRun {
   id: string;
+  name?: string;
   startTime: number;
   config: typeof DEFAULT_CONFIG;
-  thumbnail?: string;
   generationCount: number;
   fitnessHistory?: FitnessHistoryEntry[];
 }
@@ -117,11 +117,10 @@ class MockRunStorage {
     this.runs.delete(runId);
   }
 
-  async updateRunThumbnail(thumbnail: string): Promise<void> {
-    if (!this.currentRunId) return;
-    const run = this.runs.get(this.currentRunId);
+  async updateRunName(runId: string, name: string): Promise<void> {
+    const run = this.runs.get(runId);
     if (run) {
-      run.thumbnail = thumbnail;
+      run.name = name;
     }
   }
 
@@ -366,20 +365,20 @@ describe('RunStorage Interface', () => {
     });
   });
 
-  describe('updateRunThumbnail', () => {
-    it('updates thumbnail for current run', async () => {
+  describe('updateRunName', () => {
+    it('updates name for specified run', async () => {
       const runId = await storage.createRun(DEFAULT_CONFIG);
-      const thumbnail = 'data:image/png;base64,abc123';
+      const name = 'My Test Run';
 
-      await storage.updateRunThumbnail(thumbnail);
+      await storage.updateRunName(runId, name);
 
       const run = await storage.getRun(runId);
-      expect(run?.thumbnail).toBe(thumbnail);
+      expect(run?.name).toBe(name);
     });
 
-    it('does nothing when no current run', async () => {
-      // No run created, should not throw
-      await expect(storage.updateRunThumbnail('test')).resolves.not.toThrow();
+    it('does nothing for non-existent run', async () => {
+      // Non-existent run, should not throw
+      await expect(storage.updateRunName('non_existent', 'test')).resolves.not.toThrow();
     });
   });
 
