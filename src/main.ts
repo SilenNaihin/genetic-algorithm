@@ -1864,6 +1864,24 @@ class EvolutionApp {
         this.graphPanel.show();
       }
 
+      // Restore best creature ever
+      if (run.bestCreature) {
+        this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
+        this.bestCreatureGeneration = run.bestCreature.generation;
+      } else {
+        this.bestCreatureEver = null;
+        this.bestCreatureGeneration = 0;
+      }
+
+      // Restore longest surviving creature
+      if (run.longestSurvivor) {
+        this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
+        this.longestSurvivingGenerations = run.longestSurvivor.generations;
+      } else {
+        this.longestSurvivingCreature = null;
+        this.longestSurvivingGenerations = 0;
+      }
+
       // Create Population object from loaded genomes so evolution can continue
       this.population = new Population(this.config);
       this.population.generation = maxGen;
@@ -2721,6 +2739,7 @@ class EvolutionApp {
         this.bestCreatureEver = bestResult;
         this.bestCreatureGeneration = this.generation;
         console.log(`New best creature ever! Fitness: ${bestResult.finalFitness.toFixed(1)} at generation ${this.generation}`);
+        runStorage.updateBestCreature(bestResult, this.generation);
       }
     }
 
@@ -2733,6 +2752,7 @@ class EvolutionApp {
       this.longestSurvivingCreature = longestSurvivor;
       this.longestSurvivingGenerations = longestSurvivor.genome.survivalStreak;
       console.log(`New longest surviving creature! ${this.getCreatureName(longestSurvivor.genome)} survived ${longestSurvivor.genome.survivalStreak} consecutive generations`);
+      runStorage.updateLongestSurvivor(longestSurvivor, longestSurvivor.genome.survivalStreak);
     }
 
     this.fitnessHistory.push({

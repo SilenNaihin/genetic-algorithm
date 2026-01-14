@@ -8,6 +8,8 @@ export interface SavedRun {
   config: SimulationConfig;
   generationCount: number;
   fitnessHistory?: FitnessHistoryEntry[];
+  bestCreature?: { result: CompactCreatureResult; generation: number };
+  longestSurvivor?: { result: CompactCreatureResult; generations: number };
 }
 
 export interface GenerationData {
@@ -193,6 +195,24 @@ export class RunStorage {
     }
   }
 
+  compactCreatureResult(r: CreatureSimulationResult): CompactCreatureResult {
+    return {
+      genome: r.genome,
+      fitness: Math.round(r.finalFitness * 1000) / 1000,
+      pellets: r.pelletsCollected,
+      disqualified: r.disqualified,
+      frames: this.compactFrames(r.frames, r.genome),
+      pelletData: r.pellets.map(p => ({
+        position: {
+          x: Math.round(p.position.x * 1000) / 1000,
+          y: Math.round(p.position.y * 1000) / 1000,
+          z: Math.round(p.position.z * 1000) / 1000
+        },
+        collectedAtFrame: p.collectedAtFrame
+      }))
+    };
+  }
+
   private compactFrames(frames: SimulationFrame[], genome: CreatureGenome): number[][] {
     const nodeIds = genome.nodes.map(n => n.id);
     return frames.map(f => {
@@ -211,6 +231,30 @@ export class RunStorage {
       }
       return arr;
     });
+  }
+
+  expandCreatureResult(r: CompactCreatureResult, fitnessWeights: FitnessWeights): CreatureSimulationResult {
+    const frames = this.expandFrames(r.frames, r.genome);
+    const pellets: PelletData[] = r.pelletData.map((p, i) => ({
+      id: `pellet_${i}`,
+      position: p.position,
+      collectedAtFrame: p.collectedAtFrame,
+      spawnedAtFrame: 0
+    }));
+    const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, fitnessWeights, r.disqualified);
+
+    return {
+      genome: r.genome,
+      frames,
+      finalFitness: r.fitness,
+      pelletsCollected: r.pellets,
+      distanceTraveled: 0,
+      netDisplacement: 0,
+      closestPelletDistance: 0,
+      pellets,
+      fitnessOverTime,
+      disqualified: r.disqualified as any
+    };
   }
 
   private expandFrames(compactFrames: number[][], genome: CreatureGenome): SimulationFrame[] {
@@ -366,6 +410,30 @@ export class RunStorage {
     const run = await this.getRun(runId);
     if (run) {
       run.name = name;
+      await this.putRun(run);
+    }
+  }
+
+  async updateBestCreature(creature: CreatureSimulationResult, generation: number): Promise<void> {
+    if (!this.currentRunId) return;
+    const run = await this.getRun(this.currentRunId);
+    if (run) {
+      run.bestCreature = {
+        result: this.compactCreatureResult(creature),
+        generation
+      };
+      await this.putRun(run);
+    }
+  }
+
+  async updateLongestSurvivor(creature: CreatureSimulationResult, generations: number): Promise<void> {
+    if (!this.currentRunId) return;
+    const run = await this.getRun(this.currentRunId);
+    if (run) {
+      run.longestSurvivor = {
+        result: this.compactCreatureResult(creature),
+        generations
+      };
       await this.putRun(run);
     }
   }
