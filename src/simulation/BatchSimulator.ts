@@ -1,6 +1,6 @@
 import * as CANNON from 'cannon-es';
 import type { CreatureGenome, Vector3, SimulationConfig } from '../types';
-import { DEFAULT_CONFIG } from '../types';
+import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS } from '../types';
 
 export interface SimulationFrame {
   time: number;
@@ -411,25 +411,27 @@ export function simulateCreature(
     };
   }
 
-  // FITNESS CALCULATION - pellet-focused
-  // Primary metric: Pellet collection (100 points each)
-  // Secondary: Proximity to next pellet (encourages directed movement)
-  let fitness = 10;  // Base fitness
+  // FITNESS CALCULATION - using configurable weights
+  const weights = config.fitnessWeights || DEFAULT_FITNESS_WEIGHTS;
+  let fitness = weights.baseFitness;
 
   // PRIMARY: Pellet collection is the main driver
-  fitness += pelletsCollected * 100;
+  fitness += pelletsCollected * weights.pelletWeight;
 
   // SECONDARY: Proximity bonus for being close to current target
-  // Max 50 points when very close
   if (isFinite(closestPelletDistance)) {
-    const proximityBonus = Math.max(0, 20 - closestPelletDistance) * 2.5;
+    const proximityBonus = Math.max(0, weights.proximityMaxDistance - closestPelletDistance) * weights.proximityWeight;
     fitness += proximityBonus;
   }
 
-  // TERTIARY: Small movement bonus (just to differentiate stationary creatures)
-  // Capped very low so it doesn't reward random movement
+  // TERTIARY: Movement bonus (capped) - rewards total path length
   const validDistanceTraveled = isFinite(distanceTraveled) ? distanceTraveled : 0;
-  fitness += Math.min(validDistanceTraveled, 5);
+  fitness += Math.min(validDistanceTraveled * weights.movementWeight, weights.movementCap);
+
+  // QUATERNARY: Net displacement bonus - rewards straight-line distance from start
+  if (weights.distanceWeight > 0) {
+    fitness += Math.min(validNetDisplacement * weights.distanceWeight, weights.distanceCap);
+  }
 
   // Final validation - ensure fitness is always a positive finite number
   if (!isFinite(fitness) || fitness < 1) {

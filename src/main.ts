@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { generateRandomGenome } from './core/Genome';
 import { simulatePopulation, CreatureSimulationResult, PelletData, SimulationFrame } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
-import { DEFAULT_CONFIG, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3 } from './types';
+import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3, FitnessWeights } from './types';
 import { GraphPanel } from './ui/GraphPanel';
 
 // ============================================
@@ -432,6 +432,9 @@ class EvolutionApp {
     // Initialize storage first
     await runStorage.init();
 
+    // Load saved fitness weights from localStorage
+    this.loadFitnessWeights();
+
     this.setupSharedRenderer();
     this.createMenuScreen();
     this.createGridUI();
@@ -439,6 +442,27 @@ class EvolutionApp {
     this.createReplayModal();
     this.graphPanel = new GraphPanel();
     this.showMenu();
+  }
+
+  private saveFitnessWeights(): void {
+    try {
+      localStorage.setItem('evolutionLab_fitnessWeights', JSON.stringify(this.config.fitnessWeights));
+    } catch (e) {
+      console.warn('Failed to save fitness weights to localStorage:', e);
+    }
+  }
+
+  private loadFitnessWeights(): void {
+    try {
+      const saved = localStorage.getItem('evolutionLab_fitnessWeights');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge with defaults to handle any new fields
+        this.config.fitnessWeights = { ...DEFAULT_FITNESS_WEIGHTS, ...parsed };
+      }
+    } catch (e) {
+      console.warn('Failed to load fitness weights from localStorage:', e);
+    }
   }
 
   private setupSharedRenderer(): void {
@@ -517,6 +541,7 @@ class EvolutionApp {
             <input type="range" class="param-slider" id="maxmuscles-slider" min="1" max="30" value="15">
           </div>
         </div>
+
         <div style="display: flex; gap: 12px;">
           <button class="btn btn-primary" id="start-btn">
             <span>Start Evolution</span>
@@ -530,6 +555,96 @@ class EvolutionApp {
               <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 8l-5-5-5 5M12 3v12"/>
             </svg>
           </button>
+        </div>
+      </div>
+
+      <!-- Fitness Settings Panel - Fixed Right Side -->
+      <div id="fitness-settings-panel" style="
+        position: fixed;
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
+        width: 240px;
+        max-height: 90vh;
+        overflow-y: auto;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        border: 1px solid var(--border-light);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      ">
+        <div style="
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary);
+        ">Fitness Function</div>
+        <div style="padding: 12px 16px;">
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Pellet Weight</span>
+              <span class="param-value" id="pellet-weight-value">${this.config.fitnessWeights.pelletWeight}</span>
+            </div>
+            <input type="range" class="param-slider" id="pellet-weight-slider" min="0" max="200" value="${this.config.fitnessWeights.pelletWeight}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per pellet</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Proximity Weight</span>
+              <span class="param-value" id="proximity-weight-value">${this.config.fitnessWeights.proximityWeight}</span>
+            </div>
+            <input type="range" class="param-slider" id="proximity-weight-slider" min="0" max="10" step="0.5" value="${this.config.fitnessWeights.proximityWeight}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Bonus for being close</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Proximity Distance</span>
+              <span class="param-value" id="proximity-dist-value">${this.config.fitnessWeights.proximityMaxDistance}</span>
+            </div>
+            <input type="range" class="param-slider" id="proximity-dist-slider" min="5" max="50" value="${this.config.fitnessWeights.proximityMaxDistance}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max distance for bonus</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Movement Weight</span>
+              <span class="param-value" id="movement-weight-value">${this.config.fitnessWeights.movementWeight}</span>
+            </div>
+            <input type="range" class="param-slider" id="movement-weight-slider" min="0" max="5" step="0.1" value="${this.config.fitnessWeights.movementWeight}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per unit moved</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Movement Cap</span>
+              <span class="param-value" id="movement-cap-value">${this.config.fitnessWeights.movementCap}</span>
+            </div>
+            <input type="range" class="param-slider" id="movement-cap-slider" min="0" max="50" value="${this.config.fitnessWeights.movementCap}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max movement bonus</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Distance Weight</span>
+              <span class="param-value" id="distance-weight-value">${this.config.fitnessWeights.distanceWeight}</span>
+            </div>
+            <input type="range" class="param-slider" id="distance-weight-slider" min="0" max="10" step="0.5" value="${this.config.fitnessWeights.distanceWeight}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per unit displaced</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Distance Cap</span>
+              <span class="param-value" id="distance-cap-value">${this.config.fitnessWeights.distanceCap}</span>
+            </div>
+            <input type="range" class="param-slider" id="distance-cap-slider" min="0" max="100" value="${this.config.fitnessWeights.distanceCap}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max distance bonus</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Base Fitness</span>
+              <span class="param-value" id="base-fitness-value">${this.config.fitnessWeights.baseFitness}</span>
+            </div>
+            <input type="range" class="param-slider" id="base-fitness-slider" min="0" max="50" value="${this.config.fitnessWeights.baseFitness}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Starting fitness</div>
+          </div>
+          <button class="btn btn-secondary btn-small" id="reset-fitness-btn" style="width: 100%;">Reset to Defaults</button>
         </div>
       </div>
     `;
@@ -589,6 +704,35 @@ class EvolutionApp {
     frequencySlider2.addEventListener('change', () => {
       // Regenerate on frequency change to show max frequency effect
       this.regeneratePreviewCreature();
+    });
+
+    // Fitness sliders
+    this.setupMenuFitnessSlider('pellet-weight', 'pelletWeight', 0);
+    this.setupMenuFitnessSlider('proximity-weight', 'proximityWeight', 1);
+    this.setupMenuFitnessSlider('proximity-dist', 'proximityMaxDistance', 0);
+    this.setupMenuFitnessSlider('movement-weight', 'movementWeight', 1);
+    this.setupMenuFitnessSlider('movement-cap', 'movementCap', 0);
+    this.setupMenuFitnessSlider('distance-weight', 'distanceWeight', 1);
+    this.setupMenuFitnessSlider('distance-cap', 'distanceCap', 0);
+    this.setupMenuFitnessSlider('base-fitness', 'baseFitness', 0);
+
+    // Reset fitness button
+    document.getElementById('reset-fitness-btn')?.addEventListener('click', () => {
+      this.resetFitnessWeights();
+    });
+  }
+
+  private setupMenuFitnessSlider(sliderId: string, weightKey: keyof FitnessWeights, decimals: number): void {
+    const slider = document.getElementById(`${sliderId}-slider`) as HTMLInputElement;
+    const valueDisplay = document.getElementById(`${sliderId}-value`) as HTMLElement;
+
+    if (!slider || !valueDisplay) return;
+
+    slider.addEventListener('input', () => {
+      const value = parseFloat(slider.value);
+      this.config.fitnessWeights[weightKey] = value;
+      valueDisplay.textContent = decimals > 0 ? value.toFixed(decimals) : value.toString();
+      this.saveFitnessWeights();
     });
   }
 
@@ -871,6 +1015,9 @@ class EvolutionApp {
     settingsBox.innerHTML = this.getSettingsInfoHTML();
     this.gridUI.appendChild(settingsBox);
 
+    // Setup fitness dropdown click handler after DOM is ready
+    setTimeout(() => this.setupFitnessDropdown(), 0);
+
     // Grid container for creature cards - use absolute positioning for animations
     this.gridContainer = document.createElement('div');
     this.gridContainer.className = 'creature-grid';
@@ -1088,6 +1235,7 @@ class EvolutionApp {
   }
 
   private getSettingsInfoHTML(): string {
+    const fw = this.config.fitnessWeights;
     return `
       <div style="color: var(--text-secondary); font-weight: 600; margin-bottom: 8px;">Settings</div>
       <div style="display: grid; grid-template-columns: auto auto; gap: 4px 12px;">
@@ -1098,6 +1246,31 @@ class EvolutionApp {
         <span>Max Nodes:</span><span style="color: var(--text-primary);">${this.config.maxNodes}</span>
         <span>Max Muscles:</span><span style="color: var(--text-primary);">${this.config.maxMuscles}</span>
       </div>
+      <div id="fitness-dropdown-toggle" style="
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 11px;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      ">
+        <svg id="fitness-dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+        <span>Fitness Weights</span>
+      </div>
+      <div id="fitness-dropdown-content" style="display: none; margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+        <div style="display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10px;">
+          <span style="color: var(--text-muted);">Pellet:</span><span style="color: var(--text-secondary);">${fw.pelletWeight}</span>
+          <span style="color: var(--text-muted);">Proximity:</span><span style="color: var(--text-secondary);">${fw.proximityWeight} (max ${fw.proximityMaxDistance})</span>
+          <span style="color: var(--text-muted);">Movement:</span><span style="color: var(--text-secondary);">${fw.movementWeight} (cap ${fw.movementCap})</span>
+          <span style="color: var(--text-muted);">Distance:</span><span style="color: var(--text-secondary);">${fw.distanceWeight} (cap ${fw.distanceCap})</span>
+          <span style="color: var(--text-muted);">Base:</span><span style="color: var(--text-secondary);">${fw.baseFitness}</span>
+        </div>
+      </div>
     `;
   }
 
@@ -1105,7 +1278,22 @@ class EvolutionApp {
     const settingsBox = document.getElementById('settings-info-box');
     if (settingsBox) {
       settingsBox.innerHTML = this.getSettingsInfoHTML();
+      this.setupFitnessDropdown();
     }
+  }
+
+  private setupFitnessDropdown(): void {
+    const toggle = document.getElementById('fitness-dropdown-toggle');
+    const content = document.getElementById('fitness-dropdown-content');
+    const chevron = document.getElementById('fitness-dropdown-chevron');
+
+    toggle?.addEventListener('click', () => {
+      if (content && chevron) {
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        chevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+      }
+    });
   }
 
   private updateStats(): void {
@@ -2823,6 +3011,36 @@ class EvolutionApp {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // ============================================
+  // FITNESS PANEL
+  // ============================================
+
+  private resetFitnessWeights(): void {
+    this.config.fitnessWeights = { ...DEFAULT_FITNESS_WEIGHTS };
+
+    // Update all sliders (in menu)
+    const weights = this.config.fitnessWeights;
+    this.updateFitnessSlider('pellet-weight', weights.pelletWeight, 0);
+    this.updateFitnessSlider('proximity-weight', weights.proximityWeight, 1);
+    this.updateFitnessSlider('proximity-dist', weights.proximityMaxDistance, 0);
+    this.updateFitnessSlider('movement-weight', weights.movementWeight, 1);
+    this.updateFitnessSlider('movement-cap', weights.movementCap, 0);
+    this.updateFitnessSlider('distance-weight', weights.distanceWeight, 1);
+    this.updateFitnessSlider('distance-cap', weights.distanceCap, 0);
+    this.updateFitnessSlider('base-fitness', weights.baseFitness, 0);
+
+    // Save to localStorage
+    this.saveFitnessWeights();
+  }
+
+  private updateFitnessSlider(sliderId: string, value: number, decimals: number): void {
+    const slider = document.getElementById(`${sliderId}-slider`) as HTMLInputElement;
+    const valueDisplay = document.getElementById(`${sliderId}-value`) as HTMLElement;
+
+    if (slider) slider.value = value.toString();
+    if (valueDisplay) valueDisplay.textContent = decimals > 0 ? value.toFixed(decimals) : value.toString();
   }
 
   private reset(): void {

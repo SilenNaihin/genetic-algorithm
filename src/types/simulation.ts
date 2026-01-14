@@ -1,5 +1,27 @@
 import type { CreatureGenome, Vector3 } from './genome';
 
+export interface FitnessWeights {
+  baseFitness: number;           // Starting fitness value
+  pelletWeight: number;          // Points per pellet collected
+  proximityWeight: number;       // Multiplier for proximity bonus (closer to pellet)
+  proximityMaxDistance: number;  // Distance at which proximity bonus starts
+  movementWeight: number;        // Points for movement (capped)
+  movementCap: number;           // Maximum movement bonus
+  distanceWeight: number;        // Points per unit of net displacement
+  distanceCap: number;           // Maximum distance bonus
+}
+
+export const DEFAULT_FITNESS_WEIGHTS: FitnessWeights = {
+  baseFitness: 10,
+  pelletWeight: 100,
+  proximityWeight: 2.5,
+  proximityMaxDistance: 20,
+  movementWeight: 1,
+  movementCap: 5,
+  distanceWeight: 0,
+  distanceCap: 50
+};
+
 export enum SimulationPhase {
   MENU = 'menu',
   GENERATING = 'generating',
@@ -33,6 +55,9 @@ export interface SimulationConfig {
   // Environment
   pelletCount: number;          // Number of pellets per arena
   arenaSize: number;            // Size of simulation arena
+
+  // Fitness function
+  fitnessWeights: FitnessWeights;
 }
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -54,7 +79,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   maxAllowedFrequency: 3.0,
 
   pelletCount: 3,
-  arenaSize: 10
+  arenaSize: 10,
+
+  fitnessWeights: DEFAULT_FITNESS_WEIGHTS
 };
 
 export interface CreatureState {
