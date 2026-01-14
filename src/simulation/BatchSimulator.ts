@@ -212,8 +212,10 @@ export function simulateCreature(
   };
 
   // Helper to calculate fitness at any point (with NaN protection)
-  // Pellet-focused fitness formula
-  const calculateCurrentFitness = (centerOfMass: Vector3, pelletsCollectedCount: number, distTraveled: number): number => {
+  // Uses configurable weights from config.fitnessWeights
+  const weights = config.fitnessWeights || DEFAULT_FITNESS_WEIGHTS;
+
+  const calculateCurrentFitness = (centerOfMass: Vector3, pelletsCollectedCount: number, distTraveled: number, initialCOM: Vector3 | null): number => {
     // If disqualified, always return 1
     if (disqualified) return 1;
 
@@ -226,10 +228,10 @@ export function simulateCreature(
     const validDist = isFinite(distTraveled) ? distTraveled : 0;
 
     // Base fitness
-    let f = 10;
+    let f = weights.baseFitness;
 
-    // PRIMARY: Pellet collection (100 points each)
-    f += pelletsCollectedCount * 100;
+    // PRIMARY: Pellet collection
+    f += pelletsCollectedCount * weights.pelletWeight;
 
     // SECONDARY: Proximity bonus for being close to active pellet
     const activePellet = getActivePellet();
@@ -239,12 +241,28 @@ export function simulateCreature(
       const pdz = validCOM.z - activePellet.position.z;
       const pelletDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
       if (isFinite(pelletDist)) {
-        f += Math.max(0, 20 - pelletDist) * 2.5;
+        f += Math.max(0, weights.proximityMaxDistance - pelletDist) * weights.proximityWeight;
       }
     }
 
-    // TERTIARY: Small movement bonus (capped low)
-    f += Math.min(validDist, 5);
+    // TERTIARY: Movement bonus (capped)
+    f += Math.min(validDist * weights.movementWeight, weights.movementCap);
+
+    // QUATERNARY: Net displacement bonus
+    if (weights.distanceWeight > 0 && initialCOM) {
+      const validInitialCOM = {
+        x: isFinite(initialCOM.x) ? initialCOM.x : 0,
+        y: isFinite(initialCOM.y) ? initialCOM.y : 0,
+        z: isFinite(initialCOM.z) ? initialCOM.z : 0
+      };
+      const netDx = validCOM.x - validInitialCOM.x;
+      const netDy = validCOM.y - validInitialCOM.y;
+      const netDz = validCOM.z - validInitialCOM.z;
+      const netDisp = Math.sqrt(netDx * netDx + netDy * netDy + netDz * netDz);
+      if (isFinite(netDisp)) {
+        f += Math.min(netDisp * weights.distanceWeight, weights.distanceCap);
+      }
+    }
 
     // Final validation
     return isFinite(f) ? Math.max(f, 1) : 1;
@@ -357,7 +375,7 @@ export function simulateCreature(
       });
 
       // Track fitness at this frame
-      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, distanceTraveled));
+      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, distanceTraveled, initialCenterOfMass));
 
       lastFrameTime = simulationTime;
     }
@@ -411,8 +429,7 @@ export function simulateCreature(
     };
   }
 
-  // FITNESS CALCULATION - using configurable weights
-  const weights = config.fitnessWeights || DEFAULT_FITNESS_WEIGHTS;
+  // FITNESS CALCULATION - using configurable weights (weights already declared above)
   let fitness = weights.baseFitness;
 
   // PRIMARY: Pellet collection is the main driver
