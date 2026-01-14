@@ -152,9 +152,15 @@ export function simulateCreature(
     amplitude: number;
     phase: number;
     baseRestLength: number;
-    // Direction-modulated control
+    // v1: Direction-modulated control
     directionBias: Vector3;  // Unit vector - activates more when pellet is in this direction
     biasStrength: number;    // 0 = pure oscillator, 1 = heavily modulated
+    // v2: Velocity sensing (proprioception)
+    velocityBias: Vector3;   // Unit vector - activates more when moving in this direction
+    velocityStrength: number; // 0 = ignore velocity, 1 = heavily modulated
+    // v2: Distance awareness
+    distanceBias: number;    // -1 = activate when far, +1 = activate when near
+    distanceStrength: number; // 0 = ignore distance, 1 = heavily modulated
   }
 
   const springs: OscillatingSpring[] = [];
@@ -175,8 +181,14 @@ export function simulateCreature(
       amplitude: muscle.amplitude,
       phase: muscle.phase,
       baseRestLength: muscle.restLength,
+      // v1
       directionBias: muscle.directionBias || { x: 0, y: 1, z: 0 },
-      biasStrength: muscle.biasStrength ?? 0
+      biasStrength: muscle.biasStrength ?? 0,
+      // v2
+      velocityBias: muscle.velocityBias || { x: 0, y: 1, z: 0 },
+      velocityStrength: muscle.velocityStrength ?? 0,
+      distanceBias: muscle.distanceBias ?? 0,
+      distanceStrength: muscle.distanceStrength ?? 0
     });
   }
 
@@ -274,6 +286,10 @@ export function simulateCreature(
     return isFinite(f) ? Math.max(f, 1) : 1;
   };
 
+  // v2: Track previous center of mass for velocity calculation
+  let prevCOM: Vector3 | null = null;
+  const MAX_PELLET_DISTANCE = 20;  // For normalizing distance (matches proximity bonus max)
+
   for (let step = 0; step < totalSteps; step++) {
     // Calculate current center of mass for direction-modulated control
     let comX = 0, comY = 0, comZ = 0, comMass = 0;
@@ -289,30 +305,59 @@ export function simulateCreature(
       ? { x: comX / comMass, y: comY / comMass, z: comZ / comMass }
       : { x: 0, y: 0, z: 0 };
 
-    // Calculate direction to active pellet for muscle modulation
+    // v2: Calculate velocity (change in COM since last step)
+    let velocityDirection: Vector3 = { x: 0, y: 0, z: 0 };
+    if (prevCOM) {
+      const velocity = subtract(currentCOM, prevCOM);
+      const speed = length(velocity);
+      if (speed > 0.001) {  // Only normalize if actually moving
+        velocityDirection = normalize(velocity);
+      }
+    }
+    prevCOM = { ...currentCOM };
+
+    // Calculate direction and distance to active pellet for muscle modulation
     const activePelletForModulation = getActivePellet();
     let pelletDirection: Vector3 = { x: 0, y: 0, z: 0 };
+    let normalizedDistance = 1;  // 1 = far, 0 = at pellet
     if (activePelletForModulation) {
       const toPellet = subtract(activePelletForModulation.position, currentCOM);
       const dist = length(toPellet);
       if (dist > 0.01) {  // Avoid division by zero
         pelletDirection = normalize(toPellet);
       }
+      // v2: Normalize distance (0 = at pellet, 1 = far away)
+      normalizedDistance = Math.min(dist / MAX_PELLET_DISTANCE, 1);
     }
 
-    // Update springs with direction-modulated oscillation
-    for (const { spring, frequency, amplitude, phase, baseRestLength, directionBias, biasStrength } of springs) {
+    // Update springs with multi-factor modulated oscillation (v2)
+    for (const {
+      spring, frequency, amplitude, phase, baseRestLength,
+      directionBias, biasStrength,
+      velocityBias, velocityStrength,
+      distanceBias, distanceStrength
+    } of springs) {
       // Base oscillation
       const baseContraction = Math.sin(simulationTime * frequency * Math.PI * 2 + phase);
 
-      // Direction modulation: how aligned is this muscle's bias with the pellet direction?
+      // v1: Direction modulation
       // dot product gives -1 to 1: 1 = pellet in same direction as bias, -1 = opposite
       const directionMatch = dot(pelletDirection, directionBias);
+      const directionMod = directionMatch * biasStrength;
 
-      // Modulate amplitude based on direction match
-      // When pellet is in the muscle's preferred direction, increase contraction
-      // biasStrength controls how much direction affects the muscle (0 = none, 1 = full)
-      const modulation = 1 + directionMatch * biasStrength;
+      // v2: Velocity modulation (proprioception)
+      // Activates when creature is moving in the muscle's preferred direction
+      const velocityMatch = dot(velocityDirection, velocityBias);
+      const velocityMod = velocityMatch * velocityStrength;
+
+      // v2: Distance modulation
+      // distanceBias > 0: activate more when NEAR (nearness = 1 - normalizedDistance)
+      // distanceBias < 0: activate more when FAR
+      const nearness = 1 - normalizedDistance;
+      const distanceMod = (distanceBias * nearness) * distanceStrength;
+
+      // Combined modulation (clamped to prevent extreme values)
+      const modulation = Math.max(0.1, Math.min(2.5, 1 + directionMod + velocityMod + distanceMod));
 
       // Final contraction with modulation
       const finalContraction = baseContraction * amplitude * modulation;

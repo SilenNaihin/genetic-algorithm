@@ -95,8 +95,15 @@ export function generateRandomGenome(
       frequency: randomRange(constraints.minFrequency, constraints.maxFrequency),
       amplitude: randomRange(0.1, constraints.maxAmplitude),
       phase: randomRange(0, Math.PI * 2),
+      // v1: Direction sensing
       directionBias: randomUnitVector(),
-      biasStrength: randomRange(0, 0.8)  // Start with moderate bias potential
+      biasStrength: randomRange(0, 0.8),
+      // v2: Velocity sensing (proprioception)
+      velocityBias: randomUnitVector(),
+      velocityStrength: randomRange(0, 0.5),
+      // v2: Distance awareness
+      distanceBias: randomRange(-1, 1),
+      distanceStrength: randomRange(0, 0.5)
     });
 
     connected.add(toId);
@@ -132,8 +139,15 @@ export function generateRandomGenome(
       frequency: randomRange(constraints.minFrequency, constraints.maxFrequency),
       amplitude: randomRange(0.1, constraints.maxAmplitude),
       phase: randomRange(0, Math.PI * 2),
+      // v1: Direction sensing
       directionBias: randomUnitVector(),
-      biasStrength: randomRange(0, 0.8)
+      biasStrength: randomRange(0, 0.8),
+      // v2: Velocity sensing (proprioception)
+      velocityBias: randomUnitVector(),
+      velocityStrength: randomRange(0, 0.5),
+      // v2: Distance awareness
+      distanceBias: randomRange(-1, 1),
+      distanceStrength: randomRange(0, 0.5)
     });
   }
 

@@ -63,10 +63,15 @@ export function singlePointCrossover(
       ? distance(nodeAData.position, nodeBData.position)
       : lerp(muscle1.restLength, muscle2.restLength, t);
 
-    // Interpolate direction bias (lerp then normalize to keep it a unit vector)
-    const lerpedBias = muscle1.directionBias && muscle2.directionBias
+    // v1: Interpolate direction bias (lerp then normalize to keep it a unit vector)
+    const lerpedDirectionBias = muscle1.directionBias && muscle2.directionBias
       ? normalize(lerpVector3(muscle1.directionBias, muscle2.directionBias, t))
       : muscle1.directionBias || { x: 0, y: 1, z: 0 };
+
+    // v2: Interpolate velocity bias
+    const lerpedVelocityBias = muscle1.velocityBias && muscle2.velocityBias
+      ? normalize(lerpVector3(muscle1.velocityBias, muscle2.velocityBias, t))
+      : muscle1.velocityBias || { x: 0, y: 1, z: 0 };
 
     childMuscles.push({
       id: generateId('muscle'),
@@ -78,8 +83,15 @@ export function singlePointCrossover(
       frequency: lerp(muscle1.frequency, muscle2.frequency, t),
       amplitude: lerp(muscle1.amplitude, muscle2.amplitude, t),
       phase: lerp(muscle1.phase, muscle2.phase, t),
-      directionBias: lerpedBias,
-      biasStrength: lerp(muscle1.biasStrength ?? 0, muscle2.biasStrength ?? 0, t)
+      // v1: Direction sensing
+      directionBias: lerpedDirectionBias,
+      biasStrength: lerp(muscle1.biasStrength ?? 0, muscle2.biasStrength ?? 0, t),
+      // v2: Velocity sensing
+      velocityBias: lerpedVelocityBias,
+      velocityStrength: lerp(muscle1.velocityStrength ?? 0, muscle2.velocityStrength ?? 0, t),
+      // v2: Distance awareness
+      distanceBias: lerp(muscle1.distanceBias ?? 0, muscle2.distanceBias ?? 0, t),
+      distanceStrength: lerp(muscle1.distanceStrength ?? 0, muscle2.distanceStrength ?? 0, t)
     });
   }
 
@@ -159,12 +171,27 @@ export function uniformCrossover(
       frequency: Math.random() < 0.5 ? muscle.frequency : otherMuscle.frequency,
       amplitude: Math.random() < 0.5 ? muscle.amplitude : otherMuscle.amplitude,
       phase: Math.random() < 0.5 ? muscle.phase : otherMuscle.phase,
+      // v1: Direction sensing
       directionBias: Math.random() < 0.5
         ? (muscle.directionBias || { x: 0, y: 1, z: 0 })
         : (otherMuscle.directionBias || { x: 0, y: 1, z: 0 }),
       biasStrength: Math.random() < 0.5
         ? (muscle.biasStrength ?? 0)
-        : (otherMuscle.biasStrength ?? 0)
+        : (otherMuscle.biasStrength ?? 0),
+      // v2: Velocity sensing
+      velocityBias: Math.random() < 0.5
+        ? (muscle.velocityBias || { x: 0, y: 1, z: 0 })
+        : (otherMuscle.velocityBias || { x: 0, y: 1, z: 0 }),
+      velocityStrength: Math.random() < 0.5
+        ? (muscle.velocityStrength ?? 0)
+        : (otherMuscle.velocityStrength ?? 0),
+      // v2: Distance awareness
+      distanceBias: Math.random() < 0.5
+        ? (muscle.distanceBias ?? 0)
+        : (otherMuscle.distanceBias ?? 0),
+      distanceStrength: Math.random() < 0.5
+        ? (muscle.distanceStrength ?? 0)
+        : (otherMuscle.distanceStrength ?? 0)
     });
   }
 
@@ -221,7 +248,10 @@ export function cloneGenome(
       id: generateId('muscle'),
       nodeA,
       nodeB,
-      directionBias: m.directionBias ? { ...m.directionBias } : { x: 0, y: 1, z: 0 }
+      // v1: Deep copy direction bias
+      directionBias: m.directionBias ? { ...m.directionBias } : { x: 0, y: 1, z: 0 },
+      // v2: Deep copy velocity bias
+      velocityBias: m.velocityBias ? { ...m.velocityBias } : { x: 0, y: 1, z: 0 }
     });
   }
 

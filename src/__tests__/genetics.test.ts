@@ -410,8 +410,14 @@ describe('Mutation', () => {
         frequency: 1,
         amplitude: 0.2,
         phase: 0,
+        // v1
         directionBias: { x: 1, y: 0, z: 0 },
-        biasStrength: 0.5
+        biasStrength: 0.5,
+        // v2
+        velocityBias: { x: 0, y: 1, z: 0 },
+        velocityStrength: 0.3,
+        distanceBias: 0.5,
+        distanceStrength: 0.3
       };
 
       for (let i = 0; i < 50; i++) {
@@ -432,8 +438,14 @@ describe('Mutation', () => {
         frequency: 1,
         amplitude: 0.2,
         phase: 0,
+        // v1
         directionBias: { x: 1, y: 0, z: 0 },
-        biasStrength: 0.5
+        biasStrength: 0.5,
+        // v2
+        velocityBias: { x: 0, y: 1, z: 0 },
+        velocityStrength: 0.3,
+        distanceBias: 0.5,
+        distanceStrength: 0.3
       };
 
       for (let i = 0; i < 50; i++) {

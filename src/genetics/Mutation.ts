@@ -116,7 +116,7 @@ export function mutateMuscle(
     newMuscle.restLength = mutateValue(muscle.restLength, 0.2, 4.0, config.magnitude * 0.3);
   }
 
-  // Mutate direction bias (the direction that activates this muscle)
+  // v1: Mutate direction bias (the direction that activates this muscle)
   if (Math.random() < config.rate && muscle.directionBias) {
     // Perturb the direction vector and re-normalize
     const perturbedBias = {
@@ -127,9 +127,34 @@ export function mutateMuscle(
     newMuscle.directionBias = normalize(perturbedBias);
   }
 
-  // Mutate bias strength (how much direction affects this muscle)
+  // v1: Mutate bias strength (how much direction affects this muscle)
   if (Math.random() < config.rate && muscle.biasStrength !== undefined) {
     newMuscle.biasStrength = mutateValue(muscle.biasStrength, 0, 1.0, config.magnitude);
+  }
+
+  // v2: Mutate velocity bias (proprioception - preferred movement direction)
+  if (Math.random() < config.rate && muscle.velocityBias) {
+    const perturbedVelocityBias = {
+      x: muscle.velocityBias.x + (Math.random() * 2 - 1) * config.magnitude,
+      y: muscle.velocityBias.y + (Math.random() * 2 - 1) * config.magnitude,
+      z: muscle.velocityBias.z + (Math.random() * 2 - 1) * config.magnitude
+    };
+    newMuscle.velocityBias = normalize(perturbedVelocityBias);
+  }
+
+  // v2: Mutate velocity strength (how much own movement affects this muscle)
+  if (Math.random() < config.rate && muscle.velocityStrength !== undefined) {
+    newMuscle.velocityStrength = mutateValue(muscle.velocityStrength, 0, 1.0, config.magnitude);
+  }
+
+  // v2: Mutate distance bias (-1 = far, +1 = near)
+  if (Math.random() < config.rate && muscle.distanceBias !== undefined) {
+    newMuscle.distanceBias = mutateValue(muscle.distanceBias, -1.0, 1.0, config.magnitude);
+  }
+
+  // v2: Mutate distance strength (how much pellet distance affects this muscle)
+  if (Math.random() < config.rate && muscle.distanceStrength !== undefined) {
+    newMuscle.distanceStrength = mutateValue(muscle.distanceStrength, 0, 1.0, config.magnitude);
   }
 
   return newMuscle;
@@ -177,8 +202,15 @@ export function addNode(
     frequency: Math.random() * (constraints.maxFrequency - constraints.minFrequency) + constraints.minFrequency,
     amplitude: Math.random() * constraints.maxAmplitude,
     phase: Math.random() * Math.PI * 2,
+    // v1: Direction sensing
     directionBias: randomUnitVector(),
-    biasStrength: Math.random() * 0.8
+    biasStrength: Math.random() * 0.8,
+    // v2: Velocity sensing (proprioception)
+    velocityBias: randomUnitVector(),
+    velocityStrength: Math.random() * 0.5,
+    // v2: Distance awareness
+    distanceBias: Math.random() * 2 - 1,
+    distanceStrength: Math.random() * 0.5
   };
 
   return { node: newNode, muscle: newMuscle };
@@ -278,8 +310,15 @@ export function addMuscle(
     frequency: Math.random() * (constraints.maxFrequency - constraints.minFrequency) + constraints.minFrequency,
     amplitude: Math.random() * constraints.maxAmplitude,
     phase: Math.random() * Math.PI * 2,
+    // v1: Direction sensing
     directionBias: randomUnitVector(),
-    biasStrength: Math.random() * 0.8
+    biasStrength: Math.random() * 0.8,
+    // v2: Velocity sensing (proprioception)
+    velocityBias: randomUnitVector(),
+    velocityStrength: Math.random() * 0.5,
+    // v2: Distance awareness
+    distanceBias: Math.random() * 2 - 1,
+    distanceStrength: Math.random() * 0.5
   };
 }
 
