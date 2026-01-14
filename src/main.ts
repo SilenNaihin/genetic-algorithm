@@ -1,9 +1,315 @@
 import * as THREE from 'three';
 import { generateRandomGenome } from './core/Genome';
-import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
+import { simulatePopulation, CreatureSimulationResult, PelletData, SimulationFrame } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
-import { DEFAULT_CONFIG, SimulationConfig, CreatureGenome, FitnessHistoryEntry } from './types';
+import { DEFAULT_CONFIG, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3 } from './types';
 import { GraphPanel } from './ui/GraphPanel';
+
+// ============================================
+// RUN STORAGE (IndexedDB persistence)
+// ============================================
+
+interface SavedRun {
+  id: string;
+  startTime: number;
+  config: SimulationConfig;
+  thumbnail?: string;
+  generationCount: number;
+}
+
+interface GenerationData {
+  runId: string;
+  generation: number;
+  results: CompactCreatureResult[];
+}
+
+interface CompactCreatureResult {
+  genome: CreatureGenome;
+  fitness: number;
+  pellets: number;
+  disqualified: string | null;
+  frames: number[][];  // Compact: [[time, x1,y1,z1, x2,y2,z2, ...], ...]
+  pelletData: { position: Vector3; collectedAtFrame: number | null }[];
+}
+
+class RunStorage {
+  private db: IDBDatabase | null = null;
+  private currentRunId: string | null = null;
+  private dbName = 'EvolutionLabDB';
+  private dbVersion = 1;
+
+  async init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.dbVersion);
+
+      request.onerror = () => reject(request.error);
+
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+
+        // Store for run metadata
+        if (!db.objectStoreNames.contains('runs')) {
+          db.createObjectStore('runs', { keyPath: 'id' });
+        }
+
+        // Store for generation data
+        if (!db.objectStoreNames.contains('generations')) {
+          const genStore = db.createObjectStore('generations', { keyPath: ['runId', 'generation'] });
+          genStore.createIndex('runId', 'runId', { unique: false });
+        }
+      };
+    });
+  }
+
+  async createRun(config: SimulationConfig): Promise<string> {
+    const id = `run_${Date.now()}`;
+    this.currentRunId = id;
+
+    const run: SavedRun = {
+      id,
+      startTime: Date.now(),
+      config: { ...config },
+      generationCount: 0
+    };
+
+    await this.putRun(run);
+    return id;
+  }
+
+  getCurrentRunId(): string | null {
+    return this.currentRunId;
+  }
+
+  setCurrentRunId(id: string | null): void {
+    this.currentRunId = id;
+  }
+
+  private async putRun(run: SavedRun): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject(new Error('DB not initialized'));
+      const tx = this.db.transaction('runs', 'readwrite');
+      const store = tx.objectStore('runs');
+      const request = store.put(run);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async saveGeneration(gen: number, results: CreatureSimulationResult[]): Promise<void> {
+    if (!this.db || !this.currentRunId) return;
+
+    // Convert to compact format
+    const compactResults: CompactCreatureResult[] = results.map(r => ({
+      genome: r.genome,
+      fitness: Math.round(r.finalFitness * 1000) / 1000,
+      pellets: r.pelletsCollected,
+      disqualified: r.disqualified,
+      frames: this.compactFrames(r.frames, r.genome),
+      pelletData: r.pellets.map(p => ({
+        position: {
+          x: Math.round(p.position.x * 1000) / 1000,
+          y: Math.round(p.position.y * 1000) / 1000,
+          z: Math.round(p.position.z * 1000) / 1000
+        },
+        collectedAtFrame: p.collectedAtFrame
+      }))
+    }));
+
+    const genData: GenerationData = {
+      runId: this.currentRunId,
+      generation: gen,
+      results: compactResults
+    };
+
+    await this.putGeneration(genData);
+
+    // Update run metadata
+    const run = await this.getRun(this.currentRunId);
+    if (run) {
+      run.generationCount = gen + 1;
+      await this.putRun(run);
+    }
+  }
+
+  private compactFrames(frames: SimulationFrame[], genome: CreatureGenome): number[][] {
+    // Convert frames to compact format: [time, x1,y1,z1, x2,y2,z2, ...]
+    const nodeIds = genome.nodes.map(n => n.id);
+    return frames.map(f => {
+      const arr: number[] = [Math.round(f.time * 1000) / 1000];
+      for (const nodeId of nodeIds) {
+        const pos = f.nodePositions.get(nodeId);
+        if (pos) {
+          arr.push(
+            Math.round(pos.x * 1000) / 1000,
+            Math.round(pos.y * 1000) / 1000,
+            Math.round(pos.z * 1000) / 1000
+          );
+        } else {
+          arr.push(0, 0, 0);
+        }
+      }
+      return arr;
+    });
+  }
+
+  private expandFrames(compactFrames: number[][], genome: CreatureGenome): SimulationFrame[] {
+    const nodeIds = genome.nodes.map(n => n.id);
+    return compactFrames.map(arr => {
+      const nodePositions = new Map<string, Vector3>();
+      for (let i = 0; i < nodeIds.length; i++) {
+        nodePositions.set(nodeIds[i], {
+          x: arr[1 + i * 3],
+          y: arr[1 + i * 3 + 1],
+          z: arr[1 + i * 3 + 2]
+        });
+      }
+
+      // Calculate center of mass
+      let cx = 0, cy = 0, cz = 0;
+      nodePositions.forEach(pos => {
+        cx += pos.x;
+        cy += pos.y;
+        cz += pos.z;
+      });
+      const n = nodePositions.size || 1;
+
+      return {
+        time: arr[0],
+        nodePositions,
+        centerOfMass: { x: cx / n, y: cy / n, z: cz / n },
+        activePelletIndex: 0
+      };
+    });
+  }
+
+  private async putGeneration(genData: GenerationData): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject(new Error('DB not initialized'));
+      const tx = this.db.transaction('generations', 'readwrite');
+      const store = tx.objectStore('generations');
+      const request = store.put(genData);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async loadGeneration(runId: string, gen: number): Promise<CreatureSimulationResult[] | null> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject(new Error('DB not initialized'));
+      const tx = this.db.transaction('generations', 'readonly');
+      const store = tx.objectStore('generations');
+      const request = store.get([runId, gen]);
+
+      request.onsuccess = () => {
+        const genData = request.result as GenerationData | undefined;
+        if (!genData) return resolve(null);
+
+        // Expand compact format back to full results
+        const results: CreatureSimulationResult[] = genData.results.map(r => ({
+          genome: r.genome,
+          frames: this.expandFrames(r.frames, r.genome),
+          finalFitness: r.fitness,
+          pelletsCollected: r.pellets,
+          distanceTraveled: 0,
+          netDisplacement: 0,
+          closestPelletDistance: 0,
+          pellets: r.pelletData.map((p, i) => ({
+            id: `pellet_${i}`,
+            position: p.position,
+            collectedAtFrame: p.collectedAtFrame,
+            spawnedAtFrame: 0
+          })),
+          fitnessOverTime: [],
+          disqualified: r.disqualified as any
+        }));
+
+        resolve(results);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getRun(runId: string): Promise<SavedRun | null> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject(new Error('DB not initialized'));
+      const tx = this.db.transaction('runs', 'readonly');
+      const store = tx.objectStore('runs');
+      const request = store.get(runId);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllRuns(): Promise<SavedRun[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject(new Error('DB not initialized'));
+      const tx = this.db.transaction('runs', 'readonly');
+      const store = tx.objectStore('runs');
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const runs = request.result as SavedRun[];
+        // Sort by start time descending (newest first)
+        runs.sort((a, b) => b.startTime - a.startTime);
+        resolve(runs);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteRun(runId: string): Promise<void> {
+    if (!this.db) return;
+
+    // Delete all generations for this run
+    await new Promise<void>((resolve, reject) => {
+      const tx = this.db!.transaction('generations', 'readwrite');
+      const store = tx.objectStore('generations');
+      const index = store.index('runId');
+      const request = index.openCursor(IDBKeyRange.only(runId));
+
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    // Delete the run metadata
+    await new Promise<void>((resolve, reject) => {
+      const tx = this.db!.transaction('runs', 'readwrite');
+      const store = tx.objectStore('runs');
+      const request = store.delete(runId);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async updateRunThumbnail(thumbnail: string): Promise<void> {
+    if (!this.currentRunId) return;
+    const run = await this.getRun(this.currentRunId);
+    if (run) {
+      run.thumbnail = thumbnail;
+      await this.putRun(run);
+    }
+  }
+
+  async getMaxGeneration(runId: string): Promise<number> {
+    const run = await this.getRun(runId);
+    return run ? run.generationCount - 1 : -1;
+  }
+}
+
+// Global storage instance
+const runStorage = new RunStorage();
 
 type AppState = 'menu' | 'grid' | 'replay';
 type EvolutionStep = 'idle' | 'mutate' | 'simulate' | 'sort';
@@ -71,6 +377,10 @@ class EvolutionApp {
   private generation: number = 0;
   private fitnessHistory: FitnessHistoryEntry[] = [];
 
+  // History navigation
+  private viewingGeneration: number | null = null;  // null = viewing current live generation
+  private maxGeneration: number = 0;  // Highest generation number for current run
+
   // Best creature tracking
   private bestCreatureEver: CreatureSimulationResult | null = null;
   private bestCreatureGeneration: number = 0;
@@ -104,6 +414,7 @@ class EvolutionApp {
   private tooltip: HTMLElement | null = null;
   private replayModal: HTMLElement | null = null;
   private stepIndicator: HTMLElement | null = null;
+  private loadRunsModal: HTMLElement | null = null;
 
   // State
   private selectedResult: CreatureSimulationResult | null = null;
@@ -117,7 +428,10 @@ class EvolutionApp {
     this.init();
   }
 
-  private init(): void {
+  private async init(): Promise<void> {
+    // Initialize storage first
+    await runStorage.init();
+
     this.setupSharedRenderer();
     this.createMenuScreen();
     this.createGridUI();
@@ -203,19 +517,29 @@ class EvolutionApp {
             <input type="range" class="param-slider" id="maxmuscles-slider" min="1" max="30" value="15">
           </div>
         </div>
-        <button class="btn btn-primary" id="start-btn">
-          <span>Start Evolution</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-        </button>
+        <div style="display: flex; gap: 12px;">
+          <button class="btn btn-primary" id="start-btn">
+            <span>Start Evolution</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </button>
+          <button class="btn btn-secondary" id="load-run-btn">
+            <span>Load Run</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+          </button>
+        </div>
       </div>
     `;
 
     this.container.appendChild(this.menuScreen);
     this.setupPreview();
+    this.createLoadRunsModal();
 
     document.getElementById('start-btn')!.addEventListener('click', () => this.startSimulation());
+    document.getElementById('load-run-btn')!.addEventListener('click', () => this.showLoadRunsModal());
 
     const gravitySlider = document.getElementById('gravity-slider') as HTMLInputElement;
     gravitySlider.addEventListener('input', () => {
@@ -627,8 +951,32 @@ class EvolutionApp {
       ? this.longestSurvivingCreature.finalFitness.toFixed(1)
       : '-';
 
+    // Determine if we're viewing history (not on the current live generation)
+    const isViewingHistory = this.viewingGeneration !== null;
+    const displayGen = this.viewingGeneration !== null ? this.viewingGeneration : this.generation;
+    const canGoPrev = displayGen > 0;
+    // Can go next if viewing history and there's either a saved gen ahead OR the current live gen is ahead
+    const canGoNext = isViewingHistory && (this.viewingGeneration! < this.maxGeneration || this.viewingGeneration! < this.generation);
+
     return `
-      <div class="stats-title">Generation ${this.generation}</div>
+      <div class="stats-title gen-nav">
+        <button class="gen-nav-btn" id="prev-gen-btn" ${canGoPrev ? '' : 'disabled'}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <span class="gen-display" id="gen-display" title="Click to jump to a specific generation">
+          ${isViewingHistory
+            ? `<span class="gen-viewing">${displayGen}</span><span class="gen-separator">/</span><span class="gen-max" id="goto-current-gen">${this.generation}</span>`
+            : `Generation ${displayGen}`}
+        </span>
+        <button class="gen-nav-btn" id="next-gen-btn" ${canGoNext ? '' : 'disabled'}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+      ${isViewingHistory ? '<div class="history-badge">VIEWING HISTORY</div>' : ''}
       <div class="stat-row">
         <span class="stat-label">Creatures</span>
         <span class="stat-value">${this.creatureCards.length}</span>
@@ -763,6 +1111,20 @@ class EvolutionApp {
   private updateStats(): void {
     if (this.statsPanel) {
       this.statsPanel.innerHTML = this.getStatsHTML();
+
+      // Add generation navigation event handlers
+      const prevBtn = document.getElementById('prev-gen-btn');
+      const nextBtn = document.getElementById('next-gen-btn');
+      const genDisplay = document.getElementById('gen-display');
+      const gotoCurrentBtn = document.getElementById('goto-current-gen');
+
+      prevBtn?.addEventListener('click', () => this.navigateToGeneration('prev'));
+      nextBtn?.addEventListener('click', () => this.navigateToGeneration('next'));
+      genDisplay?.addEventListener('click', () => this.promptJumpToGeneration());
+      gotoCurrentBtn?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.goToCurrentGeneration();
+      });
 
       // Render longest surviving creature thumbnail and add event listeners
       if (this.longestSurvivingCreature) {
@@ -1140,10 +1502,8 @@ class EvolutionApp {
     ctx.fillStyle = '#1e1e2a';
     ctx.fillRect(0, 0, 160, 160);
 
-    // Render creature if we have frames
-    if (result.frames.length > 0) {
-      this.renderCreatureToCanvas(result, canvas);
-    }
+    // Render creature (uses frames if available, otherwise renders from genome)
+    this.renderCreatureToCanvas(result, canvas);
 
     // Create card object FIRST so event listeners can reference it
     const card: CreatureCard = {
@@ -1363,6 +1723,451 @@ class EvolutionApp {
     this.replayModal.addEventListener('click', (e) => { if (e.target === this.replayModal) this.hideReplay(); });
   }
 
+  private createLoadRunsModal(): void {
+    this.loadRunsModal = document.createElement('div');
+    this.loadRunsModal.className = 'modal-overlay';
+    this.loadRunsModal.innerHTML = `
+      <div class="modal-content" style="max-width: 800px; width: 90vw;">
+        <div class="modal-header">
+          <span class="modal-title">Load Saved Run</span>
+          <button class="btn-icon" id="close-load-runs">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="runs-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; max-height: 60vh; overflow-y: auto; padding: 4px;">
+            <div style="color: var(--text-muted); text-align: center; padding: 40px;">Loading saved runs...</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(this.loadRunsModal);
+
+    this.loadRunsModal.querySelector('#close-load-runs')?.addEventListener('click', () => this.hideLoadRunsModal());
+    this.loadRunsModal.addEventListener('click', (e) => { if (e.target === this.loadRunsModal) this.hideLoadRunsModal(); });
+  }
+
+  private async showLoadRunsModal(): Promise<void> {
+    if (!this.loadRunsModal) return;
+
+    this.loadRunsModal.classList.add('visible');
+    const runsGrid = this.loadRunsModal.querySelector('#runs-grid') as HTMLElement;
+
+    try {
+      const runs = await runStorage.getAllRuns();
+
+      if (runs.length === 0) {
+        runsGrid.innerHTML = `
+          <div style="color: var(--text-muted); text-align: center; padding: 40px; grid-column: 1 / -1;">
+            No saved runs found. Start a new evolution to create your first run!
+          </div>
+        `;
+        return;
+      }
+
+      runsGrid.innerHTML = runs.map(run => {
+        const date = new Date(run.startTime);
+        const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        return `
+          <div class="run-card" data-run-id="${run.id}" style="
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+          ">
+            <button class="delete-run-btn" data-run-id="${run.id}" style="
+              position: absolute;
+              top: 8px;
+              right: 8px;
+              background: rgba(239, 68, 68, 0.2);
+              border: none;
+              border-radius: 50%;
+              width: 24px;
+              height: 24px;
+              cursor: pointer;
+              color: var(--danger);
+              font-size: 14px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              opacity: 0.6;
+              transition: opacity 0.2s;
+            ">&times;</button>
+            <div style="
+              width: 100%;
+              height: 100px;
+              background: var(--bg-tertiary);
+              border-radius: 8px;
+              margin-bottom: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: var(--text-muted);
+              font-size: 12px;
+            ">${run.thumbnail ? `<img src="${run.thumbnail}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` : 'No preview'}</div>
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Generation ${run.generationCount - 1}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">${dateStr}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Gravity: ${run.config.gravity} | Mut: ${Math.round((run.config.mutationRate || 0.1) * 100)}%
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers
+      runsGrid.querySelectorAll('.run-card').forEach(card => {
+        card.addEventListener('click', async (e) => {
+          const target = e.target as HTMLElement;
+          if (target.classList.contains('delete-run-btn')) return;
+
+          const runId = card.getAttribute('data-run-id');
+          if (runId) {
+            await this.loadRun(runId);
+          }
+        });
+
+        card.addEventListener('mouseenter', () => {
+          (card as HTMLElement).style.borderColor = 'var(--accent)';
+          (card as HTMLElement).style.transform = 'translateY(-2px)';
+        });
+
+        card.addEventListener('mouseleave', () => {
+          (card as HTMLElement).style.borderColor = 'var(--border)';
+          (card as HTMLElement).style.transform = 'translateY(0)';
+        });
+      });
+
+      // Add delete handlers
+      runsGrid.querySelectorAll('.delete-run-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const runId = (btn as HTMLElement).getAttribute('data-run-id');
+          if (runId && confirm('Delete this run? This cannot be undone.')) {
+            await runStorage.deleteRun(runId);
+            await this.showLoadRunsModal();  // Refresh the list
+          }
+        });
+
+        btn.addEventListener('mouseenter', () => {
+          (btn as HTMLElement).style.opacity = '1';
+        });
+
+        btn.addEventListener('mouseleave', () => {
+          (btn as HTMLElement).style.opacity = '0.6';
+        });
+      });
+
+    } catch (error) {
+      console.error('Error loading runs:', error);
+      runsGrid.innerHTML = `
+        <div style="color: var(--danger); text-align: center; padding: 40px; grid-column: 1 / -1;">
+          Error loading saved runs. Please try again.
+        </div>
+      `;
+    }
+  }
+
+  private hideLoadRunsModal(): void {
+    if (this.loadRunsModal) {
+      this.loadRunsModal.classList.remove('visible');
+    }
+  }
+
+  private async loadRun(runId: string): Promise<void> {
+    try {
+      const run = await runStorage.getRun(runId);
+      if (!run) {
+        alert('Run not found');
+        return;
+      }
+
+      // Get the max generation for this run
+      const maxGen = run.generationCount - 1;
+      if (maxGen < 0) {
+        alert('This run has no saved generations');
+        return;
+      }
+
+      // Load the most recent generation
+      const results = await runStorage.loadGeneration(runId, maxGen);
+      if (!results) {
+        alert('Could not load generation data');
+        return;
+      }
+
+      // Set up state
+      this.hideLoadRunsModal();
+      runStorage.setCurrentRunId(runId);
+      this.config = { ...this.config, ...run.config };
+      this.generation = maxGen;
+      this.maxGeneration = maxGen;
+      this.viewingGeneration = maxGen;  // Viewing loaded generation
+      this.simulationResults = results;
+      this.fitnessHistory = [];  // Will be rebuilt if needed
+
+      // Switch to grid view
+      this.state = 'grid';
+      if (this.menuScreen) this.menuScreen.style.display = 'none';
+      if (this.gridUI) this.gridUI.style.display = 'block';
+
+      // Create cards from loaded results
+      this.createCreatureCardsFromResults(results);
+      this.evolutionStep = 'idle';
+      this.updateNextButton();
+      this.updateStats();
+      this.updateSettingsInfoBox();
+
+    } catch (error) {
+      console.error('Error loading run:', error);
+      alert('Error loading run. Please try again.');
+    }
+  }
+
+  private createCreatureCardsFromResults(results: CreatureSimulationResult[], shouldSort: boolean = true): void {
+    if (!this.gridContainer) return;
+
+    // Clear existing cards
+    this.gridContainer.innerHTML = '';
+    this.creatureCards = [];
+
+    // Sort by fitness if requested
+    const displayResults = shouldSort
+      ? [...results].sort((a, b) => b.finalFitness - a.finalFitness)
+      : results;
+
+    for (let i = 0; i < displayResults.length; i++) {
+      const result = displayResults[i];
+      const pos = this.getGridPosition(i);
+
+      const card = document.createElement('div');
+      card.className = 'creature-card';
+      card.innerHTML = `
+        <div class="creature-card-rank">#${i + 1}</div>
+        <canvas width="160" height="160"></canvas>
+        <div class="creature-card-fitness">${result.finalFitness.toFixed(0)}</div>
+      `;
+
+      card.style.cssText = `
+        position: absolute;
+        left: ${pos.x}px;
+        top: ${pos.y}px;
+        width: ${CARD_SIZE}px;
+        height: ${CARD_SIZE}px;
+      `;
+
+      const canvas = card.querySelector('canvas') as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d')!;
+
+      const creatureCard: CreatureCard = {
+        element: card,
+        canvas,
+        ctx,
+        result,
+        rank: i + 1,
+        gridIndex: i,
+        isDead: false,
+        isMutated: false,
+        isElite: i < (this.config.eliteCount || 5),
+        parentId: null,
+        currentX: pos.x,
+        currentY: pos.y,
+        targetX: pos.x,
+        targetY: pos.y
+      };
+
+      this.creatureCards.push(creatureCard);
+      this.gridContainer.appendChild(card);
+
+      // Render thumbnail
+      this.renderCreatureToCanvas(result, canvas);
+
+      // Add click handler for replay
+      card.addEventListener('click', () => this.showReplay(result));
+
+      // Add hover effect
+      card.addEventListener('mouseenter', (e) => this.showCardTooltip(e, creatureCard));
+      card.addEventListener('mouseleave', () => this.hideTooltip());
+    }
+  }
+
+  // ============================================
+  // GENERATION NAVIGATION
+  // ============================================
+
+  private async navigateToGeneration(direction: 'prev' | 'next'): Promise<void> {
+    const currentRunId = runStorage.getCurrentRunId();
+    if (!currentRunId) return;
+
+    // Determine which generation we're currently viewing
+    const currentViewGen = this.viewingGeneration !== null ? this.viewingGeneration : this.generation;
+
+    let targetGen: number;
+    if (direction === 'prev') {
+      targetGen = currentViewGen - 1;
+      if (targetGen < 0) return;
+    } else {
+      targetGen = currentViewGen + 1;
+      // If going beyond saved generations
+      if (targetGen > this.maxGeneration) {
+        if (targetGen === this.generation) {
+          // Go to the current live generation (exit history mode)
+          await this.goToCurrentGeneration();
+          return;
+        }
+        return;
+      }
+    }
+
+    // If navigating to the current live generation, exit history mode instead of loading from storage
+    if (targetGen === this.generation) {
+      await this.goToCurrentGeneration();
+      return;
+    }
+
+    await this.loadGenerationView(targetGen);
+  }
+
+  private async promptJumpToGeneration(): Promise<void> {
+    const currentViewGen = this.viewingGeneration !== null ? this.viewingGeneration : this.generation;
+    const input = prompt(`Jump to generation (0-${this.generation}):`, currentViewGen.toString());
+
+    if (input === null) return;
+
+    const targetGen = parseInt(input, 10);
+    if (isNaN(targetGen) || targetGen < 0 || targetGen > this.generation) {
+      alert(`Please enter a number between 0 and ${this.generation}`);
+      return;
+    }
+
+    // If jumping to current live generation, exit history mode
+    if (targetGen === this.generation) {
+      await this.goToCurrentGeneration();
+      return;
+    }
+
+    await this.loadGenerationView(targetGen);
+  }
+
+  private async goToCurrentGeneration(): Promise<void> {
+    // Exit history mode and return to the current live generation
+    this.viewingGeneration = null;
+    this.updateControlsForHistoryMode(false);
+
+    // Try to load current generation results from storage if they exist
+    const currentRunId = runStorage.getCurrentRunId();
+    if (currentRunId && this.generation <= this.maxGeneration) {
+      const results = await runStorage.loadGeneration(currentRunId, this.generation);
+      if (results && results.length > 0) {
+        this.simulationResults = results;
+        // If we're at 'simulate' step (before sort), don't sort the cards yet
+        const shouldSort = this.evolutionStep !== 'simulate';
+        this.createCreatureCardsFromResults(results, shouldSort);
+        this.updateStats();
+        return;
+      }
+    }
+
+    // Otherwise create cards from population (unsimulated creatures)
+    if (this.population && this.population.getGenomes().length > 0) {
+      this.createCardsFromPopulation();
+    }
+    this.updateStats();
+  }
+
+  private createCardsFromPopulation(): void {
+    if (!this.gridContainer || !this.population) return;
+
+    this.gridContainer.innerHTML = '';
+    this.creatureCards = [];
+
+    const genomes = this.population.getGenomes();
+
+    for (let i = 0; i < genomes.length; i++) {
+      const genome = genomes[i];
+      const pos = this.getGridPosition(i);
+
+      // Create a placeholder result for the card
+      const placeholderResult: CreatureSimulationResult = {
+        genome,
+        frames: [],
+        finalFitness: NaN,  // Will show "..." in the UI
+        pelletsCollected: 0,
+        distanceTraveled: 0,
+        netDisplacement: 0,
+        closestPelletDistance: 0,
+        pellets: [],
+        fitnessOverTime: [],
+        disqualified: null
+      };
+
+      const card = this.createSingleCard(placeholderResult, i + 1, i, pos.x, pos.y);
+      this.creatureCards.push(card);
+      this.gridContainer.appendChild(card.element);
+
+      // Update fitness label to show pending state
+      const fitnessLabel = card.element.querySelector('.creature-card-fitness') as HTMLElement;
+      if (fitnessLabel) {
+        fitnessLabel.textContent = '...';
+        fitnessLabel.style.color = '#7a8494';
+      }
+    }
+  }
+
+  private async loadGenerationView(gen: number): Promise<void> {
+    const currentRunId = runStorage.getCurrentRunId();
+    if (!currentRunId) return;
+
+    try {
+      const results = await runStorage.loadGeneration(currentRunId, gen);
+      if (!results) {
+        alert(`Could not load generation ${gen}`);
+        return;
+      }
+
+      this.viewingGeneration = gen;
+      this.simulationResults = results;
+
+      // Show history mode UI
+      this.createCreatureCardsFromResults(results);
+      this.updateStats();
+      this.updateControlsForHistoryMode(true);
+
+    } catch (error) {
+      console.error('Error loading generation:', error);
+      alert('Error loading generation data');
+    }
+  }
+
+  private updateControlsForHistoryMode(isHistoryMode: boolean): void {
+    const nextStepBtn = document.getElementById('next-step-btn') as HTMLButtonElement;
+    const run1xBtn = document.getElementById('run-1x-btn') as HTMLButtonElement;
+    const run10xBtn = document.getElementById('run-10x-btn') as HTMLButtonElement;
+    const run100xBtn = document.getElementById('run-100x-btn') as HTMLButtonElement;
+
+    if (isHistoryMode) {
+      // Disable evolution controls when viewing history
+      if (nextStepBtn) {
+        nextStepBtn.disabled = true;
+        nextStepBtn.textContent = 'Viewing History';
+      }
+      if (run1xBtn) run1xBtn.disabled = true;
+      if (run10xBtn) run10xBtn.disabled = true;
+      if (run100xBtn) run100xBtn.disabled = true;
+    } else {
+      // Re-enable controls
+      if (nextStepBtn) {
+        nextStepBtn.disabled = false;
+        this.updateNextButton();
+      }
+      if (run1xBtn) run1xBtn.disabled = false;
+      if (run10xBtn) run10xBtn.disabled = false;
+      if (run100xBtn) run100xBtn.disabled = false;
+    }
+  }
+
   private setupReplayScene(): void {
     const container = document.getElementById('replay-container')!;
     container.innerHTML = '';
@@ -1548,6 +2353,10 @@ class EvolutionApp {
     this.generation = 0;
     this.fitnessHistory = [];
     this.evolutionStep = 'idle';
+    this.viewingGeneration = null;  // Viewing current (live) generation
+
+    // Create a new run in storage
+    await runStorage.createRun(this.config);
 
     // Create genome constraints from config
     const genomeConstraints = {
@@ -1576,6 +2385,11 @@ class EvolutionApp {
     this.createCreatureCards();
     this.evolutionStep = 'idle';
     this.recordFitnessHistory();
+
+    // Auto-save generation 0
+    await runStorage.saveGeneration(this.generation, this.simulationResults);
+    this.maxGeneration = this.generation;
+
     this.updateNextButton();
     this.updateStats();
   }
@@ -1598,6 +2412,9 @@ class EvolutionApp {
       } else if (this.evolutionStep === 'simulate') {
         this.updateNextButton('Simulating...');
         await this.runSimulationStep(false);
+        // Auto-save this generation
+        await runStorage.saveGeneration(this.generation, this.simulationResults);
+        this.maxGeneration = this.generation;
         this.evolutionStep = 'sort';
       } else if (this.evolutionStep === 'sort') {
         this.updateNextButton('Sorting...');
@@ -1982,6 +2799,9 @@ class EvolutionApp {
         this.evolutionStep = 'simulate';
         this.updateStats();
         await this.runSimulationStep(true);  // Fast mode
+        // Auto-save this generation
+        await runStorage.saveGeneration(this.generation, this.simulationResults);
+        this.maxGeneration = this.generation;
 
         this.evolutionStep = 'sort';
         this.updateStats();

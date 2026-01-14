@@ -579,6 +579,83 @@
       .dg.ac {
         display: none !important;
       }
+
+      /* Generation navigation */
+      .gen-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .gen-nav-btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--text-secondary);
+        transition: all 0.2s;
+      }
+
+      .gen-nav-btn:hover:not(:disabled) {
+        background: var(--bg-secondary);
+        border-color: var(--accent);
+        color: var(--accent-light);
+      }
+
+      .gen-nav-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      .gen-display {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+
+      .gen-display:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .gen-viewing {
+        color: var(--warning);
+      }
+
+      .gen-separator {
+        color: var(--text-muted);
+        margin: 0 2px;
+      }
+
+      .gen-max {
+        color: var(--accent-light);
+        cursor: pointer;
+      }
+
+      .gen-max:hover {
+        text-decoration: underline;
+      }
+
+      .history-badge {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+        font-size: 10px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+        text-align: center;
+        margin-top: 8px;
+        letter-spacing: 0.5px;
+      }
     </style>
   </head>
   <body>
