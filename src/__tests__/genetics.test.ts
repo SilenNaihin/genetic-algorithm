@@ -409,7 +409,9 @@ describe('Mutation', () => {
         damping: 0.3,
         frequency: 1,
         amplitude: 0.2,
-        phase: 0
+        phase: 0,
+        directionBias: { x: 1, y: 0, z: 0 },
+        biasStrength: 0.5
       };
 
       for (let i = 0; i < 50; i++) {
@@ -429,7 +431,9 @@ describe('Mutation', () => {
         damping: 0.3,
         frequency: 1,
         amplitude: 0.2,
-        phase: 0
+        phase: 0,
+        directionBias: { x: 1, y: 0, z: 0 },
+        biasStrength: 0.5
       };
 
       for (let i = 0; i < 50; i++) {

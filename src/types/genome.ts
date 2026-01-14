@@ -29,6 +29,10 @@ export interface MuscleGene {
   frequency: number;    // Hz (0.1-5.0)
   amplitude: number;    // Contraction amount (0-0.5 of restLength)
   phase: number;        // Phase offset (0-2*PI)
+
+  // Direction-modulated control (allows creatures to "see" pellets)
+  directionBias: Vector3;  // Unit vector - muscle activates more when pellet is in this direction
+  biasStrength: number;    // 0 = pure oscillator, 1 = heavily modulated by pellet direction
 }
 
 // Controller interface - allows swapping oscillator for neural net later

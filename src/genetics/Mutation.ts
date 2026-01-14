@@ -7,7 +7,7 @@ import type {
 } from '../types';
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
 import { generateId } from '../utils/id';
-import { distance, clamp } from '../utils/math';
+import { distance, clamp, normalize } from '../utils/math';
 
 export interface MutationConfig {
   rate: number;           // Probability of mutation per gene
@@ -116,6 +116,22 @@ export function mutateMuscle(
     newMuscle.restLength = mutateValue(muscle.restLength, 0.2, 4.0, config.magnitude * 0.3);
   }
 
+  // Mutate direction bias (the direction that activates this muscle)
+  if (Math.random() < config.rate && muscle.directionBias) {
+    // Perturb the direction vector and re-normalize
+    const perturbedBias = {
+      x: muscle.directionBias.x + (Math.random() * 2 - 1) * config.magnitude,
+      y: muscle.directionBias.y + (Math.random() * 2 - 1) * config.magnitude,
+      z: muscle.directionBias.z + (Math.random() * 2 - 1) * config.magnitude
+    };
+    newMuscle.directionBias = normalize(perturbedBias);
+  }
+
+  // Mutate bias strength (how much direction affects this muscle)
+  if (Math.random() < config.rate && muscle.biasStrength !== undefined) {
+    newMuscle.biasStrength = mutateValue(muscle.biasStrength, 0, 1.0, config.magnitude);
+  }
+
   return newMuscle;
 }
 
@@ -160,10 +176,23 @@ export function addNode(
     damping: Math.random() * 0.4 + 0.1,
     frequency: Math.random() * (constraints.maxFrequency - constraints.minFrequency) + constraints.minFrequency,
     amplitude: Math.random() * constraints.maxAmplitude,
-    phase: Math.random() * Math.PI * 2
+    phase: Math.random() * Math.PI * 2,
+    directionBias: randomUnitVector(),
+    biasStrength: Math.random() * 0.8
   };
 
   return { node: newNode, muscle: newMuscle };
+}
+
+// Generate a random unit vector for direction bias
+function randomUnitVector(): Vector3 {
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+  return {
+    x: Math.sin(phi) * Math.cos(theta),
+    y: Math.sin(phi) * Math.sin(theta),
+    z: Math.cos(phi)
+  };
 }
 
 /**
@@ -248,7 +277,9 @@ export function addMuscle(
     damping: Math.random() * 0.4 + 0.1,
     frequency: Math.random() * (constraints.maxFrequency - constraints.minFrequency) + constraints.minFrequency,
     amplitude: Math.random() * constraints.maxAmplitude,
-    phase: Math.random() * Math.PI * 2
+    phase: Math.random() * Math.PI * 2,
+    directionBias: randomUnitVector(),
+    biasStrength: Math.random() * 0.8
   };
 }
 

@@ -26,6 +26,18 @@ function randomHSL(): HSL {
   };
 }
 
+// Generate a random unit vector for direction bias
+function randomUnitVector(): Vector3 {
+  // Use spherical coordinates for uniform distribution on sphere
+  const theta = Math.random() * Math.PI * 2;  // Azimuthal angle
+  const phi = Math.acos(2 * Math.random() - 1);  // Polar angle
+  return {
+    x: Math.sin(phi) * Math.cos(theta),
+    y: Math.sin(phi) * Math.sin(theta),
+    z: Math.cos(phi)
+  };
+}
+
 export function generateRandomGenome(
   constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
 ): CreatureGenome {
@@ -82,7 +94,9 @@ export function generateRandomGenome(
       damping: randomRange(0.1, 0.5),
       frequency: randomRange(constraints.minFrequency, constraints.maxFrequency),
       amplitude: randomRange(0.1, constraints.maxAmplitude),
-      phase: randomRange(0, Math.PI * 2)
+      phase: randomRange(0, Math.PI * 2),
+      directionBias: randomUnitVector(),
+      biasStrength: randomRange(0, 0.8)  // Start with moderate bias potential
     });
 
     connected.add(toId);
@@ -117,7 +131,9 @@ export function generateRandomGenome(
       damping: randomRange(0.1, 0.5),
       frequency: randomRange(constraints.minFrequency, constraints.maxFrequency),
       amplitude: randomRange(0.1, constraints.maxAmplitude),
-      phase: randomRange(0, Math.PI * 2)
+      phase: randomRange(0, Math.PI * 2),
+      directionBias: randomUnitVector(),
+      biasStrength: randomRange(0, 0.8)
     });
   }
 

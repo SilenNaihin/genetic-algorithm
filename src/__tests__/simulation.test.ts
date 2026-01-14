@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
-import { simulatePopulation, type CreatureSimulationResult } from '../simulation/BatchSimulator';
+import { simulatePopulation } from '../simulation/BatchSimulator';
 import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS } from '../types';
 
 describe('BatchSimulator', () => {

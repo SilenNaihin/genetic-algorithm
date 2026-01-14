@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
 import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, type FitnessHistoryEntry, type Vector3 } from '../types';
 
@@ -460,7 +460,6 @@ describe('Fitness Recalculation', () => {
     if (disqualified) return frames.map(() => 1);
 
     const fitnessOverTime: number[] = [];
-    const initialCOM = frames[0].centerOfMass;
     let distanceTraveled = 0;
     let lastCOM: Vector3 | null = null;
 

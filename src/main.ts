@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { generateRandomGenome } from './core/Genome';
-import { simulatePopulation, CreatureSimulationResult, PelletData, SimulationFrame } from './simulation/BatchSimulator';
+import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
 import { Creature } from './core/Creature';
-import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3, FitnessWeights } from './types';
+import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, FitnessWeights } from './types';
 import { GraphPanel } from './ui/GraphPanel';
-import { RunStorage, SavedRun, recalculateFitnessOverTime } from './storage/RunStorage';
+import { RunStorage } from './storage/RunStorage';
 
 // Global storage instance
 const runStorage = new RunStorage();

@@ -1,6 +1,7 @@
 import * as CANNON from 'cannon-es';
 import type { CreatureGenome, Vector3, SimulationConfig } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS } from '../types';
+import { dot, normalize, subtract, length } from '../utils/math';
 
 export interface SimulationFrame {
   time: number;
@@ -151,6 +152,9 @@ export function simulateCreature(
     amplitude: number;
     phase: number;
     baseRestLength: number;
+    // Direction-modulated control
+    directionBias: Vector3;  // Unit vector - activates more when pellet is in this direction
+    biasStrength: number;    // 0 = pure oscillator, 1 = heavily modulated
   }
 
   const springs: OscillatingSpring[] = [];
@@ -170,7 +174,9 @@ export function simulateCreature(
       frequency: muscle.frequency * genome.globalFrequencyMultiplier,
       amplitude: muscle.amplitude,
       phase: muscle.phase,
-      baseRestLength: muscle.restLength
+      baseRestLength: muscle.restLength,
+      directionBias: muscle.directionBias || { x: 0, y: 1, z: 0 },
+      biasStrength: muscle.biasStrength ?? 0
     });
   }
 
@@ -269,10 +275,49 @@ export function simulateCreature(
   };
 
   for (let step = 0; step < totalSteps; step++) {
-    // Update springs with oscillation
-    for (const { spring, frequency, amplitude, phase, baseRestLength } of springs) {
-      const contraction = Math.sin(simulationTime * frequency * Math.PI * 2 + phase);
-      spring.restLength = baseRestLength * (1 - contraction * amplitude);
+    // Calculate current center of mass for direction-modulated control
+    let comX = 0, comY = 0, comZ = 0, comMass = 0;
+    for (const body of nodeBodies.values()) {
+      if (isFinite(body.position.x) && isFinite(body.position.y) && isFinite(body.position.z)) {
+        comX += body.position.x * body.mass;
+        comY += body.position.y * body.mass;
+        comZ += body.position.z * body.mass;
+        comMass += body.mass;
+      }
+    }
+    const currentCOM: Vector3 = comMass > 0
+      ? { x: comX / comMass, y: comY / comMass, z: comZ / comMass }
+      : { x: 0, y: 0, z: 0 };
+
+    // Calculate direction to active pellet for muscle modulation
+    const activePelletForModulation = getActivePellet();
+    let pelletDirection: Vector3 = { x: 0, y: 0, z: 0 };
+    if (activePelletForModulation) {
+      const toPellet = subtract(activePelletForModulation.position, currentCOM);
+      const dist = length(toPellet);
+      if (dist > 0.01) {  // Avoid division by zero
+        pelletDirection = normalize(toPellet);
+      }
+    }
+
+    // Update springs with direction-modulated oscillation
+    for (const { spring, frequency, amplitude, phase, baseRestLength, directionBias, biasStrength } of springs) {
+      // Base oscillation
+      const baseContraction = Math.sin(simulationTime * frequency * Math.PI * 2 + phase);
+
+      // Direction modulation: how aligned is this muscle's bias with the pellet direction?
+      // dot product gives -1 to 1: 1 = pellet in same direction as bias, -1 = opposite
+      const directionMatch = dot(pelletDirection, directionBias);
+
+      // Modulate amplitude based on direction match
+      // When pellet is in the muscle's preferred direction, increase contraction
+      // biasStrength controls how much direction affects the muscle (0 = none, 1 = full)
+      const modulation = 1 + directionMatch * biasStrength;
+
+      // Final contraction with modulation
+      const finalContraction = baseContraction * amplitude * modulation;
+
+      spring.restLength = baseRestLength * (1 - finalContraction);
       spring.applyForce();
     }
 

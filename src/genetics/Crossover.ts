@@ -2,13 +2,11 @@ import type {
   CreatureGenome,
   NodeGene,
   MuscleGene,
-  GenomeConstraints,
-  Vector3,
-  HSL
+  GenomeConstraints
 } from '../types';
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
 import { generateId } from '../utils/id';
-import { distance, lerp, lerpVector3, lerpHSL } from '../utils/math';
+import { distance, lerp, lerpVector3, lerpHSL, normalize } from '../utils/math';
 
 /**
  * Simple single-point crossover on genome properties
@@ -65,6 +63,11 @@ export function singlePointCrossover(
       ? distance(nodeAData.position, nodeBData.position)
       : lerp(muscle1.restLength, muscle2.restLength, t);
 
+    // Interpolate direction bias (lerp then normalize to keep it a unit vector)
+    const lerpedBias = muscle1.directionBias && muscle2.directionBias
+      ? normalize(lerpVector3(muscle1.directionBias, muscle2.directionBias, t))
+      : muscle1.directionBias || { x: 0, y: 1, z: 0 };
+
     childMuscles.push({
       id: generateId('muscle'),
       nodeA,
@@ -74,7 +77,9 @@ export function singlePointCrossover(
       damping: lerp(muscle1.damping, muscle2.damping, t),
       frequency: lerp(muscle1.frequency, muscle2.frequency, t),
       amplitude: lerp(muscle1.amplitude, muscle2.amplitude, t),
-      phase: lerp(muscle1.phase, muscle2.phase, t)
+      phase: lerp(muscle1.phase, muscle2.phase, t),
+      directionBias: lerpedBias,
+      biasStrength: lerp(muscle1.biasStrength ?? 0, muscle2.biasStrength ?? 0, t)
     });
   }
 
@@ -153,7 +158,13 @@ export function uniformCrossover(
       damping: Math.random() < 0.5 ? muscle.damping : otherMuscle.damping,
       frequency: Math.random() < 0.5 ? muscle.frequency : otherMuscle.frequency,
       amplitude: Math.random() < 0.5 ? muscle.amplitude : otherMuscle.amplitude,
-      phase: Math.random() < 0.5 ? muscle.phase : otherMuscle.phase
+      phase: Math.random() < 0.5 ? muscle.phase : otherMuscle.phase,
+      directionBias: Math.random() < 0.5
+        ? (muscle.directionBias || { x: 0, y: 1, z: 0 })
+        : (otherMuscle.directionBias || { x: 0, y: 1, z: 0 }),
+      biasStrength: Math.random() < 0.5
+        ? (muscle.biasStrength ?? 0)
+        : (otherMuscle.biasStrength ?? 0)
     });
   }
 
@@ -209,7 +220,8 @@ export function cloneGenome(
       ...m,
       id: generateId('muscle'),
       nodeA,
-      nodeB
+      nodeB,
+      directionBias: m.directionBias ? { ...m.directionBias } : { x: 0, y: 1, z: 0 }
     });
   }
 
