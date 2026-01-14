@@ -32,6 +32,75 @@ interface CompactCreatureResult {
   pelletData: { position: Vector3; collectedAtFrame: number | null }[];
 }
 
+// Recalculate fitnessOverTime from stored frames
+function recalculateFitnessOverTime(
+  frames: SimulationFrame[],
+  pellets: PelletData[],
+  weights: FitnessWeights,
+  disqualified: string | null
+): number[] {
+  if (frames.length === 0) return [];
+  if (disqualified) return frames.map(() => 1);
+
+  const fitnessOverTime: number[] = [];
+  const initialCOM = frames[0].centerOfMass;
+  let distanceTraveled = 0;
+  let lastCOM: Vector3 | null = null;
+
+  for (let i = 0; i < frames.length; i++) {
+    const frame = frames[i];
+    const com = frame.centerOfMass;
+
+    // Track distance traveled
+    if (lastCOM) {
+      const dx = com.x - lastCOM.x;
+      const dy = com.y - lastCOM.y;
+      const dz = com.z - lastCOM.z;
+      distanceTraveled += Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    lastCOM = com;
+
+    // Count pellets collected by this frame
+    const pelletsCollected = pellets.filter(p =>
+      p.collectedAtFrame !== null && p.collectedAtFrame <= i
+    ).length;
+
+    // Find active pellet (first uncollected at this frame)
+    const activePellet = pellets.find(p =>
+      p.collectedAtFrame === null || p.collectedAtFrame > i
+    );
+
+    // Calculate fitness
+    let f = weights.baseFitness;
+    f += pelletsCollected * weights.pelletWeight;
+
+    // Proximity bonus
+    if (activePellet) {
+      const pdx = com.x - activePellet.position.x;
+      const pdy = com.y - activePellet.position.y;
+      const pdz = com.z - activePellet.position.z;
+      const pelletDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
+      f += Math.max(0, weights.proximityMaxDistance - pelletDist) * weights.proximityWeight;
+    }
+
+    // Movement bonus
+    f += Math.min(distanceTraveled * weights.movementWeight, weights.movementCap);
+
+    // Distance bonus (net displacement from start)
+    if (weights.distanceWeight > 0) {
+      const netDx = com.x - initialCOM.x;
+      const netDy = com.y - initialCOM.y;
+      const netDz = com.z - initialCOM.z;
+      const netDisp = Math.sqrt(netDx * netDx + netDy * netDy + netDz * netDz);
+      f += Math.min(netDisp * weights.distanceWeight, weights.distanceCap);
+    }
+
+    fitnessOverTime.push(Math.max(f, 1));
+  }
+
+  return fitnessOverTime;
+}
+
 class RunStorage {
   private db: IDBDatabase | null = null;
   private currentRunId: string | null = null;
@@ -198,7 +267,7 @@ class RunStorage {
     });
   }
 
-  async loadGeneration(runId: string, gen: number): Promise<CreatureSimulationResult[] | null> {
+  async loadGeneration(runId: string, gen: number, fitnessWeights?: FitnessWeights): Promise<CreatureSimulationResult[] | null> {
     return new Promise((resolve, reject) => {
       if (!this.db) return reject(new Error('DB not initialized'));
       const tx = this.db.transaction('generations', 'readonly');
@@ -209,24 +278,34 @@ class RunStorage {
         const genData = request.result as GenerationData | undefined;
         if (!genData) return resolve(null);
 
+        const weights = fitnessWeights || DEFAULT_FITNESS_WEIGHTS;
+
         // Expand compact format back to full results
-        const results: CreatureSimulationResult[] = genData.results.map(r => ({
-          genome: r.genome,
-          frames: this.expandFrames(r.frames, r.genome),
-          finalFitness: r.fitness,
-          pelletsCollected: r.pellets,
-          distanceTraveled: 0,
-          netDisplacement: 0,
-          closestPelletDistance: 0,
-          pellets: r.pelletData.map((p, i) => ({
+        const results: CreatureSimulationResult[] = genData.results.map(r => {
+          const frames = this.expandFrames(r.frames, r.genome);
+          const pellets: PelletData[] = r.pelletData.map((p, i) => ({
             id: `pellet_${i}`,
             position: p.position,
             collectedAtFrame: p.collectedAtFrame,
             spawnedAtFrame: 0
-          })),
-          fitnessOverTime: [],
-          disqualified: r.disqualified as any
-        }));
+          }));
+
+          // Recalculate fitnessOverTime from frames
+          const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, weights, r.disqualified);
+
+          return {
+            genome: r.genome,
+            frames,
+            finalFitness: r.fitness,
+            pelletsCollected: r.pellets,
+            distanceTraveled: 0,
+            netDisplacement: 0,
+            closestPelletDistance: 0,
+            pellets,
+            fitnessOverTime,
+            disqualified: r.disqualified as any
+          };
+        });
 
         resolve(results);
       };
@@ -2080,7 +2159,7 @@ class EvolutionApp {
       }
 
       // Load the most recent generation
-      const results = await runStorage.loadGeneration(runId, maxGen);
+      const results = await runStorage.loadGeneration(runId, maxGen, this.config.fitnessWeights);
       if (!results) {
         alert('Could not load generation data');
         return;
@@ -2247,7 +2326,7 @@ class EvolutionApp {
     // Try to load current generation results from storage if they exist
     const currentRunId = runStorage.getCurrentRunId();
     if (currentRunId && this.generation <= this.maxGeneration) {
-      const results = await runStorage.loadGeneration(currentRunId, this.generation);
+      const results = await runStorage.loadGeneration(currentRunId, this.generation, this.config.fitnessWeights);
       if (results && results.length > 0) {
         this.simulationResults = results;
         // If we're at 'simulate' step (before sort), don't sort the cards yet
@@ -2309,7 +2388,7 @@ class EvolutionApp {
     if (!currentRunId) return;
 
     try {
-      const results = await runStorage.loadGeneration(currentRunId, gen);
+      const results = await runStorage.loadGeneration(currentRunId, gen, this.config.fitnessWeights);
       if (!results) {
         alert(`Could not load generation ${gen}`);
         return;
