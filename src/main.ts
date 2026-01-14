@@ -121,6 +121,8 @@ class EvolutionApp {
   private replayFrame: number = 0;
   private isReplaying: boolean = false;
   private replayAnimationId: number | null = null;
+  private replayStartTime: number = 0;
+  private replaySpeed: number = 1;  // 1 = real-time (15fps), 2 = 2x (30fps), 4 = 4x (60fps)
   private isAutoRunning: boolean = false;
 
   constructor() {
@@ -1639,7 +1641,14 @@ class EvolutionApp {
           <div style="margin-top: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <div id="replay-fitness" style="font-size: 24px; font-weight: 600; color: var(--success);">0.0</div>
-              <div id="replay-frame" style="color: var(--text-muted); font-size: 13px;">Frame 0/0</div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div id="replay-time" style="color: var(--text-muted); font-size: 13px; font-family: monospace;">0:00 / 0:00</div>
+                <div style="display: flex; gap: 4px;">
+                  <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="1" style="padding: 4px 8px; font-size: 11px;">1x</button>
+                  <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="2" style="padding: 4px 8px; font-size: 11px;">2x</button>
+                  <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="4" style="padding: 4px 8px; font-size: 11px;">4x</button>
+                </div>
+              </div>
             </div>
             <div style="height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden;">
               <div id="replay-fitness-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--success)); transition: width 0.1s;"></div>
@@ -1656,8 +1665,16 @@ class EvolutionApp {
     document.body.appendChild(this.replayModal);
 
     this.replayModal.querySelector('#close-replay')?.addEventListener('click', () => this.hideReplay());
-    this.replayModal.querySelector('#replay-restart')?.addEventListener('click', () => { this.replayFrame = 0; });
+    this.replayModal.querySelector('#replay-restart')?.addEventListener('click', () => this.restartReplay());
     this.replayModal.addEventListener('click', (e) => { if (e.target === this.replayModal) this.hideReplay(); });
+
+    // Speed button handlers
+    this.replayModal.querySelectorAll('.replay-speed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const speed = parseInt((btn as HTMLElement).dataset.speed || '1');
+        this.setReplaySpeed(speed);
+      });
+    });
   }
 
   private createLoadRunsModal(): void {
@@ -2291,6 +2308,8 @@ class EvolutionApp {
     this.selectedResult = result;
     this.replayFrame = 0;
     this.isReplaying = true;
+    this.replayStartTime = performance.now();
+    this.replaySpeed = 1;
 
     this.setupReplayScene();
 
@@ -2344,6 +2363,18 @@ class EvolutionApp {
       Pellets: <strong>${result.pelletsCollected}/${result.pellets.length}</strong>
     `;
 
+    // Reset speed button styles (1x is default)
+    this.replayModal?.querySelectorAll('.replay-speed-btn').forEach(btn => {
+      const btnSpeed = parseInt((btn as HTMLElement).dataset.speed || '1');
+      if (btnSpeed === 1) {
+        (btn as HTMLElement).style.background = 'var(--accent)';
+        (btn as HTMLElement).style.color = 'white';
+      } else {
+        (btn as HTMLElement).style.background = '';
+        (btn as HTMLElement).style.color = '';
+      }
+    });
+
     this.replayModal!.classList.add('visible');
     this.animateReplay();
   }
@@ -2375,7 +2406,36 @@ class EvolutionApp {
     this.replayAnimationId = requestAnimationFrame(this.animateReplay);
 
     if (this.selectedResult && this.replayCreature) {
-      const frame = this.selectedResult.frames[this.replayFrame];
+      const frames = this.selectedResult.frames;
+      const totalFrames = frames.length;
+      if (totalFrames === 0) return;
+
+      // Calculate current time based on elapsed time and speed
+      const now = performance.now();
+      const elapsedMs = (now - this.replayStartTime) * this.replaySpeed;
+      const totalDuration = frames[totalFrames - 1].time * 1000; // Convert to ms
+
+      // Determine current simulation time
+      let currentSimTime = elapsedMs;
+      if (currentSimTime >= totalDuration) {
+        // Loop back to start
+        this.replayStartTime = now;
+        currentSimTime = 0;
+      }
+
+      // Find the frame that matches the current time
+      const targetTime = currentSimTime / 1000; // Convert back to seconds
+      let frameIndex = 0;
+      for (let i = 0; i < totalFrames; i++) {
+        if (frames[i].time <= targetTime) {
+          frameIndex = i;
+        } else {
+          break;
+        }
+      }
+      this.replayFrame = frameIndex;
+
+      const frame = frames[this.replayFrame];
       if (frame) {
         const nodeMeshes = this.replayCreature.userData.nodeMeshes as Map<string, THREE.Mesh>;
 
@@ -2407,17 +2467,52 @@ class EvolutionApp {
         const currentFitness = this.selectedResult.fitnessOverTime[this.replayFrame] || 0;
         const maxFitness = Math.max(...this.selectedResult.fitnessOverTime, 0.1);
 
+        // Update time display
+        const currentTime = frame.time;
+        const totalTime = frames[totalFrames - 1].time;
+        document.getElementById('replay-time')!.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(totalTime)}`;
         document.getElementById('replay-fitness')!.textContent = currentFitness.toFixed(1);
-        document.getElementById('replay-frame')!.textContent = `Frame ${this.replayFrame + 1}/${this.selectedResult.frames.length}`;
         (document.getElementById('replay-fitness-fill') as HTMLElement).style.width = `${(currentFitness / maxFitness) * 100}%`;
-
-        this.replayFrame++;
-        if (this.replayFrame >= this.selectedResult.frames.length) this.replayFrame = 0;
       }
     }
 
     this.replayRenderer.render(this.replayScene, this.replayCamera);
   };
+
+  private formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  private restartReplay(): void {
+    this.replayStartTime = performance.now();
+    this.replayFrame = 0;
+  }
+
+  private setReplaySpeed(speed: number): void {
+    // Preserve current position when changing speed
+    if (this.selectedResult && this.selectedResult.frames.length > 0) {
+      const currentTime = this.selectedResult.frames[this.replayFrame]?.time || 0;
+      this.replaySpeed = speed;
+      // Adjust start time so current position is maintained
+      this.replayStartTime = performance.now() - (currentTime * 1000 / this.replaySpeed);
+    } else {
+      this.replaySpeed = speed;
+    }
+
+    // Update button styles
+    this.replayModal?.querySelectorAll('.replay-speed-btn').forEach(btn => {
+      const btnSpeed = parseInt((btn as HTMLElement).dataset.speed || '1');
+      if (btnSpeed === speed) {
+        (btn as HTMLElement).style.background = 'var(--accent)';
+        (btn as HTMLElement).style.color = 'white';
+      } else {
+        (btn as HTMLElement).style.background = '';
+        (btn as HTMLElement).style.color = '';
+      }
+    });
+  }
 
   // ============================================
   // SIMULATION & EVOLUTION
