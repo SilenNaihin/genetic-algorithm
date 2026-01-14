@@ -841,7 +841,14 @@ class EvolutionApp {
           </svg>
         </button>
       </div>
-      ${isViewingHistory ? '<div class="history-badge">VIEWING HISTORY</div>' : ''}
+      ${isViewingHistory ? `
+        <div class="history-badge">VIEWING HISTORY</div>
+        <button id="fork-run-btn" class="btn btn-secondary btn-small" style="
+          margin-top: 8px;
+          width: 100%;
+          font-size: 11px;
+        ">Fork from Gen ${displayGen}</button>
+      ` : ''}
       <div class="stat-row">
         <span class="stat-label">Creatures</span>
         <span class="stat-value">${this.creatureCards.length}</span>
@@ -1048,6 +1055,12 @@ class EvolutionApp {
             await runStorage.updateRunName(currentRunId, this.runName);
           }
         });
+      }
+
+      // Fork run button handler
+      const forkBtn = document.getElementById('fork-run-btn');
+      if (forkBtn) {
+        forkBtn.addEventListener('click', () => this.forkRunFromCurrentGeneration());
       }
 
       // Render longest surviving creature thumbnail and add event listeners
@@ -2064,6 +2077,78 @@ class EvolutionApp {
       this.createCardsFromPopulation();
     }
     this.updateStats();
+  }
+
+  private async forkRunFromCurrentGeneration(): Promise<void> {
+    if (this.viewingGeneration === null) return;
+
+    const currentRunId = runStorage.getCurrentRunId();
+    if (!currentRunId) return;
+
+    try {
+      // Fork the run up to the current viewing generation
+      const newRunId = await runStorage.forkRun(currentRunId, this.viewingGeneration);
+
+      // Load the forked run
+      const run = await runStorage.getRun(newRunId);
+      if (!run) throw new Error('Failed to load forked run');
+
+      // Set up state for the new run
+      this.generation = this.viewingGeneration;
+      this.maxGeneration = this.viewingGeneration;
+      this.viewingGeneration = null;  // We're now at the current generation of the new run
+      this.runName = run.name || '';
+      this.fitnessHistory = run.fitnessHistory || [];
+
+      // Restore best creature and longest survivor
+      if (run.bestCreature) {
+        this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
+        this.bestCreatureGeneration = run.bestCreature.generation;
+      } else {
+        this.bestCreatureEver = null;
+        this.bestCreatureGeneration = 0;
+      }
+
+      if (run.longestSurvivor) {
+        this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
+        this.longestSurvivingGenerations = run.longestSurvivor.generations;
+      } else {
+        this.longestSurvivingCreature = null;
+        this.longestSurvivingGenerations = 0;
+      }
+
+      // Load the generation results
+      const results = await runStorage.loadGeneration(newRunId, this.generation, this.config.fitnessWeights);
+      if (results) {
+        this.simulationResults = results;
+
+        // Recreate population from loaded genomes
+        this.population = new Population(this.config);
+        this.population.generation = this.generation;
+        for (const result of results) {
+          const creature = new Creature(result.genome);
+          creature.state.fitness = result.finalFitness;
+          creature.state.pelletsCollected = result.pelletsCollected;
+          this.population.creatures.push(creature);
+        }
+
+        this.createCreatureCardsFromResults(results, false);
+      }
+
+      // Update graph
+      if (this.graphPanel && this.fitnessHistory.length > 0) {
+        this.graphPanel.updateData(this.fitnessHistory);
+      }
+
+      this.evolutionStep = 'sort';
+      this.updateControlsForHistoryMode(false);
+      this.updateStats();
+
+      console.log(`Forked run to new run: ${newRunId}, starting at generation ${this.generation}`);
+    } catch (error) {
+      console.error('Failed to fork run:', error);
+      alert('Failed to fork run. See console for details.');
+    }
   }
 
   private createCardsFromPopulation(): void {

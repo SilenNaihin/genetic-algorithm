@@ -442,4 +442,55 @@ export class RunStorage {
     const run = await this.getRun(runId);
     return run ? run.generationCount - 1 : -1;
   }
+
+  async forkRun(sourceRunId: string, upToGeneration: number, newName?: string): Promise<string> {
+    const sourceRun = await this.getRun(sourceRunId);
+    if (!sourceRun) throw new Error('Source run not found');
+
+    // Create new run
+    const newId = `run_${Date.now()}`;
+    const newRun: SavedRun = {
+      id: newId,
+      name: newName || `Fork of ${sourceRun.name || 'Run'} (Gen ${upToGeneration})`,
+      startTime: Date.now(),
+      config: { ...sourceRun.config },
+      generationCount: upToGeneration + 1,
+      fitnessHistory: sourceRun.fitnessHistory?.slice(0, upToGeneration + 1),
+      bestCreature: sourceRun.bestCreature && sourceRun.bestCreature.generation <= upToGeneration
+        ? sourceRun.bestCreature
+        : undefined,
+      longestSurvivor: sourceRun.longestSurvivor
+        ? sourceRun.longestSurvivor
+        : undefined
+    };
+
+    await this.putRun(newRun);
+
+    // Copy generations 0 to upToGeneration
+    for (let gen = 0; gen <= upToGeneration; gen++) {
+      const genData = await this.loadGenerationRaw(sourceRunId, gen);
+      if (genData) {
+        const newGenData: GenerationData = {
+          runId: newId,
+          generation: gen,
+          results: genData.results
+        };
+        await this.putGeneration(newGenData);
+      }
+    }
+
+    this.currentRunId = newId;
+    return newId;
+  }
+
+  private async loadGenerationRaw(runId: string, gen: number): Promise<GenerationData | null> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject(new Error('DB not initialized'));
+      const tx = this.db.transaction('generations', 'readonly');
+      const store = tx.objectStore('generations');
+      const request = store.get([runId, gen]);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
 }
