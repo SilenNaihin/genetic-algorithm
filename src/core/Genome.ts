@@ -7,20 +7,8 @@ import type {
   HSL
 } from '../types';
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
-
-let genomeCounter = 0;
-
-function generateId(prefix: string): string {
-  return `${prefix}_${Date.now()}_${genomeCounter++}`;
-}
-
-function randomRange(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(randomRange(min, max + 1));
-}
+import { generateId } from '../utils/id';
+import { distance, randomRange, randomInt } from '../utils/math';
 
 function randomVector3(radius: number): Vector3 {
   return {
@@ -28,13 +16,6 @@ function randomVector3(radius: number): Vector3 {
     y: randomRange(0.5, radius * 1.5),  // Keep above ground
     z: randomRange(-radius, radius)
   };
-}
-
-function distance(a: Vector3, b: Vector3): number {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  const dz = a.z - b.z;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 function randomHSL(): HSL {

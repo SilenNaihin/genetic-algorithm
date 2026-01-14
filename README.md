@@ -110,12 +110,41 @@ fitness = baseFitness
 
 ```
 src/
-  core/           # Genome generation
-  genetics/       # Mutation and population management
-  simulation/     # Physics simulation (BatchSimulator)
-  types/          # TypeScript interfaces
-  ui/             # Graph panel
-  main.ts         # Application entry point
+├── __tests__/              # Test suite (Vitest)
+│   ├── genetics.test.ts    # Selection, crossover, mutation, population tests
+│   ├── genome.test.ts      # Genome generation tests
+│   ├── math.test.ts        # Math utility tests
+│   ├── simulation.test.ts  # BatchSimulator tests
+│   └── storage.test.ts     # IndexedDB storage tests
+├── core/                   # Domain models
+│   ├── Creature.ts         # Creature entity (genome + physics + rendering)
+│   ├── Genome.ts           # Genome generation utilities
+│   └── Pellet.ts           # Pellet entity for collection
+├── genetics/               # Evolutionary algorithm
+│   ├── Crossover.ts        # Genetic crossover operators
+│   ├── Mutation.ts         # Mutation operators
+│   ├── Population.ts       # Population management
+│   └── Selection.ts        # Selection operators
+├── physics/                # Physics engine
+│   ├── BodyFactory.ts      # Creates physics bodies for creatures
+│   └── PhysicsWorld.ts     # Cannon.js world wrapper
+├── rendering/              # 3D visualization
+│   ├── CreatureRenderer.ts # Three.js mesh creation for creatures
+│   └── SceneManager.ts     # Three.js scene setup
+├── simulation/             # Simulation engine
+│   └── BatchSimulator.ts   # Headless creature simulation
+├── storage/                # Persistence
+│   └── RunStorage.ts       # IndexedDB storage for runs/generations
+├── types/                  # TypeScript interfaces
+│   ├── genome.ts           # Genome type definitions
+│   ├── index.ts            # Re-exports
+│   └── simulation.ts       # Simulation config types
+├── ui/                     # UI components
+│   └── GraphPanel.ts       # Fitness history graph
+├── utils/                  # Shared utilities
+│   ├── id.ts               # ID generation
+│   └── math.ts             # Math utilities (distance, lerp, clamp)
+└── main.ts                 # Application entry point
 ```
 
 ## Technologies

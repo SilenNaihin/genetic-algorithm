@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
   },
   "repository": {
     "type": "git",
@@ -35,6 +38,9 @@
   },
   "devDependencies": {
     "@types/dat.gui": "^0.7.13",
-    "@types/three": "^0.182.0"
+    "@types/three": "^0.182.0",
+    "@vitest/ui": "^4.0.17",
+    "happy-dom": "^20.1.0",
+    "vitest": "^4.0.17"
   }
 }

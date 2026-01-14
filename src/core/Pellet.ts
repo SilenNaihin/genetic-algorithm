@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import type { Vector3 } from '../types';
+import { generateId } from '../utils/id';
 
 export interface PelletConfig {
   id: string;
@@ -86,10 +87,8 @@ export class Pellet {
   }
 }
 
-let pelletCounter = 0;
-
 export function generatePelletId(): string {
-  return `pellet_${Date.now()}_${pelletCounter++}`;
+  return generateId('pellet');
 }
 
 export function createRandomPellets(

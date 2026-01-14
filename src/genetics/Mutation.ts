@@ -6,6 +6,8 @@ import type {
   Vector3
 } from '../types';
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
+import { generateId } from '../utils/id';
+import { distance, clamp } from '../utils/math';
 
 export interface MutationConfig {
   rate: number;           // Probability of mutation per gene
@@ -19,15 +21,6 @@ export const DEFAULT_MUTATION_CONFIG: MutationConfig = {
   structuralRate: 0.1
 };
 
-let idCounter = 0;
-function generateId(prefix: string): string {
-  return `${prefix}_mut_${Date.now()}_${idCounter++}`;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
 function mutateValue(
   value: number,
   min: number,
@@ -37,13 +30,6 @@ function mutateValue(
   const range = max - min;
   const delta = (Math.random() * 2 - 1) * range * magnitude;
   return clamp(value + delta, min, max);
-}
-
-function distance(a: Vector3, b: Vector3): number {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  const dz = a.z - b.z;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 /**
