@@ -2112,7 +2112,7 @@ class EvolutionApp {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const runId = (btn as HTMLElement).getAttribute('data-run-id');
-          if (runId && confirm('Delete this run? This cannot be undone.')) {
+          if (runId) {
             await runStorage.deleteRun(runId);
             await this.showLoadRunsModal();  // Refresh the list
           }
