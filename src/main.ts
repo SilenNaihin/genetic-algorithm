@@ -1899,8 +1899,16 @@ class EvolutionApp {
         this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
         this.bestCreatureGeneration = run.bestCreature.generation;
       } else {
-        this.bestCreatureEver = null;
-        this.bestCreatureGeneration = 0;
+        // Fallback: compute from current results for older runs without this data
+        const validResults = results.filter(r => !r.disqualified && isFinite(r.finalFitness));
+        if (validResults.length > 0) {
+          const best = validResults.reduce((a, b) => a.finalFitness > b.finalFitness ? a : b);
+          this.bestCreatureEver = best;
+          this.bestCreatureGeneration = maxGen;
+        } else {
+          this.bestCreatureEver = null;
+          this.bestCreatureGeneration = 0;
+        }
       }
 
       // Restore longest surviving creature
@@ -1908,8 +1916,23 @@ class EvolutionApp {
         this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
         this.longestSurvivingGenerations = run.longestSurvivor.generations;
       } else {
-        this.longestSurvivingCreature = null;
-        this.longestSurvivingGenerations = 0;
+        // Fallback: compute from current results for older runs without this data
+        const validResults = results.filter(r => !r.disqualified && isFinite(r.finalFitness));
+        if (validResults.length > 0) {
+          const longest = validResults.reduce((a, b) =>
+            (a.genome.survivalStreak || 0) > (b.genome.survivalStreak || 0) ? a : b
+          );
+          if (longest.genome.survivalStreak && longest.genome.survivalStreak > 0) {
+            this.longestSurvivingCreature = longest;
+            this.longestSurvivingGenerations = longest.genome.survivalStreak;
+          } else {
+            this.longestSurvivingCreature = null;
+            this.longestSurvivingGenerations = 0;
+          }
+        } else {
+          this.longestSurvivingCreature = null;
+          this.longestSurvivingGenerations = 0;
+        }
       }
 
       // Create Population object from loaded genomes so evolution can continue
@@ -1930,8 +1953,8 @@ class EvolutionApp {
       if (this.menuScreen) this.menuScreen.style.display = 'none';
       if (this.gridUI) this.gridUI.style.display = 'block';
 
-      // Create cards from loaded results (already sorted)
-      this.createCreatureCardsFromResults(results, false);
+      // Create cards from loaded results (sort by fitness)
+      this.createCreatureCardsFromResults(results, true);
 
       // Set evolution step - we're ready to mutate (start next generation)
       this.evolutionStep = 'idle';
