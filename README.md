@@ -2,6 +2,8 @@
 
 A browser-based genetic algorithm simulator where soft-bodied creatures evolve to collect pellets. Watch populations of creatures develop movement strategies over generations through mutation, crossover, and natural selection.
 
+<video src="assets/demo.mp4" controls width="100%"></video>
+
 ## Features
 
 - **Soft-body Physics**: Creatures are made of nodes (spheres) connected by oscillating muscles (springs)
