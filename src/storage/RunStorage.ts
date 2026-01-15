@@ -1,6 +1,12 @@
 import { CreatureSimulationResult, PelletData, SimulationFrame } from '../simulation/BatchSimulator';
 import { DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3, FitnessWeights } from '../types';
 
+// Serializable creature type entry (Map converted to array of [nodeCount, count] pairs)
+export interface StoredCreatureTypeEntry {
+  generation: number;
+  nodeCountDistribution: [number, number][]; // Array of [nodeCount, count] pairs
+}
+
 export interface SavedRun {
   id: string;
   name?: string;
@@ -8,6 +14,7 @@ export interface SavedRun {
   config: SimulationConfig;
   generationCount: number;
   fitnessHistory?: FitnessHistoryEntry[];
+  creatureTypeHistory?: StoredCreatureTypeEntry[];
   bestCreature?: { result: CompactCreatureResult; generation: number };
   longestSurvivor?: { result: CompactCreatureResult; generations: number };
 }
@@ -239,7 +246,8 @@ export class RunStorage {
       id: `pellet_${i}`,
       position: p.position,
       collectedAtFrame: p.collectedAtFrame,
-      spawnedAtFrame: 0
+      spawnedAtFrame: 0,
+      initialDistance: 5  // Default for legacy data
     }));
     const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, fitnessWeights, r.disqualified);
 
@@ -316,7 +324,8 @@ export class RunStorage {
             id: `pellet_${i}`,
             position: p.position,
             collectedAtFrame: p.collectedAtFrame,
-            spawnedAtFrame: 0
+            spawnedAtFrame: 0,
+            initialDistance: 5  // Default for legacy data
           }));
 
           const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, weights, r.disqualified);
@@ -406,6 +415,19 @@ export class RunStorage {
     }
   }
 
+  async updateCreatureTypeHistory(history: { generation: number; nodeCountDistribution: Map<number, number> }[]): Promise<void> {
+    if (!this.currentRunId) return;
+    const run = await this.getRun(this.currentRunId);
+    if (run) {
+      // Convert Map to serializable array format
+      run.creatureTypeHistory = history.map(entry => ({
+        generation: entry.generation,
+        nodeCountDistribution: Array.from(entry.nodeCountDistribution.entries())
+      }));
+      await this.putRun(run);
+    }
+  }
+
   async updateRunName(runId: string, name: string): Promise<void> {
     const run = await this.getRun(runId);
     if (run) {
@@ -456,6 +478,7 @@ export class RunStorage {
       config: { ...sourceRun.config },
       generationCount: upToGeneration + 1,
       fitnessHistory: sourceRun.fitnessHistory?.slice(0, upToGeneration + 1),
+      creatureTypeHistory: sourceRun.creatureTypeHistory?.slice(0, upToGeneration + 1),
       bestCreature: sourceRun.bestCreature && sourceRun.bestCreature.generation <= upToGeneration
         ? sourceRun.bestCreature
         : undefined,

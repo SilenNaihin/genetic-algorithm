@@ -2013,17 +2013,26 @@ class EvolutionApp {
         this.graphPanel.show();
       }
 
-      // Rebuild creature type history from current results (we don't persist this)
-      this.creatureTypeHistory = [];
-      const nodeCountDistribution = new Map<number, number>();
-      for (const result of results) {
-        const nodeCount = result.genome.nodes.length;
-        nodeCountDistribution.set(nodeCount, (nodeCountDistribution.get(nodeCount) || 0) + 1);
+      // Restore creature type history from storage, or rebuild from current results
+      if (run.creatureTypeHistory && run.creatureTypeHistory.length > 0) {
+        // Convert stored format (array) back to Map format
+        this.creatureTypeHistory = run.creatureTypeHistory.map(entry => ({
+          generation: entry.generation,
+          nodeCountDistribution: new Map(entry.nodeCountDistribution)
+        }));
+      } else {
+        // Fallback: rebuild from current results only
+        this.creatureTypeHistory = [];
+        const nodeCountDistribution = new Map<number, number>();
+        for (const result of results) {
+          const nodeCount = result.genome.nodes.length;
+          nodeCountDistribution.set(nodeCount, (nodeCountDistribution.get(nodeCount) || 0) + 1);
+        }
+        this.creatureTypeHistory.push({
+          generation: maxGen,
+          nodeCountDistribution
+        });
       }
-      this.creatureTypeHistory.push({
-        generation: maxGen,
-        nodeCountDistribution
-      });
 
       if (this.creatureTypesPanel && this.creatureTypeHistory.length > 0) {
         this.creatureTypesPanel.updateData(this.creatureTypeHistory);
@@ -3455,6 +3464,9 @@ class EvolutionApp {
       generation: this.generation,
       nodeCountDistribution
     });
+
+    // Save creature type history to storage
+    runStorage.updateCreatureTypeHistory(this.creatureTypeHistory);
 
     if (this.graphPanel) {
       this.graphPanel.updateData(this.fitnessHistory);
