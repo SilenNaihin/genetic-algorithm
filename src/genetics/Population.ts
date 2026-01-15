@@ -106,7 +106,10 @@ export class Population {
     const targetSize = this.config.populationSize;
 
     while (newGenomes.length < targetSize) {
-      if (Math.random() < this.config.crossoverRate && survivors.length >= 2) {
+      const useCrossover = this.config.useCrossover !== false;
+      const useMutation = this.config.useMutation !== false;
+
+      if (useCrossover && Math.random() < this.config.crossoverRate && survivors.length >= 2) {
         // Crossover
         const parent1 = weightedRandomSelect(survivors, probabilities);
         let parent2 = weightedRandomSelect(survivors, probabilities);
@@ -120,14 +123,22 @@ export class Population {
 
         let child = singlePointCrossover(parent1.genome, parent2.genome, this.genomeConstraints);
 
-        // Apply mutation
-        child = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
+        // Apply mutation if enabled
+        if (useMutation) {
+          child = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
+        }
 
         newGenomes.push(child);
       } else {
-        // Clone and mutate
+        // Clone (and optionally mutate)
         const parent = weightedRandomSelect(survivors, probabilities);
-        const child = mutateGenome(cloneGenome(parent.genome, this.genomeConstraints), this.mutationConfig, this.genomeConstraints);
+        let child = cloneGenome(parent.genome, this.genomeConstraints);
+
+        // Apply mutation if enabled
+        if (useMutation) {
+          child = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
+        }
+
         newGenomes.push(child);
       }
     }

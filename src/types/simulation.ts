@@ -3,6 +3,7 @@ import type { CreatureGenome, Vector3 } from './genome';
 export interface FitnessWeights {
   baseFitness: number;           // Starting fitness value
   pelletWeight: number;          // Points per pellet collected
+  progressWeight: number;        // Points for progress toward pellet (0-100 per pellet)
   proximityWeight: number;       // Multiplier for proximity bonus (closer to pellet)
   proximityMaxDistance: number;  // Distance at which proximity bonus starts
   movementWeight: number;        // Points for movement (capped)
@@ -14,6 +15,7 @@ export interface FitnessWeights {
 export const DEFAULT_FITNESS_WEIGHTS: FitnessWeights = {
   baseFitness: 10,
   pelletWeight: 100,
+  progressWeight: 1,           // 0-100 points per pellet based on progress toward it
   proximityWeight: 2.5,
   proximityMaxDistance: 20,
   movementWeight: 1,
@@ -45,6 +47,8 @@ export interface SimulationConfig {
   mutationMagnitude: number;    // How much values change
   crossoverRate: number;        // Probability of crossover vs cloning
   eliteCount: number;           // Number of top performers to keep unchanged
+  useMutation: boolean;         // Whether to apply mutation during evolution
+  useCrossover: boolean;        // Whether to use crossover (vs cloning only)
 
   // Creature constraints
   minNodes: number;
@@ -72,6 +76,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   mutationMagnitude: 0.3,
   crossoverRate: 0.3,
   eliteCount: 5,
+  useMutation: true,
+  useCrossover: true,
 
   minNodes: 3,
   maxNodes: 8,

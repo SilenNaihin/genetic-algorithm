@@ -263,6 +263,30 @@ class EvolutionApp {
           </div>
         </div>
 
+        <div style="margin-bottom: 16px;">
+          <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">Evolution Mode</div>
+          <div style="display: flex; gap: 16px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary); font-size: 13px;">
+              <input type="checkbox" id="use-mutation-checkbox" checked style="
+                width: 16px;
+                height: 16px;
+                cursor: pointer;
+                accent-color: var(--accent);
+              ">
+              Mutation
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary); font-size: 13px;">
+              <input type="checkbox" id="use-crossover-checkbox" checked style="
+                width: 16px;
+                height: 16px;
+                cursor: pointer;
+                accent-color: var(--accent);
+              ">
+              Crossover
+            </label>
+          </div>
+        </div>
+
         <div style="display: flex; gap: 12px;">
           <button class="btn btn-primary" id="start-btn">
             <span>Start Evolution</span>
@@ -418,6 +442,31 @@ class EvolutionApp {
       this.config.maxMuscles = parseInt(maxMusclesSlider.value);
       document.getElementById('maxmuscles-value')!.textContent = maxMusclesSlider.value;
       this.regeneratePreviewCreature();
+      this.updateSettingsInfoBox();
+    });
+
+    // Evolution mode checkboxes
+    const useMutationCheckbox = document.getElementById('use-mutation-checkbox') as HTMLInputElement;
+    const useCrossoverCheckbox = document.getElementById('use-crossover-checkbox') as HTMLInputElement;
+
+    const enforceAtLeastOne = () => {
+      // At least one must be checked
+      if (!useMutationCheckbox.checked && !useCrossoverCheckbox.checked) {
+        // Re-check the one that was just unchecked
+        useMutationCheckbox.checked = true;
+        this.config.useMutation = true;
+      }
+    };
+
+    useMutationCheckbox.addEventListener('change', () => {
+      this.config.useMutation = useMutationCheckbox.checked;
+      enforceAtLeastOne();
+      this.updateSettingsInfoBox();
+    });
+
+    useCrossoverCheckbox.addEventListener('change', () => {
+      this.config.useCrossover = useCrossoverCheckbox.checked;
+      enforceAtLeastOne();
       this.updateSettingsInfoBox();
     });
 
