@@ -38,6 +38,23 @@ interface CreatureCard {
   targetY: number;
 }
 
+// Family tree types
+interface AncestorInfo {
+  id: string;
+  generation: number;
+  fitness: number;
+  pelletsCollected: number;
+  nodeCount: number;
+  muscleCount: number;
+  color: { h: number; s: number; l: number };
+  parentIds: string[];
+}
+
+interface FamilyTreeNode {
+  creature: AncestorInfo;
+  parents: FamilyTreeNode[];
+}
+
 // Grid layout constants
 const GRID_COLS = 10;
 const GRID_ROWS = 10;
@@ -124,6 +141,8 @@ class EvolutionApp {
   private replayStartTime: number = 0;
   private replaySpeed: number = 1;  // 1 = real-time (15fps), 2 = 2x (30fps), 4 = 4x (60fps)
   private isAutoRunning: boolean = false;
+  private lineageMode: 'both' | 'crossover' | 'clone' = 'both';
+  private readonly MAX_ANCESTORS = 100;
 
   constructor() {
     this.container = document.getElementById('app')!;
@@ -1631,32 +1650,63 @@ class EvolutionApp {
     this.replayModal = document.createElement('div');
     this.replayModal.className = 'modal-overlay';
     this.replayModal.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-content" style="max-width: 1400px; width: 95vw;">
         <div class="modal-header">
           <span class="modal-title">Simulation Replay</span>
           <button class="btn-icon" id="close-replay">&times;</button>
         </div>
-        <div class="modal-body">
-          <div id="replay-container" style="width: 600px; height: 400px; border-radius: 12px; overflow: hidden;"></div>
-          <div style="margin-top: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <div id="replay-fitness" style="font-size: 24px; font-weight: 600; color: var(--success);">0.0</div>
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div id="replay-time" style="color: var(--text-muted); font-size: 13px; font-family: monospace;">0:00 / 0:00</div>
-                <div style="display: flex; gap: 4px;">
-                  <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="1" style="padding: 4px 8px; font-size: 11px;">1x</button>
-                  <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="2" style="padding: 4px 8px; font-size: 11px;">2x</button>
-                  <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="4" style="padding: 4px 8px; font-size: 11px;">4x</button>
+        <div class="modal-body" style="display: flex; gap: 20px;">
+          <!-- Left: Replay viewer -->
+          <div style="flex: 0 0 500px;">
+            <div id="replay-container" style="width: 500px; height: 350px; border-radius: 12px; overflow: hidden;"></div>
+            <div style="margin-top: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div id="replay-fitness" style="font-size: 24px; font-weight: 600; color: var(--success);">0.0</div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div id="replay-time" style="color: var(--text-muted); font-size: 13px; font-family: monospace;">0:00 / 0:00</div>
+                  <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="1" style="padding: 4px 8px; font-size: 11px;">1x</button>
+                    <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="2" style="padding: 4px 8px; font-size: 11px;">2x</button>
+                    <button class="btn btn-secondary btn-small replay-speed-btn" data-speed="4" style="padding: 4px 8px; font-size: 11px;">4x</button>
+                  </div>
                 </div>
               </div>
+              <div style="height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden;">
+                <div id="replay-fitness-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--success)); transition: width 0.1s;"></div>
+              </div>
             </div>
-            <div style="height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden;">
-              <div id="replay-fitness-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--success)); transition: width 0.1s;"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+              <div id="replay-stats" style="color: var(--text-secondary); font-size: 13px;"></div>
+              <button class="btn btn-secondary btn-small" id="replay-restart">Restart</button>
             </div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-            <div id="replay-stats" style="color: var(--text-secondary); font-size: 13px;"></div>
-            <button class="btn btn-secondary btn-small" id="replay-restart">Restart</button>
+
+          <!-- Middle: Genome info (scrollable) -->
+          <div id="genome-viewer" style="flex: 0 0 280px; max-height: 500px; overflow-y: auto; background: var(--bg-tertiary); border-radius: 12px; padding: 16px; font-size: 12px; font-family: monospace;">
+            <div style="color: var(--text-muted);">Loading genome...</div>
+          </div>
+
+          <!-- Right: Family tree -->
+          <div id="family-tree-panel" style="flex: 1; min-width: 350px; max-height: 500px; overflow: auto; background: var(--bg-tertiary); border-radius: 12px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border-light); padding-bottom: 4px;">
+              <div style="color: var(--accent); font-weight: 600; font-size: 13px;">FAMILY TREE</div>
+              <select id="lineage-mode-select" style="
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 2px 6px;
+                font-size: 11px;
+                cursor: pointer;
+              ">
+                <option value="both">Both</option>
+                <option value="crossover">Crossover only</option>
+                <option value="clone">Clone only</option>
+              </select>
+            </div>
+            <div id="family-tree-container" style="min-height: 100px; min-width: max-content;">
+              <div style="color: var(--text-muted); text-align: center; padding: 20px;">Select a creature to view ancestry</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1675,6 +1725,18 @@ class EvolutionApp {
         this.setReplaySpeed(speed);
       });
     });
+
+    // Lineage mode selector
+    const lineageModeSelect = this.replayModal.querySelector('#lineage-mode-select') as HTMLSelectElement;
+    if (lineageModeSelect) {
+      lineageModeSelect.addEventListener('change', () => {
+        this.lineageMode = lineageModeSelect.value as 'both' | 'crossover' | 'clone';
+        // Refresh family tree if a creature is selected
+        if (this.selectedResult) {
+          this.buildAndRenderFamilyTree(this.selectedResult.genome);
+        }
+      });
+    }
   }
 
   private createLoadRunsModal(): void {
@@ -2386,6 +2448,9 @@ class EvolutionApp {
       Pellets: <strong>${result.pelletsCollected}/${result.pellets.length}</strong>
     `;
 
+    // Populate genome viewer
+    this.populateGenomeViewer(result.genome);
+
     // Reset speed button styles (1x is default)
     this.replayModal?.querySelectorAll('.replay-speed-btn').forEach(btn => {
       const btnSpeed = parseInt((btn as HTMLElement).dataset.speed || '1');
@@ -2418,6 +2483,343 @@ class EvolutionApp {
       this.replayRenderer.dispose();
       this.replayRenderer = null;
     }
+  }
+
+  private populateGenomeViewer(genome: CreatureGenome): void {
+    const viewer = document.getElementById('genome-viewer');
+    if (!viewer) return;
+
+    const formatVector = (v: { x: number; y: number; z: number }) =>
+      `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
+
+    const formatNumber = (n: number, decimals = 2) => n.toFixed(decimals);
+
+    const sectionStyle = 'margin-bottom: 16px;';
+    const headerStyle = 'color: var(--accent); font-weight: 600; margin-bottom: 8px; font-size: 13px; border-bottom: 1px solid var(--border-light); padding-bottom: 4px;';
+    const labelStyle = 'color: var(--text-muted);';
+    const valueStyle = 'color: var(--text-primary);';
+    const subHeaderStyle = 'color: var(--text-secondary); font-weight: 600; margin: 8px 0 4px 0; font-size: 11px;';
+
+    let html = '';
+
+    // Creature Info
+    html += `<div style="${sectionStyle}">
+      <div style="${headerStyle}">CREATURE INFO</div>
+      <div><span style="${labelStyle}">ID:</span> <span style="${valueStyle}">${genome.id}</span></div>
+      <div><span style="${labelStyle}">Generation:</span> <span style="${valueStyle}">${genome.generation}</span></div>
+      <div><span style="${labelStyle}">Survival Streak:</span> <span style="${valueStyle}">${genome.survivalStreak}</span></div>
+      <div><span style="${labelStyle}">Parents:</span> <span style="${valueStyle}">${genome.parentIds.length > 0 ? genome.parentIds.length : 'None (Gen 0)'}</span></div>
+      <div><span style="${labelStyle}">Global Freq Mult:</span> <span style="${valueStyle}">${formatNumber(genome.globalFrequencyMultiplier)}</span></div>
+      <div><span style="${labelStyle}">Color (HSL):</span> <span style="${valueStyle}">${formatNumber(genome.color.h)}, ${formatNumber(genome.color.s)}, ${formatNumber(genome.color.l)}</span></div>
+    </div>`;
+
+    // Nodes
+    html += `<div style="${sectionStyle}">
+      <div style="${headerStyle}">NODES (${genome.nodes.length})</div>`;
+
+    genome.nodes.forEach((node, i) => {
+      html += `<div style="margin-bottom: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 6px;">
+        <div style="${subHeaderStyle}">Node ${i + 1}</div>
+        <div><span style="${labelStyle}">Size:</span> <span style="${valueStyle}">${formatNumber(node.size)}</span></div>
+        <div><span style="${labelStyle}">Friction:</span> <span style="${valueStyle}">${formatNumber(node.friction)}</span></div>
+        <div><span style="${labelStyle}">Position:</span> <span style="${valueStyle}">${formatVector(node.position)}</span></div>
+      </div>`;
+    });
+    html += '</div>';
+
+    // Muscles
+    html += `<div style="${sectionStyle}">
+      <div style="${headerStyle}">MUSCLES (${genome.muscles.length})</div>`;
+
+    genome.muscles.forEach((muscle, i) => {
+      const nodeAIndex = genome.nodes.findIndex(n => n.id === muscle.nodeA) + 1;
+      const nodeBIndex = genome.nodes.findIndex(n => n.id === muscle.nodeB) + 1;
+
+      html += `<div style="margin-bottom: 12px; padding: 8px; background: var(--bg-secondary); border-radius: 6px;">
+        <div style="${subHeaderStyle}">Muscle ${i + 1} (Node ${nodeAIndex} ↔ Node ${nodeBIndex})</div>
+
+        <div style="margin-bottom: 4px;">
+          <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 2px;">PHYSICAL</div>
+          <div><span style="${labelStyle}">Rest Length:</span> <span style="${valueStyle}">${formatNumber(muscle.restLength)}</span></div>
+          <div><span style="${labelStyle}">Stiffness:</span> <span style="${valueStyle}">${formatNumber(muscle.stiffness)}</span></div>
+          <div><span style="${labelStyle}">Damping:</span> <span style="${valueStyle}">${formatNumber(muscle.damping)}</span></div>
+        </div>
+
+        <div style="margin-bottom: 4px;">
+          <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 2px;">OSCILLATION</div>
+          <div><span style="${labelStyle}">Frequency:</span> <span style="${valueStyle}">${formatNumber(muscle.frequency)} Hz</span></div>
+          <div><span style="${labelStyle}">Amplitude:</span> <span style="${valueStyle}">${formatNumber(muscle.amplitude)}</span></div>
+          <div><span style="${labelStyle}">Phase:</span> <span style="${valueStyle}">${formatNumber(muscle.phase)} rad</span></div>
+        </div>
+
+        <div style="margin-bottom: 4px;">
+          <div style="color: var(--accent); font-size: 10px; margin-bottom: 2px;">v1: DIRECTION SENSING</div>
+          <div><span style="${labelStyle}">Direction Bias:</span> <span style="${valueStyle}">${formatVector(muscle.directionBias)}</span></div>
+          <div><span style="${labelStyle}">Bias Strength:</span> <span style="${valueStyle}">${formatNumber(muscle.biasStrength)}</span></div>
+        </div>
+
+        <div>
+          <div style="color: var(--success); font-size: 10px; margin-bottom: 2px;">v2: PROPRIOCEPTION & DISTANCE</div>
+          <div><span style="${labelStyle}">Velocity Bias:</span> <span style="${valueStyle}">${formatVector(muscle.velocityBias)}</span></div>
+          <div><span style="${labelStyle}">Velocity Strength:</span> <span style="${valueStyle}">${formatNumber(muscle.velocityStrength)}</span></div>
+          <div><span style="${labelStyle}">Distance Bias:</span> <span style="${valueStyle}">${formatNumber(muscle.distanceBias)} (${muscle.distanceBias > 0 ? 'near' : muscle.distanceBias < 0 ? 'far' : 'neutral'})</span></div>
+          <div><span style="${labelStyle}">Distance Strength:</span> <span style="${valueStyle}">${formatNumber(muscle.distanceStrength)}</span></div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+
+    viewer.innerHTML = html;
+
+    // Build and render family tree in the separate panel
+    this.buildAndRenderFamilyTree(genome);
+  }
+
+  private async buildAndRenderFamilyTree(genome: CreatureGenome): Promise<void> {
+    const container = document.getElementById('family-tree-container');
+    if (!container) return;
+
+    // Show loading state
+    container.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">Loading ancestry...</div>';
+
+    try {
+      const tree = await this.buildFamilyTree(genome, 100); // Trace all the way back to gen 0
+      container.innerHTML = this.renderFamilyTree(tree);
+    } catch (error) {
+      container.innerHTML = '<div style="color: var(--text-muted); text-align: center;">Unable to load ancestry</div>';
+    }
+  }
+
+  private async buildFamilyTree(genome: CreatureGenome, maxDepth: number): Promise<FamilyTreeNode> {
+    const currentRunId = runStorage.getCurrentRunId();
+    if (!currentRunId) {
+      return this.createTreeNode(genome, null);
+    }
+
+    // Build a map of all ancestors we can find
+    const ancestorMap = new Map<string, AncestorInfo>();
+
+    // Add current creature to map
+    const currentResult = this.simulationResults.find(r => r.genome.id === genome.id);
+    ancestorMap.set(genome.id, this.genomeToAncestorInfo(genome, currentResult?.finalFitness || 0, currentResult?.pelletsCollected || 0));
+
+    // Add all creatures from current simulation results
+    for (const result of this.simulationResults) {
+      if (!ancestorMap.has(result.genome.id)) {
+        ancestorMap.set(result.genome.id, this.genomeToAncestorInfo(
+          result.genome,
+          result.finalFitness,
+          result.pelletsCollected
+        ));
+      }
+    }
+
+    // Load ALL previous generations to build complete ancestry
+    // This ensures we can trace lineage even when creatures survive multiple generations
+    const maxGen = Math.max(genome.generation, this.generation, this.maxGeneration);
+    for (let gen = maxGen - 1; gen >= 0; gen--) {
+      try {
+        const results = await runStorage.loadGeneration(currentRunId, gen, this.config.fitnessWeights);
+        if (results) {
+          for (const result of results) {
+            if (!ancestorMap.has(result.genome.id)) {
+              ancestorMap.set(result.genome.id, this.genomeToAncestorInfo(
+                result.genome,
+                result.finalFitness,
+                result.pelletsCollected
+              ));
+            }
+          }
+        }
+      } catch {
+        // Generation not found, continue
+      }
+    }
+
+    // Build tree recursively, following actual parent IDs
+    const ancestorCount = { count: 0 };
+    return this.buildTreeNode(genome.id, ancestorMap, 0, maxDepth, ancestorCount);
+  }
+
+  private genomeToAncestorInfo(genome: CreatureGenome, fitness: number, pelletsCollected: number): AncestorInfo {
+    return {
+      id: genome.id,
+      generation: genome.generation,
+      fitness,
+      pelletsCollected,
+      nodeCount: genome.nodes.length,
+      muscleCount: genome.muscles.length,
+      color: genome.color,
+      parentIds: genome.parentIds
+    };
+  }
+
+  private shouldFollowLineage(parentCount: number): boolean {
+    switch (this.lineageMode) {
+      case 'crossover':
+        return parentCount === 2;
+      case 'clone':
+        return parentCount === 1;
+      case 'both':
+      default:
+        return parentCount > 0;
+    }
+  }
+
+  private buildTreeNode(
+    creatureId: string,
+    ancestorMap: Map<string, AncestorInfo>,
+    depth: number,
+    maxDepth: number,
+    ancestorCount: { count: number }
+  ): FamilyTreeNode {
+    const ancestor = ancestorMap.get(creatureId);
+    if (!ancestor) {
+      // Unknown ancestor - create placeholder
+      return {
+        creature: {
+          id: creatureId.substring(0, 8) + '...',
+          generation: -1,
+          fitness: 0,
+          pelletsCollected: 0,
+          nodeCount: 0,
+          muscleCount: 0,
+          color: { h: 0, s: 0, l: 0.5 },
+          parentIds: []
+        },
+        parents: []
+      };
+    }
+
+    // Count this ancestor
+    ancestorCount.count++;
+
+    const parents: FamilyTreeNode[] = [];
+    // Only follow parents if:
+    // 1. We haven't exceeded max depth
+    // 2. We haven't exceeded max ancestors
+    // 3. The lineage mode allows following this type of parent relationship
+    if (depth < maxDepth &&
+        ancestorCount.count < this.MAX_ANCESTORS &&
+        this.shouldFollowLineage(ancestor.parentIds.length)) {
+      for (const parentId of ancestor.parentIds) {
+        if (ancestorCount.count >= this.MAX_ANCESTORS) break;
+        parents.push(this.buildTreeNode(parentId, ancestorMap, depth + 1, maxDepth, ancestorCount));
+      }
+    }
+
+    return { creature: ancestor, parents };
+  }
+
+  private createTreeNode(genome: CreatureGenome, result: CreatureSimulationResult | null): FamilyTreeNode {
+    return {
+      creature: this.genomeToAncestorInfo(genome, result?.finalFitness || 0, result?.pelletsCollected || 0),
+      parents: []
+    };
+  }
+
+  private renderFamilyTree(tree: FamilyTreeNode): string {
+    // Track seen creature IDs to avoid duplicates
+    const seenIds = new Set<string>();
+
+    const renderCreatureLabel = (creature: AncestorInfo, isRoot: boolean): string => {
+      const hue = creature.color.h * 360;
+      const sat = creature.color.s * 100;
+      const light = creature.color.l * 100;
+      const color = `hsl(${hue}, ${sat}%, ${Math.min(light + 20, 80)}%)`;
+
+      return `<span style="color: ${color}; font-weight: ${isRoot ? '600' : '400'};">Gen ${creature.generation}</span>` +
+        `<span style="color: var(--text-muted);"> · ${creature.fitness.toFixed(0)}pts · ${creature.nodeCount}N/${creature.muscleCount}M</span>`;
+    };
+
+    const renderBranch = (node: FamilyTreeNode, indent: number, isLast: boolean, isRoot: boolean): string => {
+      const { creature } = node;
+
+      // Skip unknown nodes
+      if (creature.generation === -1) return '';
+
+      // Skip duplicates
+      if (seenIds.has(creature.id)) {
+        return '';
+      }
+      seenIds.add(creature.id);
+
+      // Build indent prefix
+      const indentPx = indent * 16;
+      const connector = indent === 0 ? '' : (isLast ? '└─ ' : '├─ ');
+
+      let html = `<div style="margin-left: ${indentPx}px; padding: 3px 0; font-size: 11px; white-space: nowrap;">`;
+      html += `<span style="color: var(--text-muted);">${connector}</span>`;
+      html += renderCreatureLabel(creature, isRoot);
+
+      // Show relationship type
+      const knownParents = node.parents.filter(p => p.creature.generation !== -1);
+      if (isRoot && knownParents.length > 0) {
+        const relType = knownParents.length === 1 ? '(mutated from)' : '(offspring of)';
+        html += `<span style="color: var(--text-muted); font-size: 9px; margin-left: 6px;">${relType}</span>`;
+      }
+
+      html += '</div>';
+
+      // Render parents
+      const unseenParents = knownParents.filter(p => !seenIds.has(p.creature.id));
+      for (let i = 0; i < unseenParents.length; i++) {
+        const parent = unseenParents[i];
+        const isLastParent = i === unseenParents.length - 1;
+        html += renderBranch(parent, indent + 1, isLastParent, false);
+      }
+
+      return html;
+    };
+
+    // Check if this is generation 0 (no ancestors)
+    if (tree.creature.generation === 0) {
+      return `
+        <div style="font-size: 11px;">
+          ${renderCreatureLabel(tree.creature, true)}
+          <div style="color: var(--text-muted); font-size: 10px; margin-top: 8px;">
+            Gen 0 - Randomly generated
+          </div>
+        </div>
+      `;
+    }
+
+    // Count unique known ancestors
+    const countUniqueAncestors = (node: FamilyTreeNode, seen: Set<string>): number => {
+      if (node.creature.generation === -1) return 0;
+      if (seen.has(node.creature.id)) return 0;
+      seen.add(node.creature.id);
+      let count = 1;
+      for (const parent of node.parents) {
+        count += countUniqueAncestors(parent, seen);
+      }
+      return count;
+    };
+
+    const totalUnique = countUniqueAncestors(tree, new Set());
+    const minGen = this.findMinGeneration(tree);
+    const cappedText = totalUnique >= this.MAX_ANCESTORS ? ` (capped at ${this.MAX_ANCESTORS})` : '';
+    const modeText = this.lineageMode !== 'both' ? ` [${this.lineageMode}]` : '';
+
+    // Render the tree with stats
+    return `
+      <div style="margin-bottom: 8px; color: var(--text-muted); font-size: 10px;">
+        ${totalUnique} ancestors traced to Gen ${minGen}${cappedText}${modeText}
+      </div>
+      <div style="font-family: monospace;">
+        ${renderBranch(tree, 0, true, true)}
+      </div>
+    `;
+  }
+
+  private findMinGeneration(node: FamilyTreeNode): number {
+    if (node.creature.generation === -1) return Infinity;
+    let min = node.creature.generation;
+    for (const parent of node.parents) {
+      const parentMin = this.findMinGeneration(parent);
+      if (parentMin < min) min = parentMin;
+    }
+    return min;
   }
 
   private animateReplay = (): void => {
