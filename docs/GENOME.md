@@ -391,36 +391,38 @@ interface CreatureGenome {
 
 ---
 
-### Neural Network Controller (Long-term)
+### Neural Network Controller
 
-**Problem:** Evolved weights have limited representational power compared to learned networks.
+> **Status: IMPLEMENTED** - See [NEURAL.md](./NEURAL.md) for full documentation.
 
-**Proposed approach:**
-```typescript
-interface NeuralControllerGene {
-  inputNodes: ('pellet_dir_x' | 'pellet_dir_y' | 'pellet_dir_z' |
-               'velocity_x' | 'velocity_y' | 'velocity_z' |
-               'pellet_dist' | 'time_phase')[];
-  hiddenLayers: number[];         // e.g., [8, 4] = two hidden layers
-  outputNodes: string[];          // Muscle IDs
-  weights: number[];              // Flattened weight matrix (evolved, not learned)
-  activationFunction: 'tanh' | 'relu' | 'sigmoid';
-}
-```
+Neural networks replace the oscillator-based control with learned input→output mappings.
 
-**What this enables:** Arbitrary input-output mappings, learned during evolution. Could develop complex conditional behaviors impossible with direct gene-to-behavior mappings.
+**Two control modes:**
+- **Hybrid**: Neural net modulates base oscillator (easier to evolve)
+- **Pure**: Neural net directly controls muscle contraction (more expressive)
 
-**Implementation complexity:** Very High - requires neural network forward pass per step, careful weight initialization, and likely NEAT-style topology evolution.
+**Architecture:**
+- 8 inputs (pellet direction, velocity, distance, time phase)
+- 8 hidden neurons (tanh activation)
+- N outputs (one per muscle)
+
+**See also:**
+- [NEURAL.md](./NEURAL.md) - Full neural network documentation
+- [NEURAL_IMPLEMENTATION.md](./NEURAL_IMPLEMENTATION.md) - Implementation checklist
+- [NEAT_FUTURE.md](./NEAT_FUTURE.md) - Topology evolution roadmap
 
 ---
 
-### Comparison of Future Extensions
+### Comparison of Extensions
 
-| Feature | Behavior Richness | Implementation Effort | Evolution Speed |
-|---------|-------------------|----------------------|-----------------|
-| Phase Coupling | Medium | Medium | Fast |
-| Reflex Arcs | High | Medium-High | Medium |
-| Behavioral Modes | Very High | High | Slow |
-| Neural Networks | Unlimited | Very High | Very Slow |
+| Feature | Behavior Richness | Implementation Effort | Evolution Speed | Status |
+|---------|-------------------|----------------------|-----------------|--------|
+| Phase Coupling | Medium | Medium | Fast | Future |
+| Reflex Arcs | High | Medium-High | Medium | Future |
+| Behavioral Modes | Very High | High | Slow | Future |
+| Neural Networks (Fixed) | High | Medium | Medium | **In Progress** |
+| Neural Networks (NEAT) | Unlimited | Very High | Slow | Planned |
 
-**Recommended order:** Phase Coupling → Reflex Arcs → Behavioral Modes → Neural Networks
+**Current focus:** Fixed-topology neural networks with hybrid/pure control modes.
+
+**Recommended future order:** Phase Coupling → Reflex Arcs → NEAT → Behavioral Modes
