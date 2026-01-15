@@ -5,6 +5,7 @@ import { Population } from './genetics/Population';
 import { Creature } from './core/Creature';
 import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, FitnessWeights } from './types';
 import { GraphPanel } from './ui/GraphPanel';
+import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
 import { RunStorage } from './storage/RunStorage';
 
 // Global storage instance
@@ -110,8 +111,10 @@ class EvolutionApp {
   private creatureCards: CreatureCard[] = [];
   private gridContainer: HTMLElement | null = null;
 
-  // Graph panel
+  // Graph panels
   private graphPanel: GraphPanel | null = null;
+  private creatureTypesPanel: CreatureTypesPanel | null = null;
+  private creatureTypeHistory: CreatureTypeEntry[] = [];
 
   // Config
   private config: Config = {
@@ -162,6 +165,7 @@ class EvolutionApp {
     this.createTooltip();
     this.createReplayModal();
     this.graphPanel = new GraphPanel();
+    this.creatureTypesPanel = new CreatureTypesPanel();
     this.showMenu();
   }
 
@@ -746,6 +750,7 @@ class EvolutionApp {
     if (this.menuScreen) this.menuScreen.style.display = 'flex';
     if (this.gridUI) this.gridUI.style.display = 'none';
     if (this.graphPanel) this.graphPanel.hide();
+    if (this.creatureTypesPanel) this.creatureTypesPanel.hide();
     this.animatePreview();
   }
 
@@ -837,7 +842,10 @@ class EvolutionApp {
     this.gridUI.querySelector('#run-1x-btn')?.addEventListener('click', () => this.autoRun(1));
     this.gridUI.querySelector('#run-10x-btn')?.addEventListener('click', () => this.autoRun(10));
     this.gridUI.querySelector('#run-100x-btn')?.addEventListener('click', () => this.autoRun(100));
-    this.gridUI.querySelector('#graph-btn')?.addEventListener('click', () => this.graphPanel?.toggle());
+    this.gridUI.querySelector('#graph-btn')?.addEventListener('click', () => {
+      this.graphPanel?.toggle();
+      this.creatureTypesPanel?.toggle();
+    });
     this.gridUI.querySelector('#reset-btn')?.addEventListener('click', () => this.reset());
   }
 
@@ -2005,6 +2013,23 @@ class EvolutionApp {
         this.graphPanel.show();
       }
 
+      // Rebuild creature type history from current results (we don't persist this)
+      this.creatureTypeHistory = [];
+      const nodeCountDistribution = new Map<number, number>();
+      for (const result of results) {
+        const nodeCount = result.genome.nodes.length;
+        nodeCountDistribution.set(nodeCount, (nodeCountDistribution.get(nodeCount) || 0) + 1);
+      }
+      this.creatureTypeHistory.push({
+        generation: maxGen,
+        nodeCountDistribution
+      });
+
+      if (this.creatureTypesPanel && this.creatureTypeHistory.length > 0) {
+        this.creatureTypesPanel.updateData(this.creatureTypeHistory);
+        this.creatureTypesPanel.show();
+      }
+
       // Restore best creature ever
       if (run.bestCreature) {
         this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
@@ -2995,6 +3020,7 @@ class EvolutionApp {
   private async startSimulation(): Promise<void> {
     this.generation = 0;
     this.fitnessHistory = [];
+    this.creatureTypeHistory = [];
     this.evolutionStep = 'idle';
     this.viewingGeneration = null;  // Viewing current (live) generation
     this.runName = '';  // Reset run name for new run
@@ -3419,9 +3445,25 @@ class EvolutionApp {
     // Save fitness history to storage
     runStorage.updateFitnessHistory(this.fitnessHistory);
 
+    // Update creature type history
+    const nodeCountDistribution = new Map<number, number>();
+    for (const result of this.simulationResults) {
+      const nodeCount = result.genome.nodes.length;
+      nodeCountDistribution.set(nodeCount, (nodeCountDistribution.get(nodeCount) || 0) + 1);
+    }
+    this.creatureTypeHistory.push({
+      generation: this.generation,
+      nodeCountDistribution
+    });
+
     if (this.graphPanel) {
       this.graphPanel.updateData(this.fitnessHistory);
       this.graphPanel.show();
+    }
+
+    if (this.creatureTypesPanel) {
+      this.creatureTypesPanel.updateData(this.creatureTypeHistory);
+      this.creatureTypesPanel.show();
     }
 
     console.log(`Generation ${this.generation}: Best=${best.toFixed(1)}, Avg=${avg.toFixed(1)}, Worst=${worst.toFixed(1)}`);
@@ -3513,6 +3555,7 @@ class EvolutionApp {
 
     this.generation = 0;
     this.fitnessHistory = [];
+    this.creatureTypeHistory = [];
     this.simulationResults = [];
     this.population = null;
     this.evolutionStep = 'idle';
@@ -3523,6 +3566,7 @@ class EvolutionApp {
     this.longestSurvivingGenerations = 0;
     if (this.gridContainer) this.gridContainer.innerHTML = '';
     if (this.graphPanel) this.graphPanel.hide();
+    if (this.creatureTypesPanel) this.creatureTypesPanel.hide();
     this.showMenu();
   }
 }
