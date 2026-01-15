@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "lint:duplicates": "jscpd src",
+    "lint:dead-code": "knip",
+    "lint": "npm run lint:duplicates && npm run lint:dead-code"
   },
   "repository": {
     "type": "git",
@@ -41,6 +44,8 @@
     "@types/three": "^0.182.0",
     "@vitest/ui": "^4.0.17",
     "happy-dom": "^20.1.0",
+    "jscpd": "^4.0.7",
+    "knip": "^5.81.0",
     "vitest": "^4.0.17"
   }
 }
