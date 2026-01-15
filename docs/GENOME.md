@@ -266,23 +266,34 @@ When two creatures reproduce:
 
 ## Evolution Pressure
 
-### What Gets Selected For
+### Fitness Model (Edge-based, Ground Distance)
 
-1. **Pellet Collection** (primary) - +100 fitness per pellet
-2. **Proximity to Pellet** - Bonus for being close to active pellet
-3. **Movement** - Small bonus for total path length (capped)
-4. **Net Displacement** - Optional bonus for straight-line travel
+| Component | Points | Description |
+|-----------|--------|-------------|
+| **Progress** | 0-80 | XZ ground distance from creature's EDGE toward pellet |
+| **Collection** | +20 | Bonus when pellet actually collected (requires correct Y height) |
+| **Movement** | 0-25 | XZ net displacement over time (ignores falling, discourages flailing) |
+| **Regression** | -20 max | Penalty for moving away from pellet (after first pellet) |
+
+**Total per pellet: 100 max** (80 progress + 20 collection) + up to 25 movement bonus
+
+**Key mechanics:**
+- All distances on XZ plane (ground only, Y ignored for progress)
+- Distance from creature's nearest **edge**, not center
+- Creature radius from genome with 1.3x buffer for extension
+- Progress capped at 80 → must actually collect to get final 20
 
 ### What This Selects For in Genomes
 
 | Trait | Selection Pressure |
 |-------|-------------------|
-| Efficient locomotion | Movement + pellet collection |
-| Directional steering (v1) | Pellet proximity + collection |
-| Momentum control (v2) | Efficient approach paths |
-| Effort scaling (v2) | Sprint vs search behaviors |
-| Appropriate body size | Trade-off: mobility vs. reach |
-| Coordinated oscillation | Effective gaits emerge |
+| Basic locomotion | Movement bonus rewards consistent motion (stepping stone) |
+| Efficient locomotion | Progress toward pellets |
+| Directional steering (v1) | Changing direction to reach pellets in opposite arcs |
+| Momentum control (v2) | Efficient approach without overshooting |
+| Vertical reaching | Collection bonus requires correct height |
+| Appropriate body size | Edge-based distance means large creatures must move further |
+| Coordinated oscillation | Effective gaits for direction changes |
 
 ---
 

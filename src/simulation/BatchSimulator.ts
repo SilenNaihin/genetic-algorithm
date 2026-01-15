@@ -1,6 +1,6 @@
 import * as CANNON from 'cannon-es';
 import type { CreatureGenome, Vector3, SimulationConfig } from '../types';
-import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS } from '../types';
+import { DEFAULT_CONFIG } from '../types';
 import { dot, normalize, subtract, length } from '../utils/math';
 
 export interface SimulationFrame {
@@ -34,38 +34,115 @@ export interface PelletData {
   position: Vector3;
   collectedAtFrame: number | null;
   spawnedAtFrame: number;  // When this pellet appeared
+  initialDistance: number; // Distance from creature when pellet spawned (for progress-based fitness)
 }
 
-// Generate a pellet position that gets progressively harder
-function generatePelletPosition(arenaSize: number, pelletIndex: number): Vector3 {
-  // Progressive difficulty:
-  // - First pellet: close to origin, on ground
-  // - Later pellets: further away AND elevated (not on ground!)
+// Track the angle of the last pellet relative to creature (for opposite-half spawning)
+let lastPelletAngle: number | null = null;
 
-  // Distance from origin increases with pellet index
-  const minRadius = 1.0;  // First pellet very close
-  const maxRadius = arenaSize * 0.4;
-  const radiusProgress = Math.min(pelletIndex / 5, 1);  // Reaches max at pellet 5
-  const radius = minRadius + (maxRadius - minRadius) * radiusProgress;
-
+// Generate a pellet position in the opposite 180° half from the last pellet
+// Distance is measured from creature's EDGE (XZ radius), not center
+function generatePelletPosition(
+  arenaSize: number,
+  pelletIndex: number,
+  creaturePosition: Vector3,
+  creatureXZRadius: number  // XZ-only radius (ground footprint)
+): Vector3 {
   // Height increases with pellet index
-  // First pellet on ground, subsequent ones elevated
-  // Heights: ground(0.3), then progressively higher (0.6, 0.9, 1.2, 1.5, 1.8, 2.1, 2.4, 2.7, 3.0)
   const baseHeight = 0.3;
   const heightIncrement = 0.4;
   const height = pelletIndex === 0 ? baseHeight : baseHeight + pelletIndex * heightIncrement;
 
-  // Random angle for position
-  const angle = Math.random() * Math.PI * 2;
+  // Progressive distance FROM CREATURE'S EDGE (not center):
+  // +4 buffer added to account for full muscle extension (chain of muscles can extend far)
+  // Pellet 1: 7-8 units from edge, Pellet 2-3: 8-9 units, Pellet 4+: 9-10 units
+  let minDistFromEdge: number, maxDistFromEdge: number;
+  if (pelletIndex === 0) {
+    minDistFromEdge = 7.0; maxDistFromEdge = 8.0;
+  } else if (pelletIndex <= 2) {
+    minDistFromEdge = 8.0; maxDistFromEdge = 9.0;
+  } else {
+    minDistFromEdge = 9.0; maxDistFromEdge = 10.0;
+  }
 
-  // Add some randomness to radius (±20%)
-  const actualRadius = radius * (0.8 + Math.random() * 0.4);
+  // Total distance from center = creature XZ radius + distance from edge
+  const distFromEdge = minDistFromEdge + Math.random() * (maxDistFromEdge - minDistFromEdge);
+  const totalDistFromCenter = creatureXZRadius + distFromEdge;
 
-  return {
-    x: Math.cos(angle) * actualRadius,
-    y: height,
-    z: Math.sin(angle) * actualRadius
-  };
+  // Opposite-half spawning:
+  // If we have a last pellet angle, spawn in the opposite 180° arc
+  let angle: number;
+  if (lastPelletAngle === null) {
+    // First pellet: random angle
+    angle = Math.random() * Math.PI * 2;
+  } else {
+    // Spawn in opposite 180° arc: [lastAngle + 90°, lastAngle + 270°]
+    // This is centered around lastAngle + 180° (opposite direction)
+    const oppositeCenter = lastPelletAngle + Math.PI;
+    // Random angle within ±90° of the opposite direction
+    const offsetFromOpposite = (Math.random() - 0.5) * Math.PI;  // -90° to +90°
+    angle = oppositeCenter + offsetFromOpposite;
+  }
+
+  // Calculate position relative to creature
+  let x = creaturePosition.x + Math.cos(angle) * totalDistFromCenter;
+  let z = creaturePosition.z + Math.sin(angle) * totalDistFromCenter;
+
+  // Clamp to arena bounds
+  const arenaBound = arenaSize * 0.45;
+  x = Math.max(-arenaBound, Math.min(arenaBound, x));
+  z = Math.max(-arenaBound, Math.min(arenaBound, z));
+
+  // Store this pellet's angle for next spawn
+  lastPelletAngle = angle;
+
+  return { x, y: height, z };
+}
+
+// Calculate creature's XZ radius from genome (rest state, with buffer for extension)
+// This uses the original genome positions, not current physics positions
+function calculateCreatureXZRadiusFromGenome(genome: CreatureGenome): number {
+  // Calculate center of genome nodes (XZ only)
+  let centerX = 0, centerZ = 0;
+  for (const node of genome.nodes) {
+    centerX += node.position.x;
+    centerZ += node.position.z;
+  }
+  centerX /= genome.nodes.length;
+  centerZ /= genome.nodes.length;
+
+  // Find max XZ distance from center to any node edge
+  let maxDist = 0;
+  for (const node of genome.nodes) {
+    const dx = node.position.x - centerX;
+    const dz = node.position.z - centerZ;
+    const dist = Math.sqrt(dx * dx + dz * dz) + node.size * 0.5;  // Add node radius
+    if (dist > maxDist) {
+      maxDist = dist;
+    }
+  }
+
+  // Add buffer (1.3x) to account for creature potentially being contracted at spawn
+  // and muscle extension making it larger than rest state
+  const bufferedRadius = maxDist * 1.3;
+
+  // Minimum radius of 1.0 unit - even if creature evolved to be tiny/clustered,
+  // we still treat it as having at least this radius for pellet spawning fairness
+  const MIN_CREATURE_RADIUS = 1.0;
+  return Math.max(MIN_CREATURE_RADIUS, bufferedRadius);
+}
+
+// Calculate XZ ground distance from creature's edge to a point
+function edgeToPointGroundDistance(
+  creatureCenter: Vector3,
+  creatureXZRadius: number,
+  point: Vector3
+): number {
+  const dx = point.x - creatureCenter.x;
+  const dz = point.z - creatureCenter.z;
+  const groundDistFromCenter = Math.sqrt(dx * dx + dz * dz);
+  // Distance from edge = distance from center - radius (can be negative if point is inside)
+  return Math.max(0, groundDistFromCenter - creatureXZRadius);
 }
 
 /**
@@ -100,13 +177,13 @@ export function simulateCreature(
         centerOfMass: { x: 0, y: 0.5, z: 0 },
         activePelletIndex: 0
       }],
-      finalFitness: 1,
+      finalFitness: 0,
       pelletsCollected: 0,
       distanceTraveled: 0,
       netDisplacement: 0,
       closestPelletDistance: Infinity,
       pellets: [],
-      fitnessOverTime: [1],
+      fitnessOverTime: [0],
       disqualified: 'frequency_exceeded'
     };
   }
@@ -192,16 +269,39 @@ export function simulateCreature(
     });
   }
 
+  // Reset pellet angle tracker for each new creature simulation
+  lastPelletAngle = null;
+
   // Create pellets - one at a time, respawns when collected
   const pellets: PelletData[] = [];
   let currentPelletIndex = 0;
 
-  // Create first pellet
+  // Calculate creature's XZ radius from genome (with buffer for extension)
+  // This is consistent regardless of current physics state
+  const creatureXZRadius = calculateCreatureXZRadiusFromGenome(genome);
+
+  // Calculate initial center of mass
+  let spawnCOMX = 0, spawnCOMY = 0, spawnCOMZ = 0, spawnMass = 0;
+  for (const body of nodeBodies.values()) {
+    spawnCOMX += body.position.x * body.mass;
+    spawnCOMY += body.position.y * body.mass;
+    spawnCOMZ += body.position.z * body.mass;
+    spawnMass += body.mass;
+  }
+  const spawnCOM: Vector3 = spawnMass > 0
+    ? { x: spawnCOMX / spawnMass, y: spawnCOMY / spawnMass, z: spawnCOMZ / spawnMass }
+    : { x: 0, y: 0.5, z: 0 };
+
+  // Create first pellet - spawn relative to creature's edge, in random direction
+  const firstPelletPos = generatePelletPosition(config.arenaSize, 0, spawnCOM, creatureXZRadius);
+  // Initial distance = XZ ground distance from creature's EDGE to pellet
+  const firstPelletEdgeDist = edgeToPointGroundDistance(spawnCOM, creatureXZRadius, firstPelletPos);
   pellets.push({
     id: `pellet_0`,
-    position: generatePelletPosition(config.arenaSize, 0),
+    position: firstPelletPos,
     collectedAtFrame: null,
-    spawnedAtFrame: 0
+    spawnedAtFrame: 0,
+    initialDistance: firstPelletEdgeDist  // Edge-based ground distance
   });
 
   // Simulation
@@ -229,61 +329,82 @@ export function simulateCreature(
     return pellets.find(p => p.collectedAtFrame === null) || null;
   };
 
-  // Helper to calculate fitness at any point (with NaN protection)
-  // Uses configurable weights from config.fitnessWeights
-  const weights = config.fitnessWeights || DEFAULT_FITNESS_WEIGHTS;
+  // Track the closest the creature's edge has gotten to the current pellet (for penalty calculation)
+  let closestEdgeDistanceToCurrentPellet = Infinity;
 
-  const calculateCurrentFitness = (centerOfMass: Vector3, pelletsCollectedCount: number, distTraveled: number, initialCOM: Vector3 | null): number => {
-    // If disqualified, always return 1
-    if (disqualified) return 1;
+  // FITNESS MODEL (edge-based, XZ ground distance):
+  // - Starts at 0
+  // - 0-80 points for XZ progress toward current pellet (capped at 80)
+  // - +20 points when pellet is actually collected (requires reaching correct Y height)
+  // - After first pellet: -20 max penalty if moving AWAY from next pellet
+  // - Total per pellet: 100 (80 progress + 20 collection)
+  // - Movement bonus: 0-25 points for NET displacement over time (discourages flailing)
+  const MOVEMENT_BONUS_CAP = 25;  // Maximum bonus for directed locomotion
+  const TARGET_DISPLACEMENT_RATE = 1.0;  // Units/second for full bonus (net displacement, not total)
 
-    // Validate inputs
+  const calculateCurrentFitness = (
+    centerOfMass: Vector3,
+    pelletsCollectedCount: number,
+    currentNetDisplacement: number,  // Straight-line distance from start (not total distance)
+    currentTime: number
+  ): number => {
+    // If disqualified, always return 0
+    if (disqualified) return 0;
+
+    // Validate center of mass
     const validCOM = {
       x: isFinite(centerOfMass.x) ? centerOfMass.x : 0,
       y: isFinite(centerOfMass.y) ? centerOfMass.y : 0,
       z: isFinite(centerOfMass.z) ? centerOfMass.z : 0
     };
-    const validDist = isFinite(distTraveled) ? distTraveled : 0;
 
-    // Base fitness
-    let f = weights.baseFitness;
+    // Base: 100 points per collected pellet (80 progress + 20 collection bonus)
+    let fitness = pelletsCollectedCount * 100;
 
-    // PRIMARY: Pellet collection
-    f += pelletsCollectedCount * weights.pelletWeight;
-
-    // SECONDARY: Proximity bonus for being close to active pellet
+    // Progress toward current pellet (0-80 points, using XZ ground distance from EDGE)
     const activePellet = getActivePellet();
-    if (activePellet) {
-      const pdx = validCOM.x - activePellet.position.x;
-      const pdy = validCOM.y - activePellet.position.y;
-      const pdz = validCOM.z - activePellet.position.z;
-      const pelletDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
-      if (isFinite(pelletDist)) {
-        f += Math.max(0, weights.proximityMaxDistance - pelletDist) * weights.proximityWeight;
+    if (activePellet && activePellet.initialDistance > 0) {
+      // Calculate current edge-to-pellet ground distance (XZ only)
+      const currentEdgeDist = edgeToPointGroundDistance(validCOM, creatureXZRadius, activePellet.position);
+
+      if (isFinite(currentEdgeDist)) {
+        // Progress = how much closer the EDGE has gotten (0 = no progress, 1 = edge reached pellet horizontally)
+        const progress = Math.max(0, Math.min(1,
+          (activePellet.initialDistance - currentEdgeDist) / activePellet.initialDistance
+        ));
+        // Cap at 80 points (remaining 20 comes from actually collecting)
+        fitness += progress * 80;
+
+        // Track closest edge distance for penalty calculation
+        if (currentEdgeDist < closestEdgeDistanceToCurrentPellet) {
+          closestEdgeDistanceToCurrentPellet = currentEdgeDist;
+        }
+
+        // PENALTY: After first pellet, penalize up to -20 for moving AWAY from pellet
+        // Only apply if we've collected at least one pellet and are moving away
+        if (pelletsCollectedCount > 0 && currentEdgeDist > closestEdgeDistanceToCurrentPellet) {
+          // How much further we've moved from our closest approach
+          const regressionDist = currentEdgeDist - closestEdgeDistanceToCurrentPellet;
+          // Penalty scales with regression, max -20 points
+          // Full -20 penalty when regression equals half the initial distance
+          const regressionRatio = Math.min(1, regressionDist / (activePellet.initialDistance * 0.5));
+          fitness -= regressionRatio * 20;
+        }
       }
     }
 
-    // TERTIARY: Movement bonus (capped)
-    f += Math.min(validDist * weights.movementWeight, weights.movementCap);
-
-    // QUATERNARY: Net displacement bonus
-    if (weights.distanceWeight > 0 && initialCOM) {
-      const validInitialCOM = {
-        x: isFinite(initialCOM.x) ? initialCOM.x : 0,
-        y: isFinite(initialCOM.y) ? initialCOM.y : 0,
-        z: isFinite(initialCOM.z) ? initialCOM.z : 0
-      };
-      const netDx = validCOM.x - validInitialCOM.x;
-      const netDy = validCOM.y - validInitialCOM.y;
-      const netDz = validCOM.z - validInitialCOM.z;
-      const netDisp = Math.sqrt(netDx * netDx + netDy * netDy + netDz * netDz);
-      if (isFinite(netDisp)) {
-        f += Math.min(netDisp * weights.distanceWeight, weights.distanceCap);
-      }
+    // MOVEMENT BONUS: Reward NET displacement over time (stepping stone for evolution)
+    // Uses net displacement (straight-line from start) NOT total distance traveled
+    // This discourages flailing: lots of motion that goes nowhere gets 0 bonus
+    // A creature that walks in a straight line gets full bonus
+    if (currentTime > 0.5) {  // Only apply after settling period
+      const displacementRate = currentNetDisplacement / currentTime;  // Units per second
+      const movementRatio = Math.min(1, displacementRate / TARGET_DISPLACEMENT_RATE);
+      fitness += movementRatio * MOVEMENT_BONUS_CAP;
     }
 
-    // Final validation
-    return isFinite(f) ? Math.max(f, 1) : 1;
+    // Ensure fitness is never negative (minimum 0)
+    return Math.max(0, fitness);
   };
 
   // v2: Track previous center of mass for velocity calculation
@@ -425,6 +546,16 @@ export function simulateCreature(
         initialCenterOfMass = { ...centerOfMass };
       }
 
+      // Calculate current net displacement (XZ only - ignore Y/falling)
+      let currentNetDisplacement = 0;
+      if (initialCenterOfMass) {
+        const ndx = centerOfMass.x - initialCenterOfMass.x;
+        const ndz = centerOfMass.z - initialCenterOfMass.z;
+        // XZ only - falling doesn't count as movement
+        currentNetDisplacement = Math.sqrt(ndx * ndx + ndz * ndz);
+        if (!isFinite(currentNetDisplacement)) currentNetDisplacement = 0;
+      }
+
       // Check pellet collection - only check active pellet
       const activePellet = getActivePellet();
       if (activePellet) {
@@ -443,13 +574,26 @@ export function simulateCreature(
             pelletsCollected++;
             currentPelletIndex++;
 
+            // Reset closest edge distance tracker for the next pellet
+            closestEdgeDistanceToCurrentPellet = Infinity;
+
             // Spawn next pellet (up to a max)
+            // Use genome-based XZ radius (consistent, with buffer for extension)
             if (currentPelletIndex < 10) {  // Max 10 pellets per simulation
+              const newPelletPos = generatePelletPosition(
+                config.arenaSize,
+                currentPelletIndex,
+                centerOfMass,       // Creature's current position
+                creatureXZRadius    // Genome-based XZ radius (consistent)
+              );
+              // Initial distance = XZ ground distance from creature's EDGE to pellet
+              const newPelletEdgeDist = edgeToPointGroundDistance(centerOfMass, creatureXZRadius, newPelletPos);
               pellets.push({
                 id: `pellet_${currentPelletIndex}`,
-                position: generatePelletPosition(config.arenaSize, currentPelletIndex),
+                position: newPelletPos,
                 collectedAtFrame: null,
-                spawnedAtFrame: frames.length
+                spawnedAtFrame: frames.length,
+                initialDistance: newPelletEdgeDist  // Edge-based ground distance
               });
             }
             break;
@@ -465,7 +609,7 @@ export function simulateCreature(
       });
 
       // Track fitness at this frame
-      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, distanceTraveled, initialCenterOfMass));
+      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, currentNetDisplacement, simulationTime));
 
       lastFrameTime = simulationTime;
     }
@@ -500,15 +644,19 @@ export function simulateCreature(
   const netDx = validFinalCOM.x - validInitialCOM.x;
   const netDy = validFinalCOM.y - validInitialCOM.y;
   const netDz = validFinalCOM.z - validInitialCOM.z;
+  // Full 3D net displacement for stats
   const netDisplacement = Math.sqrt(netDx * netDx + netDy * netDy + netDz * netDz);
   const validNetDisplacement = isFinite(netDisplacement) ? netDisplacement : 0;
+  // XZ-only net displacement for fitness (falling doesn't count)
+  const netDisplacementXZ = Math.sqrt(netDx * netDx + netDz * netDz);
+  const validNetDisplacementXZ = isFinite(netDisplacementXZ) ? netDisplacementXZ : 0;
 
-  // If disqualified during simulation, return with fitness 1
+  // If disqualified during simulation, return with fitness 0
   if (disqualified) {
     return {
       genome,
       frames,
-      finalFitness: 1,
+      finalFitness: 0,
       pelletsCollected,
       distanceTraveled,
       netDisplacement: validNetDisplacement,
@@ -519,36 +667,17 @@ export function simulateCreature(
     };
   }
 
-  // FITNESS CALCULATION - using configurable weights (weights already declared above)
-  let fitness = weights.baseFitness;
-
-  // PRIMARY: Pellet collection is the main driver
-  fitness += pelletsCollected * weights.pelletWeight;
-
-  // SECONDARY: Proximity bonus for being close to current target
-  if (isFinite(closestPelletDistance)) {
-    const proximityBonus = Math.max(0, weights.proximityMaxDistance - closestPelletDistance) * weights.proximityWeight;
-    fitness += proximityBonus;
-  }
-
-  // TERTIARY: Movement bonus (capped) - rewards total path length
-  const validDistanceTraveled = isFinite(distanceTraveled) ? distanceTraveled : 0;
-  fitness += Math.min(validDistanceTraveled * weights.movementWeight, weights.movementCap);
-
-  // QUATERNARY: Net displacement bonus - rewards straight-line distance from start
-  if (weights.distanceWeight > 0) {
-    fitness += Math.min(validNetDisplacement * weights.distanceWeight, weights.distanceCap);
-  }
-
-  // Final validation - ensure fitness is always a positive finite number
-  if (!isFinite(fitness) || fitness < 1) {
-    fitness = 1;
-  }
+  // SIMPLE FITNESS MODEL:
+  // - 100 points per collected pellet
+  // - 0-80 points for progress toward current pellet
+  // - 0-25 points for XZ net displacement over time (discourages flailing, ignores falling)
+  // - After first pellet: up to -20 penalty for moving away
+  const finalFitness = calculateCurrentFitness(validFinalCOM, pelletsCollected, validNetDisplacementXZ, simulationTime);
 
   return {
     genome,
     frames,
-    finalFitness: fitness,
+    finalFitness,
     pelletsCollected,
     distanceTraveled,
     netDisplacement: validNetDisplacement,

@@ -330,11 +330,13 @@ export function mutateGenome(
   config: MutationConfig = DEFAULT_MUTATION_CONFIG,
   constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
 ): CreatureGenome {
+  // Mutation modifies an existing creature - does NOT increment generation
+  // Generation is set by crossover/clone, mutation just tweaks the genes
   const newGenome: CreatureGenome = {
     ...genome,
     id: generateId('creature'),
-    parentIds: [...genome.parentIds, genome.id],
-    generation: genome.generation + 1,
+    parentIds: genome.parentIds,  // Keep same parents - mutation doesn't change lineage
+    generation: genome.generation,  // Keep same generation - mutation doesn't create new generation
     nodes: genome.nodes.map(n => mutateNode({ ...n, id: generateId('node') }, config, constraints)),
     muscles: [],
     color: { ...genome.color }

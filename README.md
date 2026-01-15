@@ -42,33 +42,28 @@ Open `http://localhost:5173` in your browser.
 
 ### Fitness Function
 
-The fitness function determines how creatures are scored. Configure these weights in the main menu:
+Creatures are scored using an edge-based, ground-distance system:
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| **Pellet Weight** | Points per pellet collected | 100 |
-| **Proximity Weight** | Bonus multiplier for being close to active pellet | 2.5 |
-| **Proximity Distance** | Max distance for proximity bonus | 20 |
-| **Movement Weight** | Points per unit of total path length | 1 |
-| **Movement Cap** | Maximum movement bonus | 5 |
-| **Distance Weight** | Points per unit of net displacement (start to end) | 0 |
-| **Distance Cap** | Maximum distance bonus | 50 |
-| **Base Fitness** | Starting fitness for all creatures | 10 |
+| Component | Points | Description |
+|-----------|--------|-------------|
+| **Progress** | 0-80 | XZ ground distance progress from creature's EDGE toward pellet |
+| **Collection** | +20 | Bonus when pellet is actually collected (requires correct height) |
+| **Movement Bonus** | 0-25 | XZ net displacement over time (ignores falling, discourages flailing) |
+| **Regression Penalty** | -20 max | Penalty for moving away from pellet (after first pellet) |
 
-**Formula:**
-```
-fitness = baseFitness
-        + pelletsCollected * pelletWeight
-        + max(0, proximityMaxDistance - distToPellet) * proximityWeight
-        + min(totalPathLength * movementWeight, movementCap)
-        + min(netDisplacement * distanceWeight, distanceCap)
-```
+**Total per pellet: 100 max** (80 progress + 20 collection) + up to 25 movement bonus
 
-**Tips:**
-- Default settings prioritize pellet collection
-- Increase `distanceWeight` to evolve creatures that travel far
-- Increase `movementWeight` and `movementCap` to reward active movement
-- Set `pelletWeight` to 0 and increase `distanceWeight` for distance-only evolution
+**Key mechanics:**
+- All distances measured on XZ plane (ground only, Y/height ignored for progress)
+- Distance measured from creature's nearest **edge**, not center
+- Creature radius calculated from genome with 1.3x buffer for muscle extension
+- Progress capped at 80 to incentivize actually collecting (reaching correct height)
+
+**Anti-luck pellet spawning:**
+- Pellets spawn in opposite 180° arc from previous pellet direction
+- Progressive distances from creature's edge: 7-8 units (1st), 8-9 units (2nd-3rd), 9-10 units (4th+)
+- Extra distance accounts for full muscle extension (chains of muscles can reach far)
+- Ensures creatures must change direction to collect successive pellets
 
 ### Simulation Parameters
 

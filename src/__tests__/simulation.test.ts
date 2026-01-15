@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
 import { simulatePopulation } from '../simulation/BatchSimulator';
-import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS } from '../types';
+import { DEFAULT_CONFIG } from '../types';
 
 describe('BatchSimulator', () => {
   // Use shorter duration for tests
@@ -133,64 +133,27 @@ describe('BatchSimulator', () => {
   });
 
   describe('Fitness Calculation', () => {
-    it('base fitness is applied', async () => {
-      const config = {
-        ...testConfig,
-        fitnessWeights: {
-          ...DEFAULT_FITNESS_WEIGHTS,
-          baseFitness: 50,
-          pelletWeight: 0,
-          proximityWeight: 0,
-          movementWeight: 0,
-          distanceWeight: 0
-        }
-      };
-
+    it('fitness is non-negative', async () => {
       const genomes = [generateRandomGenome()];
-      const results = await simulatePopulation(genomes, config);
+      const results = await simulatePopulation(genomes, testConfig);
 
-      // Fitness should be at least the base fitness (unless disqualified)
-      if (!results[0].disqualified) {
-        expect(results[0].finalFitness).toBeGreaterThanOrEqual(50);
-      }
+      // New fitness model: starts at 0, can get up to 100 per pellet + progress
+      // Fitness should always be >= 0
+      expect(results[0].finalFitness).toBeGreaterThanOrEqual(0);
     });
 
-    it('fitness increases with movement', async () => {
-      const configNoMovement = {
-        ...testConfig,
-        fitnessWeights: {
-          ...DEFAULT_FITNESS_WEIGHTS,
-          baseFitness: 10,
-          pelletWeight: 0,
-          proximityWeight: 0,
-          movementWeight: 0,
-          distanceWeight: 0
+    it('fitness reflects progress toward pellet', async () => {
+      const genomes = [generateRandomGenome(), generateRandomGenome()];
+      const results = await simulatePopulation(genomes, testConfig);
+
+      // All non-disqualified creatures should have some fitness based on progress
+      // (0-100 per pellet being approached, 100 per pellet collected)
+      for (const result of results) {
+        if (!result.disqualified) {
+          // Fitness should be between 0 and (pellets * 100 + 100 for current progress)
+          expect(result.finalFitness).toBeGreaterThanOrEqual(0);
+          expect(result.finalFitness).toBeLessThanOrEqual((result.pelletsCollected + 1) * 100);
         }
-      };
-
-      const configWithMovement = {
-        ...testConfig,
-        fitnessWeights: {
-          ...DEFAULT_FITNESS_WEIGHTS,
-          baseFitness: 10,
-          pelletWeight: 0,
-          proximityWeight: 0,
-          movementWeight: 10,
-          movementCap: 100,
-          distanceWeight: 0
-        }
-      };
-
-      const genome = generateRandomGenome();
-      const genomes = [genome];
-
-      const resultsNoMov = await simulatePopulation(genomes, configNoMovement);
-      const resultsWithMov = await simulatePopulation(genomes, configWithMovement);
-
-      // Fitness with movement weight should be >= fitness without
-      // (assuming creature moved at all)
-      if (!resultsNoMov[0].disqualified && !resultsWithMov[0].disqualified) {
-        expect(resultsWithMov[0].finalFitness).toBeGreaterThanOrEqual(resultsNoMov[0].finalFitness);
       }
     });
   });
@@ -212,7 +175,7 @@ describe('BatchSimulator', () => {
       const results = await simulatePopulation([genome], config);
 
       if (results[0].disqualified) {
-        expect(results[0].finalFitness).toBe(1);
+        expect(results[0].finalFitness).toBe(0);
       }
     });
 

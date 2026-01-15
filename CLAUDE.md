@@ -56,6 +56,13 @@ src/
 - Clean code over clever code
 - Commit after completing each feature/fix
 
+## Changelog
+
+**Keep `CHANGELOG.md` updated for major changes.** When adding significant features or fixes:
+1. Add entry under `## [Unreleased]` section
+2. Use categories: Added, Changed, Fixed, Removed
+3. Be concise but descriptive
+
 ## Testing
 
 ```bash
@@ -76,4 +83,4 @@ npm test -- --run  # Run once (no watch)
 - `main.ts` is large (~2800 lines) - contains EvolutionApp class with all UI
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
-- Fitness calculated from pellet collection, movement, proximity
+- Fitness: 0-80 progress (XZ ground distance from edge) + 20 collection bonus per pellet

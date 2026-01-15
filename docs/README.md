@@ -20,10 +20,9 @@ Soft-bodied entities with:
 
 ### Fitness Function
 Creatures are scored on:
-- Pellets collected
-- Proximity to active pellet
-- Movement (path length)
-- Distance (net displacement)
+- **Progress (0-80)**: XZ ground distance from creature's edge toward pellet
+- **Collection (+20)**: Bonus when pellet actually collected
+- **Regression (-20 max)**: Penalty for moving away (after first pellet)
 
 ### Storage
 Runs and generations are saved to IndexedDB. Creature frames are compacted to reduce storage size.

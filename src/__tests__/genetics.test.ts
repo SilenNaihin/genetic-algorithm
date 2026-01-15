@@ -330,17 +330,18 @@ describe('Mutation', () => {
       expect(mutated.id).not.toBe(original.id);
     });
 
-    it('sets parent id', () => {
+    it('preserves parent ids (mutation does not change lineage)', () => {
       const original = generateRandomGenome();
+      original.parentIds = ['parent1', 'parent2'];
       const mutated = mutateGenome(original);
-      expect(mutated.parentIds).toContain(original.id);
+      expect(mutated.parentIds).toEqual(['parent1', 'parent2']);
     });
 
-    it('increments generation', () => {
+    it('preserves generation (mutation does not create new generation)', () => {
       const original = generateRandomGenome();
       original.generation = 5;
       const mutated = mutateGenome(original);
-      expect(mutated.generation).toBe(6);
+      expect(mutated.generation).toBe(5);
     });
 
     it('maintains valid muscle references after mutation', () => {
