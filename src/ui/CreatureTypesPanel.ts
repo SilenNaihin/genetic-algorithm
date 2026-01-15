@@ -31,8 +31,8 @@ export class CreatureTypesPanel {
     this.container.id = 'creature-types-panel';
     this.container.style.cssText = `
       position: fixed;
-      bottom: 20px;
-      right: 420px;
+      bottom: 320px;
+      right: 20px;
       width: 380px;
       height: 280px;
       background: rgba(15, 15, 20, 0.95);
