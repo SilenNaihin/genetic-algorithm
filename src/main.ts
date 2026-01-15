@@ -263,9 +263,9 @@ class EvolutionApp {
           </div>
         </div>
 
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 16px; text-align: center;">
           <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">Evolution Mode</div>
-          <div style="display: flex; gap: 16px;">
+          <div style="display: flex; gap: 16px; justify-content: center;">
             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary); font-size: 13px;">
               <input type="checkbox" id="use-mutation-checkbox" checked style="
                 width: 16px;
