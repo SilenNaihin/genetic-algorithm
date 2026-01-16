@@ -44,12 +44,12 @@ export interface SimulationConfig {
   // Evolution
   populationSize: number;       // 100
   cullPercentage: number;       // 0.5 (bottom 50%)
-  mutationRate: number;         // 0.1-0.5
+  mutationRate: number;         // Per-gene mutation rate (0.1-0.5)
   mutationMagnitude: number;    // How much values change
-  crossoverRate: number;        // Probability of crossover vs cloning
-  eliteCount: number;           // Number of top performers to keep unchanged
+  crossoverRate: number;        // Probability of crossover vs mutation for new creatures (0-1)
+  eliteCount: number;           // Deprecated - survivors determined by cullPercentage
   useMutation: boolean;         // Whether to apply mutation during evolution
-  useCrossover: boolean;        // Whether to use crossover (vs cloning only)
+  useCrossover: boolean;        // Whether to use crossover (vs mutation only)
 
   // Creature constraints
   minNodes: number;
@@ -83,7 +83,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   cullPercentage: 0.5,
   mutationRate: 0.1,
   mutationMagnitude: 0.3,
-  crossoverRate: 0.3,
+  crossoverRate: 0.5,
   eliteCount: 5,
   useMutation: true,
   useCrossover: true,

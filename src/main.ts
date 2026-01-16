@@ -235,10 +235,11 @@ class EvolutionApp {
           </div>
           <div class="param-group" style="width: 200px;">
             <div class="param-label">
-              <span class="param-name">Mutation Rate</span>
+              <span class="param-name">Gene Mut. Rate</span>
               <span class="param-value" id="mutation-value">10%</span>
             </div>
             <input type="range" class="param-slider" id="mutation-slider" min="5" max="80" value="10">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Per-gene change probability</div>
           </div>
           <div class="param-group" style="width: 200px;">
             <div class="param-label">
@@ -270,9 +271,19 @@ class EvolutionApp {
           </div>
         </div>
 
-        <div style="margin-bottom: 16px; text-align: center;">
-          <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">Evolution Mode</div>
-          <div style="display: flex; gap: 16px; justify-content: center;">
+        <div style="margin-bottom: 12px; text-align: center;">
+          <!-- Cull Percentage -->
+          <div class="param-group" style="width: 200px; margin: 0 auto 12px auto;">
+            <div class="param-label">
+              <span class="param-name">Cull Percentage</span>
+              <span class="param-value" id="cull-value">50%</span>
+            </div>
+            <input type="range" class="param-slider" id="cull-slider" min="10" max="90" value="50">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Bottom % removed each gen</div>
+          </div>
+
+          <!-- Evolution Mode Checkboxes -->
+          <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 12px;">
             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary); font-size: 13px;">
               <input type="checkbox" id="use-mutation-checkbox" checked style="
                 width: 16px;
@@ -291,6 +302,19 @@ class EvolutionApp {
               ">
               Crossover
             </label>
+          </div>
+
+          <!-- Dynamic Rate Slider Container -->
+          <div id="evolution-rate-sliders" style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
+            <!-- Split slider when both modes selected -->
+            <div id="dual-rate-container" class="param-group" style="width: 200px;">
+              <div class="param-label">
+                <span class="param-name">Crossover vs Mutation</span>
+                <span class="param-value" id="crossover-split-value">50/50</span>
+              </div>
+              <input type="range" class="param-slider" id="crossover-split-slider" min="0" max="100" value="50">
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Crossover ← → Mutation</div>
+            </div>
           </div>
         </div>
 
@@ -551,14 +575,48 @@ class EvolutionApp {
       this.updateSettingsInfoBox();
     });
 
-    // Evolution mode checkboxes
+    // Cull percentage slider
+    const cullSlider = document.getElementById('cull-slider') as HTMLInputElement;
+    cullSlider.addEventListener('input', () => {
+      this.config.cullPercentage = parseInt(cullSlider.value) / 100;
+      document.getElementById('cull-value')!.textContent = cullSlider.value + '%';
+      this.updateSettingsInfoBox();
+    });
+
+    // Evolution mode checkboxes and split slider
     const useMutationCheckbox = document.getElementById('use-mutation-checkbox') as HTMLInputElement;
     const useCrossoverCheckbox = document.getElementById('use-crossover-checkbox') as HTMLInputElement;
+    const dualRateContainer = document.getElementById('dual-rate-container') as HTMLElement;
+    const crossoverSplitSlider = document.getElementById('crossover-split-slider') as HTMLInputElement;
+    const crossoverSplitValue = document.getElementById('crossover-split-value') as HTMLElement;
+
+    const updateRateSliders = () => {
+      const mutation = useMutationCheckbox.checked;
+      const crossover = useCrossoverCheckbox.checked;
+
+      if (mutation && crossover) {
+        // Both enabled: show split slider
+        dualRateContainer.style.display = 'block';
+        // crossoverRate determines split: crossover vs mutation
+        this.config.crossoverRate = parseInt(crossoverSplitSlider.value) / 100;
+      } else if (mutation) {
+        // Only mutation: hide split slider, all new creatures via mutation
+        dualRateContainer.style.display = 'none';
+        this.config.crossoverRate = 0;
+      } else if (crossover) {
+        // Only crossover: hide split slider, all new creatures via crossover
+        dualRateContainer.style.display = 'none';
+        this.config.crossoverRate = 1;
+      } else {
+        // Neither - shouldn't happen
+        dualRateContainer.style.display = 'none';
+      }
+      this.updateSettingsInfoBox();
+    };
 
     const enforceAtLeastOne = () => {
       // At least one must be checked
       if (!useMutationCheckbox.checked && !useCrossoverCheckbox.checked) {
-        // Re-check the one that was just unchecked
         useMutationCheckbox.checked = true;
         this.config.useMutation = true;
       }
@@ -567,14 +625,23 @@ class EvolutionApp {
     useMutationCheckbox.addEventListener('change', () => {
       this.config.useMutation = useMutationCheckbox.checked;
       enforceAtLeastOne();
-      this.updateSettingsInfoBox();
+      updateRateSliders();
     });
 
     useCrossoverCheckbox.addEventListener('change', () => {
       this.config.useCrossover = useCrossoverCheckbox.checked;
       enforceAtLeastOne();
-      this.updateSettingsInfoBox();
+      updateRateSliders();
     });
+
+    crossoverSplitSlider.addEventListener('input', () => {
+      const split = parseInt(crossoverSplitSlider.value);
+      crossoverSplitValue.textContent = `${split}/${100 - split}`;
+      updateRateSliders();
+    });
+
+    // Initialize slider visibility
+    updateRateSliders();
 
     // Neural network controls
     const useNeuralCheckbox = document.getElementById('use-neural-checkbox') as HTMLInputElement;

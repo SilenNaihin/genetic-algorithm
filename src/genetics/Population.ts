@@ -6,7 +6,7 @@ import type {
 } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_GENOME_CONSTRAINTS } from '../types';
 import { generateRandomGenome } from '../core/Genome';
-import { truncationSelection, getElites, rankBasedProbabilities, weightedRandomSelect } from './Selection';
+import { truncationSelection, rankBasedProbabilities, weightedRandomSelect } from './Selection';
 import { mutateGenome, MutationConfig, DEFAULT_MUTATION_CONFIG } from './Mutation';
 import { singlePointCrossover, cloneGenome } from './Crossover';
 import { Creature } from '../core/Creature';
@@ -90,31 +90,40 @@ export class Population {
 
   /**
    * Evolve to next generation
+   *
+   * Survivors (top performers based on cullPercentage) pass through UNCHANGED.
+   * New creatures are created to fill the culled slots via crossover or mutation.
    */
   evolve(): CreatureGenome[] {
-    // Get elites - keep their genomes EXACTLY as-is (same ID) but increment survivalStreak
-    const elites = getElites(this.creatures, this.config.eliteCount);
-    const eliteGenomes = elites.map(c => ({
+    // Select survivors - these pass through unchanged
+    const { survivors } = truncationSelection(this.creatures, 1 - this.config.cullPercentage);
+
+    // Survivors pass through with incremented survivalStreak (unchanged otherwise)
+    const survivorGenomes = survivors.map(c => ({
       ...c.genome,
       survivalStreak: c.genome.survivalStreak + 1
     }));
 
-    // Select survivors
-    const { survivors } = truncationSelection(this.creatures, 1 - this.config.cullPercentage);
-
-    // Calculate selection probabilities based on rank
+    // Calculate selection probabilities based on rank (for creating new creatures)
     const probabilities = rankBasedProbabilities(survivors);
 
-    // Create next generation
-    const newGenomes: CreatureGenome[] = [...eliteGenomes];
+    // Start with all survivors
+    const newGenomes: CreatureGenome[] = [...survivorGenomes];
     const targetSize = this.config.populationSize;
+    const newCreaturesNeeded = targetSize - survivors.length;
 
-    while (newGenomes.length < targetSize) {
+    // Create new creatures to fill the culled slots
+    // All new creatures are either crossover or mutation (controlled by crossoverRate)
+    for (let i = 0; i < newCreaturesNeeded; i++) {
       const useCrossover = this.config.useCrossover !== false;
       const useMutation = this.config.useMutation !== false;
 
-      if (useCrossover && Math.random() < this.config.crossoverRate && survivors.length >= 2) {
-        // Crossover
+      // Determine crossover vs mutation based on rates
+      const crossoverProb = useCrossover ? this.config.crossoverRate : 0;
+      const doCrossover = Math.random() < crossoverProb && survivors.length >= 2;
+
+      if (doCrossover) {
+        // Create via crossover of two survivors
         const parent1 = weightedRandomSelect(survivors, probabilities);
         let parent2 = weightedRandomSelect(survivors, probabilities);
 
@@ -125,34 +134,25 @@ export class Population {
           attempts++;
         }
 
-        let child = singlePointCrossover(parent1.genome, parent2.genome, this.genomeConstraints);
-
-        // Apply mutation if enabled
-        if (useMutation) {
-          child = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
-        }
-
+        const child = singlePointCrossover(parent1.genome, parent2.genome, this.genomeConstraints);
         newGenomes.push(child);
-      } else {
-        // Clone (and optionally mutate)
+      } else if (useMutation) {
+        // Create via mutation of a survivor (clone + mutate)
         const parent = weightedRandomSelect(survivors, probabilities);
-        let child = cloneGenome(parent.genome, this.genomeConstraints);
-
-        // Apply mutation if enabled
-        if (useMutation) {
-          child = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
-        }
-
+        const child = cloneGenome(parent.genome, this.genomeConstraints);
+        const mutatedChild = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
+        newGenomes.push(mutatedChild);
+      } else {
+        // Only crossover enabled but couldn't do it (e.g., not enough survivors)
+        // Fall back to clone
+        const parent = weightedRandomSelect(survivors, probabilities);
+        const child = cloneGenome(parent.genome, this.genomeConstraints);
         newGenomes.push(child);
       }
     }
 
     // Increment population generation counter
     this.generation++;
-
-    // NOTE: genome.generation tracks lineage age (how many generations this creature's
-    // ancestors have survived), which is already correctly set by crossover/clone functions.
-    // We do NOT overwrite it here with this.generation.
 
     return newGenomes;
   }
