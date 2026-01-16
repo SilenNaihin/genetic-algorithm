@@ -1,0 +1,754 @@
+/**
+ * Integration tests for RunStorage using actual IndexedDB (via fake-indexeddb)
+ * These tests verify the real storage implementation, not a mock
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+import { RunStorage, CompactCreatureResult, recalculateFitnessOverTime } from '../storage/RunStorage';
+import { generateRandomGenome } from '../core/Genome';
+import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, type FitnessHistoryEntry, type Vector3 } from '../types';
+import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../simulation/BatchSimulator';
+
+// Helper to create a mock simulation result
+function createMockSimulationResult(
+  fitness: number = 100,
+  pelletsCollected: number = 2,
+  frameCount: number = 10
+): CreatureSimulationResult {
+  const genome = generateRandomGenome();
+  const frames: SimulationFrame[] = [];
+  const fitnessOverTime: number[] = [];
+
+  for (let i = 0; i < frameCount; i++) {
+    const nodePositions = new Map<string, Vector3>();
+    for (const node of genome.nodes) {
+      nodePositions.set(node.id, {
+        x: Math.random() * 10,
+        y: 0.5 + Math.random(),
+        z: Math.random() * 10
+      });
+    }
+
+    frames.push({
+      time: i * 0.1,
+      nodePositions,
+      centerOfMass: { x: i * 0.5, y: 0.5, z: i * 0.3 },
+      activePelletIndex: 0
+    });
+    fitnessOverTime.push(fitness * (i / frameCount));
+  }
+
+  const pellets: PelletData[] = [
+    { id: 'p1', position: { x: 5, y: 0.3, z: 5 }, collectedAtFrame: 5, spawnedAtFrame: 0, initialDistance: 7 },
+    { id: 'p2', position: { x: 10, y: 0.5, z: 10 }, collectedAtFrame: null, spawnedAtFrame: 5, initialDistance: 8 }
+  ];
+
+  return {
+    genome,
+    frames,
+    finalFitness: fitness,
+    pelletsCollected,
+    distanceTraveled: frameCount * 0.5,
+    netDisplacement: frameCount * 0.3,
+    closestPelletDistance: 2.5,
+    pellets,
+    fitnessOverTime,
+    disqualified: null
+  };
+}
+
+describe('RunStorage Integration', () => {
+  let storage: RunStorage;
+
+  beforeEach(async () => {
+    // Clear IndexedDB before each test
+    indexedDB = new IDBFactory();
+    storage = new RunStorage();
+    await storage.init();
+  });
+
+  afterEach(() => {
+    // Reset for next test
+    indexedDB = new IDBFactory();
+  });
+
+  describe('Database Initialization', () => {
+    it('initializes without error', async () => {
+      const newStorage = new RunStorage();
+      await expect(newStorage.init()).resolves.not.toThrow();
+    });
+
+    it('can be initialized multiple times safely', async () => {
+      const newStorage = new RunStorage();
+      await newStorage.init();
+      await expect(newStorage.init()).resolves.not.toThrow();
+    });
+  });
+
+  describe('Run Lifecycle', () => {
+    it('creates a run with unique ID', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+
+      expect(runId).toBeDefined();
+      expect(runId.startsWith('run_')).toBe(true);
+      expect(storage.getCurrentRunId()).toBe(runId);
+    });
+
+    it('stores run config correctly', async () => {
+      const customConfig = { ...DEFAULT_CONFIG, populationSize: 50, simulationDuration: 15 };
+      const runId = await storage.createRun(customConfig);
+
+      const run = await storage.getRun(runId);
+
+      expect(run).not.toBeNull();
+      expect(run?.config.populationSize).toBe(50);
+      expect(run?.config.simulationDuration).toBe(15);
+    });
+
+    it('initializes run with generationCount 0', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const run = await storage.getRun(runId);
+
+      expect(run?.generationCount).toBe(0);
+    });
+
+    it('creates multiple runs with different IDs', async () => {
+      const runId1 = await storage.createRun(DEFAULT_CONFIG);
+      await new Promise(resolve => setTimeout(resolve, 5)); // Ensure different timestamps
+      const runId2 = await storage.createRun(DEFAULT_CONFIG);
+
+      expect(runId1).not.toBe(runId2);
+    });
+  });
+
+  describe('Generation Storage', () => {
+    it('saves and loads generation results', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult(100), createMockSimulationResult(80)];
+
+      await storage.saveGeneration(0, results);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded).not.toBeNull();
+      expect(loaded?.length).toBe(2);
+    });
+
+    it('preserves genome ID through save/load cycle', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      const originalGenomeId = result.genome.id;
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].genome.id).toBe(originalGenomeId);
+    });
+
+    it('preserves fitness values through save/load cycle', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(123.456);
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      // Fitness is rounded to 3 decimal places
+      expect(loaded?.[0].finalFitness).toBeCloseTo(123.456, 2);
+    });
+
+    it('preserves pellets collected through save/load cycle', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(100, 5);
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].pelletsCollected).toBe(5);
+    });
+
+    it('updates generationCount after saving', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult()];
+
+      await storage.saveGeneration(0, results);
+      let run = await storage.getRun(runId);
+      expect(run?.generationCount).toBe(1);
+
+      await storage.saveGeneration(1, results);
+      run = await storage.getRun(runId);
+      expect(run?.generationCount).toBe(2);
+    });
+
+    it('returns null for non-existent generation', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const loaded = await storage.loadGeneration(runId, 99, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded).toBeNull();
+    });
+
+    it('stores multiple generations independently', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const results0 = [createMockSimulationResult(100)];
+      const results1 = [createMockSimulationResult(150)];
+
+      await storage.saveGeneration(0, results0);
+      await storage.saveGeneration(1, results1);
+
+      const loaded0 = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded1 = await storage.loadGeneration(runId, 1, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded0?.[0].finalFitness).toBeCloseTo(100, 2);
+      expect(loaded1?.[0].finalFitness).toBeCloseTo(150, 2);
+    });
+  });
+
+  describe('Frame Compaction and Expansion', () => {
+    it('compacts frames to number arrays', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(100, 2, 20);
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      // Frames should be reconstructed
+      expect(loaded?.[0].frames.length).toBe(20);
+      expect(loaded?.[0].frames[0].nodePositions).toBeInstanceOf(Map);
+    });
+
+    it('preserves node positions through compaction', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(100, 2, 5);
+      const originalFirstFrame = result.frames[0];
+      const firstNodeId = result.genome.nodes[0].id;
+      const originalPosition = originalFirstFrame.nodePositions.get(firstNodeId)!;
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      const loadedPosition = loaded?.[0].frames[0].nodePositions.get(firstNodeId);
+
+      // Positions are rounded to 3 decimal places
+      expect(loadedPosition?.x).toBeCloseTo(originalPosition.x, 2);
+      expect(loadedPosition?.y).toBeCloseTo(originalPosition.y, 2);
+      expect(loadedPosition?.z).toBeCloseTo(originalPosition.z, 2);
+    });
+
+    it('recalculates center of mass on expansion', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(100, 2, 5);
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      const frame = loaded?.[0].frames[0];
+      expect(frame?.centerOfMass).toHaveProperty('x');
+      expect(frame?.centerOfMass).toHaveProperty('y');
+      expect(frame?.centerOfMass).toHaveProperty('z');
+    });
+
+    it('preserves pellet data through compaction', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(100, 2, 10);
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].pellets.length).toBe(2);
+      expect(loaded?.[0].pellets[0].collectedAtFrame).toBe(5);
+      expect(loaded?.[0].pellets[1].collectedAtFrame).toBeNull();
+    });
+  });
+
+  describe('Fitness History', () => {
+    it('stores fitness history', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const history: FitnessHistoryEntry[] = [
+        { generation: 0, best: 100, average: 50, worst: 10 },
+        { generation: 1, best: 150, average: 75, worst: 20 }
+      ];
+
+      await storage.updateFitnessHistory(history);
+      const run = await storage.getRun(runId);
+
+      expect(run?.fitnessHistory).toEqual(history);
+    });
+
+    it('overwrites previous fitness history', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+
+      await storage.updateFitnessHistory([{ generation: 0, best: 100, average: 50, worst: 10 }]);
+      await storage.updateFitnessHistory([
+        { generation: 0, best: 100, average: 50, worst: 10 },
+        { generation: 1, best: 150, average: 75, worst: 20 }
+      ]);
+
+      const run = await storage.getRun(runId);
+
+      expect(run?.fitnessHistory?.length).toBe(2);
+    });
+  });
+
+  describe('Creature Type History', () => {
+    it('stores creature type distribution', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const history = [
+        { generation: 0, nodeCountDistribution: new Map([[3, 10], [4, 8], [5, 2]]) },
+        { generation: 1, nodeCountDistribution: new Map([[3, 8], [4, 10], [5, 2]]) }
+      ];
+
+      await storage.updateCreatureTypeHistory(history);
+      const run = await storage.getRun(runId);
+
+      expect(run?.creatureTypeHistory).toBeDefined();
+      expect(run?.creatureTypeHistory?.length).toBe(2);
+    });
+
+    it('converts Map to array format for storage', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const history = [
+        { generation: 0, nodeCountDistribution: new Map([[3, 10], [4, 5]]) }
+      ];
+
+      await storage.updateCreatureTypeHistory(history);
+      const run = await storage.getRun(runId);
+
+      // Stored as array of [nodeCount, count] pairs
+      expect(run?.creatureTypeHistory?.[0].nodeCountDistribution).toEqual([[3, 10], [4, 5]]);
+    });
+  });
+
+  describe('Best Creature Tracking', () => {
+    it('stores best creature', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(250);
+
+      await storage.updateBestCreature(result, 5);
+      const run = await storage.getRun(runId);
+
+      expect(run?.bestCreature).toBeDefined();
+      expect(run?.bestCreature?.generation).toBe(5);
+      expect(run?.bestCreature?.result.fitness).toBeCloseTo(250, 2);
+    });
+
+    it('stores best creature genome', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(250);
+      const genomeId = result.genome.id;
+
+      await storage.updateBestCreature(result, 5);
+      const run = await storage.getRun(runId);
+
+      expect(run?.bestCreature?.result.genome.id).toBe(genomeId);
+    });
+
+    it('can expand best creature result', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(250, 3, 15);
+
+      await storage.updateBestCreature(result, 5);
+      const run = await storage.getRun(runId);
+
+      const expanded = storage.expandCreatureResult(run!.bestCreature!.result, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(expanded.genome.id).toBe(result.genome.id);
+      expect(expanded.finalFitness).toBeCloseTo(250, 2);
+      expect(expanded.frames.length).toBe(15);
+    });
+  });
+
+  describe('Longest Survivor Tracking', () => {
+    it('stores longest survivor', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(150);
+      result.genome.survivalStreak = 12;
+
+      await storage.updateLongestSurvivor(result, 12);
+      const run = await storage.getRun(runId);
+
+      expect(run?.longestSurvivor).toBeDefined();
+      expect(run?.longestSurvivor?.generations).toBe(12);
+    });
+
+    it('preserves survival streak in genome', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult(150);
+      result.genome.survivalStreak = 8;
+
+      await storage.updateLongestSurvivor(result, 8);
+      const run = await storage.getRun(runId);
+
+      expect(run?.longestSurvivor?.result.genome.survivalStreak).toBe(8);
+    });
+  });
+
+  describe('Run Management', () => {
+    it('lists all runs', async () => {
+      await storage.createRun(DEFAULT_CONFIG);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      await storage.createRun(DEFAULT_CONFIG);
+
+      const runs = await storage.getAllRuns();
+
+      expect(runs.length).toBe(2);
+    });
+
+    it('returns runs sorted by startTime descending', async () => {
+      const runId1 = await storage.createRun(DEFAULT_CONFIG);
+      await new Promise(resolve => setTimeout(resolve, 10));
+      const runId2 = await storage.createRun(DEFAULT_CONFIG);
+
+      const runs = await storage.getAllRuns();
+
+      expect(runs[0].id).toBe(runId2); // Most recent first
+      expect(runs[1].id).toBe(runId1);
+    });
+
+    it('deletes run and all its generations', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult()];
+
+      await storage.saveGeneration(0, results);
+      await storage.saveGeneration(1, results);
+
+      await storage.deleteRun(runId);
+
+      const run = await storage.getRun(runId);
+      const gen0 = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const gen1 = await storage.loadGeneration(runId, 1, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(run).toBeNull();
+      expect(gen0).toBeNull();
+      expect(gen1).toBeNull();
+    });
+
+    it('updates run name', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+
+      await storage.updateRunName(runId, 'My Awesome Run');
+      const run = await storage.getRun(runId);
+
+      expect(run?.name).toBe('My Awesome Run');
+    });
+
+    it('returns max generation correctly', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult()];
+
+      await storage.saveGeneration(0, results);
+      await storage.saveGeneration(1, results);
+      await storage.saveGeneration(2, results);
+
+      const maxGen = await storage.getMaxGeneration(runId);
+
+      expect(maxGen).toBe(2);
+    });
+  });
+
+  describe('Fork Run', () => {
+    it('creates new run from existing run', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult(100)];
+      await storage.saveGeneration(0, results);
+      await storage.saveGeneration(1, results);
+      await storage.saveGeneration(2, results);
+
+      const newId = await storage.forkRun(sourceId, 1);
+
+      expect(newId).not.toBe(sourceId);
+      expect(storage.getCurrentRunId()).toBe(newId);
+    });
+
+    it('copies generations up to specified point', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+      const results0 = [createMockSimulationResult(100)];
+      const results1 = [createMockSimulationResult(150)];
+      const results2 = [createMockSimulationResult(200)];
+
+      await storage.saveGeneration(0, results0);
+      await storage.saveGeneration(1, results1);
+      await storage.saveGeneration(2, results2);
+
+      // Small delay to ensure different timestamp for fork
+      await new Promise(resolve => setTimeout(resolve, 5));
+
+      const newId = await storage.forkRun(sourceId, 1);
+
+      // Verify forked run has correct generationCount
+      const forkedRun = await storage.getRun(newId);
+      expect(forkedRun?.generationCount).toBe(2); // 0 and 1
+
+      const gen0 = await storage.loadGeneration(newId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const gen1 = await storage.loadGeneration(newId, 1, DEFAULT_FITNESS_WEIGHTS);
+      const gen2 = await storage.loadGeneration(newId, 2, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(gen0).not.toBeNull();
+      expect(gen1).not.toBeNull();
+      // Gen2 should not exist in forked run
+      expect(gen2).toBeNull();
+    });
+
+    it('copies fitness history up to fork point', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult()];
+
+      await storage.saveGeneration(0, results);
+      await storage.saveGeneration(1, results);
+      await storage.saveGeneration(2, results);
+
+      await storage.updateFitnessHistory([
+        { generation: 0, best: 100, average: 50, worst: 10 },
+        { generation: 1, best: 150, average: 75, worst: 20 },
+        { generation: 2, best: 200, average: 100, worst: 30 }
+      ]);
+
+      const newId = await storage.forkRun(sourceId, 1);
+      const newRun = await storage.getRun(newId);
+
+      expect(newRun?.fitnessHistory?.length).toBe(2); // Only gen 0 and 1
+    });
+
+    it('copies creature type history up to fork point', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult()];
+
+      await storage.saveGeneration(0, results);
+      await storage.saveGeneration(1, results);
+
+      await storage.updateCreatureTypeHistory([
+        { generation: 0, nodeCountDistribution: new Map([[3, 10]]) },
+        { generation: 1, nodeCountDistribution: new Map([[3, 8], [4, 2]]) }
+      ]);
+
+      const newId = await storage.forkRun(sourceId, 0);
+      const newRun = await storage.getRun(newId);
+
+      expect(newRun?.creatureTypeHistory?.length).toBe(1); // Only gen 0
+    });
+
+    it('preserves best creature if within fork range', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+      const results = [createMockSimulationResult(200)];
+
+      await storage.saveGeneration(0, results);
+      await storage.updateBestCreature(results[0], 0);
+      await storage.saveGeneration(1, [createMockSimulationResult(100)]);
+
+      const newId = await storage.forkRun(sourceId, 1);
+      const newRun = await storage.getRun(newId);
+
+      expect(newRun?.bestCreature?.generation).toBe(0);
+    });
+
+    it('excludes best creature if beyond fork range', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+
+      await storage.saveGeneration(0, [createMockSimulationResult(100)]);
+      await storage.saveGeneration(1, [createMockSimulationResult(150)]);
+      await storage.saveGeneration(2, [createMockSimulationResult(300)]);
+      await storage.updateBestCreature(createMockSimulationResult(300), 2);
+
+      const newId = await storage.forkRun(sourceId, 1);
+      const newRun = await storage.getRun(newId);
+
+      expect(newRun?.bestCreature).toBeUndefined();
+    });
+
+    it('sets correct generationCount on forked run', async () => {
+      const sourceId = await storage.createRun(DEFAULT_CONFIG);
+
+      await storage.saveGeneration(0, [createMockSimulationResult()]);
+      await storage.saveGeneration(1, [createMockSimulationResult()]);
+      await storage.saveGeneration(2, [createMockSimulationResult()]);
+
+      const newId = await storage.forkRun(sourceId, 1);
+      const newRun = await storage.getRun(newId);
+
+      expect(newRun?.generationCount).toBe(2); // 0 and 1
+    });
+
+    it('throws error for non-existent source run', async () => {
+      await expect(storage.forkRun('non_existent', 0)).rejects.toThrow('Source run not found');
+    });
+  });
+
+  describe('Data Integrity', () => {
+    it('genome nodes survive round-trip', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      const originalNodeCount = result.genome.nodes.length;
+      const originalNodeIds = result.genome.nodes.map(n => n.id);
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].genome.nodes.length).toBe(originalNodeCount);
+      expect(loaded?.[0].genome.nodes.map(n => n.id)).toEqual(originalNodeIds);
+    });
+
+    it('genome muscles survive round-trip', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      const originalMuscleCount = result.genome.muscles.length;
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].genome.muscles.length).toBe(originalMuscleCount);
+    });
+
+    it('genome parent IDs survive round-trip', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      result.genome.parentIds = ['parent1', 'parent2'];
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].genome.parentIds).toEqual(['parent1', 'parent2']);
+    });
+
+    it('genome generation number survives round-trip', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      result.genome.generation = 42;
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].genome.generation).toBe(42);
+    });
+
+    it('disqualified creatures are preserved', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      (result as any).disqualified = 'frequency_exceeded';
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].disqualified).toBe('frequency_exceeded');
+    });
+
+    it('neural network weights survive round-trip', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const result = createMockSimulationResult();
+      result.genome.neuralNetwork = {
+        inputSize: 6,
+        hiddenSize: 8,
+        outputSize: 4,
+        weightsIH: Array(48).fill(0).map(() => Math.random()),
+        weightsHO: Array(32).fill(0).map(() => Math.random()),
+        biasH: Array(8).fill(0).map(() => Math.random()),
+        biasO: Array(4).fill(0).map(() => Math.random())
+      };
+
+      await storage.saveGeneration(0, [result]);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+
+      expect(loaded?.[0].genome.neuralNetwork).toBeDefined();
+      expect(loaded?.[0].genome.neuralNetwork?.weightsIH.length).toBe(48);
+    });
+  });
+
+  describe('Concurrent Access', () => {
+    it('handles multiple simultaneous saves', async () => {
+      await storage.createRun(DEFAULT_CONFIG);
+
+      const results = Array.from({ length: 5 }, (_, i) => createMockSimulationResult(i * 10));
+
+      // Save all generations concurrently
+      await Promise.all([
+        storage.saveGeneration(0, [results[0]]),
+        storage.saveGeneration(1, [results[1]]),
+        storage.saveGeneration(2, [results[2]]),
+        storage.saveGeneration(3, [results[3]]),
+        storage.saveGeneration(4, [results[4]])
+      ]);
+
+      // Verify all were saved
+      const runId = storage.getCurrentRunId()!;
+      for (let i = 0; i < 5; i++) {
+        const loaded = await storage.loadGeneration(runId, i, DEFAULT_FITNESS_WEIGHTS);
+        expect(loaded).not.toBeNull();
+      }
+    });
+  });
+});
+
+describe('recalculateFitnessOverTime', () => {
+  const createFrames = (count: number, movement: number = 1): SimulationFrame[] => {
+    return Array.from({ length: count }, (_, i) => ({
+      time: i * 0.1,
+      nodePositions: new Map(),
+      centerOfMass: { x: i * movement, y: 0.5, z: 0 },
+      activePelletIndex: 0
+    }));
+  };
+
+  it('returns empty array for no frames', () => {
+    const result = recalculateFitnessOverTime([], [], DEFAULT_FITNESS_WEIGHTS, null);
+    expect(result).toEqual([]);
+  });
+
+  it('returns array of 1s for disqualified creature', () => {
+    const frames = createFrames(5);
+    const result = recalculateFitnessOverTime(frames, [], DEFAULT_FITNESS_WEIGHTS, 'frequency_exceeded');
+    expect(result).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it('includes base fitness in calculation', () => {
+    const frames = createFrames(1, 0);
+    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 50, movementWeight: 0, pelletWeight: 0 };
+
+    const result = recalculateFitnessOverTime(frames, [], weights, null);
+
+    expect(result[0]).toBe(50);
+  });
+
+  it('increases fitness with pellet collection', () => {
+    const frames = createFrames(3, 0);
+    const pellets: PelletData[] = [
+      { id: 'p1', position: { x: 0, y: 0, z: 0 }, collectedAtFrame: 1, spawnedAtFrame: 0, initialDistance: 5 }
+    ];
+    // Disable proximity bonus to isolate pellet collection effect
+    const weights = {
+      ...DEFAULT_FITNESS_WEIGHTS,
+      baseFitness: 0,
+      pelletWeight: 100,
+      movementWeight: 0,
+      proximityWeight: 0
+    };
+
+    const result = recalculateFitnessOverTime(frames, pellets, weights, null);
+
+    expect(result[0]).toBe(1); // Min fitness (no pellet yet)
+    expect(result[1]).toBe(100); // After collection
+    expect(result[2]).toBe(100); // Still collected
+  });
+
+  it('adds movement bonus', () => {
+    const frames = createFrames(3, 5); // 5 units movement per frame
+    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 0, movementWeight: 2, movementCap: 100 };
+
+    const result = recalculateFitnessOverTime(frames, [], weights, null);
+
+    expect(result[0]).toBe(1); // No movement yet
+    expect(result[1]).toBe(10); // 5 distance * 2 weight = 10
+    expect(result[2]).toBe(20); // 10 distance * 2 weight = 20
+  });
+
+  it('respects movement cap', () => {
+    const frames = createFrames(3, 100); // 100 units per frame
+    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 0, movementWeight: 10, movementCap: 50 };
+
+    const result = recalculateFitnessOverTime(frames, [], weights, null);
+
+    expect(result[2]).toBe(50); // Capped
+  });
+
+  it('returns array length matching frame count', () => {
+    const frames = createFrames(100);
+    const result = recalculateFitnessOverTime(frames, [], DEFAULT_FITNESS_WEIGHTS, null);
+
+    expect(result.length).toBe(100);
+  });
+});

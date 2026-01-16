@@ -1,3 +1,5 @@
+import type { NeuralGenomeData } from '../neural/NeuralGenome';
+
 export interface Vector3 {
   x: number;
   y: number;
@@ -61,8 +63,11 @@ export interface CreatureGenome {
   // Global control parameter
   globalFrequencyMultiplier: number;  // Scales all muscle frequencies
 
-  // Controller type (for future neural network support)
+  // Controller type (oscillator or neural network)
   controllerType: ControllerType;
+
+  // Neural network weights (only used when controllerType === 'neural')
+  neuralGenome?: NeuralGenomeData;
 
   // Visual
   color: HSL;

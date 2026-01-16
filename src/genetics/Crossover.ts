@@ -7,6 +7,9 @@ import type {
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
 import { generateId } from '../utils/id';
 import { distance, lerp, lerpVector3, lerpHSL, normalize } from '../utils/math';
+import type { NeuralGenomeData } from '../neural/NeuralGenome';
+import { cloneNeuralGenome, initializeNeuralGenome } from '../neural/NeuralGenome';
+import type { NeuralConfig } from '../neural/NeuralGenome';
 
 /**
  * Simple single-point crossover on genome properties
@@ -95,6 +98,35 @@ export function singlePointCrossover(
     });
   }
 
+  // Handle neural genome crossover
+  let neuralGenome: NeuralGenomeData | undefined;
+  if (parent1.neuralGenome && parent2.neuralGenome) {
+    neuralGenome = crossoverNeuralWeights(parent1.neuralGenome, parent2.neuralGenome);
+    // Adapt if muscle count changed
+    if (neuralGenome.topology.outputSize !== childMuscles.length) {
+      neuralGenome = adaptNeuralTopology(neuralGenome, childMuscles.length, {
+        useNeuralNet: true,
+        neuralMode: 'hybrid',
+        hiddenSize: neuralGenome.topology.hiddenSize,
+        activation: neuralGenome.activation,
+        weightMutationRate: 0.1,
+        weightMutationMagnitude: 0.3
+      });
+    }
+  } else if (parent1.neuralGenome) {
+    neuralGenome = cloneNeuralGenome(parent1.neuralGenome);
+    if (neuralGenome.topology.outputSize !== childMuscles.length) {
+      neuralGenome = adaptNeuralTopology(neuralGenome, childMuscles.length, {
+        useNeuralNet: true,
+        neuralMode: 'hybrid',
+        hiddenSize: neuralGenome.topology.hiddenSize,
+        activation: neuralGenome.activation,
+        weightMutationRate: 0.1,
+        weightMutationMagnitude: 0.3
+      });
+    }
+  }
+
   return {
     id: generateId('creature'),
     generation: Math.max(parent1.generation, parent2.generation) + 1,
@@ -107,7 +139,8 @@ export function singlePointCrossover(
       parent2.globalFrequencyMultiplier,
       Math.random()
     ),
-    controllerType: 'oscillator',
+    controllerType: parent1.controllerType,
+    neuralGenome,
     color: lerpHSL(parent1.color, parent2.color, Math.random())
   };
 }
@@ -195,6 +228,35 @@ export function uniformCrossover(
     });
   }
 
+  // Handle neural genome crossover (uniform)
+  let neuralGenome: NeuralGenomeData | undefined;
+  if (parent1.neuralGenome && parent2.neuralGenome) {
+    neuralGenome = uniformCrossoverNeuralWeights(parent1.neuralGenome, parent2.neuralGenome);
+    // Adapt if muscle count changed
+    if (neuralGenome.topology.outputSize !== childMuscles.length) {
+      neuralGenome = adaptNeuralTopology(neuralGenome, childMuscles.length, {
+        useNeuralNet: true,
+        neuralMode: 'hybrid',
+        hiddenSize: neuralGenome.topology.hiddenSize,
+        activation: neuralGenome.activation,
+        weightMutationRate: 0.1,
+        weightMutationMagnitude: 0.3
+      });
+    }
+  } else if (parent1.neuralGenome) {
+    neuralGenome = cloneNeuralGenome(parent1.neuralGenome);
+    if (neuralGenome.topology.outputSize !== childMuscles.length) {
+      neuralGenome = adaptNeuralTopology(neuralGenome, childMuscles.length, {
+        useNeuralNet: true,
+        neuralMode: 'hybrid',
+        hiddenSize: neuralGenome.topology.hiddenSize,
+        activation: neuralGenome.activation,
+        weightMutationRate: 0.1,
+        weightMutationMagnitude: 0.3
+      });
+    }
+  }
+
   return {
     id: generateId('creature'),
     generation: Math.max(parent1.generation, parent2.generation) + 1,
@@ -205,7 +267,8 @@ export function uniformCrossover(
     globalFrequencyMultiplier: Math.random() < 0.5
       ? parent1.globalFrequencyMultiplier
       : parent2.globalFrequencyMultiplier,
-    controllerType: 'oscillator',
+    controllerType: parent1.controllerType,
+    neuralGenome,
     color: lerpHSL(parent1.color, parent2.color, 0.5)
   };
 }
@@ -263,6 +326,211 @@ export function cloneGenome(
     survivalStreak: 0,  // Clone is a new creature, starts fresh
     nodes: newNodes,
     muscles: newMuscles,
-    color: { ...genome.color }
+    color: { ...genome.color },
+    // Clone neural genome if present
+    neuralGenome: genome.neuralGenome
+      ? cloneNeuralGenome(genome.neuralGenome)
+      : undefined
+  };
+}
+
+/**
+ * Crossover neural network weights using interpolation.
+ * Each weight is linearly interpolated between parents with a random t value.
+ *
+ * @param parent1 First parent's neural genome
+ * @param parent2 Second parent's neural genome
+ * @returns New neural genome with crossed-over weights
+ */
+export function crossoverNeuralWeights(
+  parent1: NeuralGenomeData,
+  parent2: NeuralGenomeData
+): NeuralGenomeData {
+  // Use parent1's topology (they should match in fixed-topology networks)
+  const weights1 = parent1.weights;
+  const weights2 = parent2.weights;
+
+  // Handle mismatched weight counts (different muscle counts)
+  // Use the smaller array and fill rest from parent1
+  const minLen = Math.min(weights1.length, weights2.length);
+  const newWeights: number[] = [];
+
+  // Interpolate shared weights
+  for (let i = 0; i < minLen; i++) {
+    const t = Math.random();
+    newWeights.push(lerp(weights1[i], weights2[i], t));
+  }
+
+  // If parent1 has more weights, copy them directly
+  for (let i = minLen; i < weights1.length; i++) {
+    newWeights.push(weights1[i]);
+  }
+
+  return {
+    weights: newWeights,
+    topology: { ...parent1.topology },
+    activation: parent1.activation
+  };
+}
+
+/**
+ * Uniform crossover for neural weights.
+ * Each weight is randomly selected from either parent.
+ *
+ * @param parent1 First parent's neural genome
+ * @param parent2 Second parent's neural genome
+ * @returns New neural genome with crossed-over weights
+ */
+export function uniformCrossoverNeuralWeights(
+  parent1: NeuralGenomeData,
+  parent2: NeuralGenomeData
+): NeuralGenomeData {
+  const weights1 = parent1.weights;
+  const weights2 = parent2.weights;
+
+  const minLen = Math.min(weights1.length, weights2.length);
+  const newWeights: number[] = [];
+
+  // Randomly pick each weight from either parent
+  for (let i = 0; i < minLen; i++) {
+    newWeights.push(Math.random() < 0.5 ? weights1[i] : weights2[i]);
+  }
+
+  // If parent1 has more weights, copy them
+  for (let i = minLen; i < weights1.length; i++) {
+    newWeights.push(weights1[i]);
+  }
+
+  return {
+    weights: newWeights,
+    topology: { ...parent1.topology },
+    activation: parent1.activation
+  };
+}
+
+/**
+ * Create or adapt neural genome for a child creature.
+ * Handles crossover when both parents have neural genomes,
+ * or initializes a new one when needed.
+ *
+ * @param parent1 First parent genome
+ * @param parent2 Second parent genome (optional for cloning)
+ * @param childMuscleCount Number of muscles in the child
+ * @param neuralConfig Neural network configuration
+ * @param useUniform Whether to use uniform crossover (vs interpolation)
+ * @returns Neural genome for the child, or undefined if neural not enabled
+ */
+export function crossoverOrInitNeuralGenome(
+  parent1: CreatureGenome,
+  parent2: CreatureGenome | null,
+  childMuscleCount: number,
+  neuralConfig: NeuralConfig | null,
+  useUniform: boolean = false
+): NeuralGenomeData | undefined {
+  // If neural not enabled, return undefined
+  if (!neuralConfig || !neuralConfig.useNeuralNet) {
+    return undefined;
+  }
+
+  const neural1 = parent1.neuralGenome;
+  const neural2 = parent2?.neuralGenome;
+
+  // Both parents have neural genomes - crossover
+  if (neural1 && neural2) {
+    const crossed = useUniform
+      ? uniformCrossoverNeuralWeights(neural1, neural2)
+      : crossoverNeuralWeights(neural1, neural2);
+
+    // Adapt topology if muscle count changed
+    if (crossed.topology.outputSize !== childMuscleCount) {
+      return adaptNeuralTopology(crossed, childMuscleCount, neuralConfig);
+    }
+    return crossed;
+  }
+
+  // Only parent1 has neural genome - clone and adapt
+  if (neural1) {
+    const cloned = cloneNeuralGenome(neural1);
+    if (cloned.topology.outputSize !== childMuscleCount) {
+      return adaptNeuralTopology(cloned, childMuscleCount, neuralConfig);
+    }
+    return cloned;
+  }
+
+  // No parent has neural genome - initialize new one
+  return initializeNeuralGenome(childMuscleCount, neuralConfig);
+}
+
+/**
+ * Adapt neural genome topology when muscle count changes.
+ * Preserves as many weights as possible while adjusting output layer.
+ *
+ * @param genome Current neural genome
+ * @param newMuscleCount Target number of output neurons
+ * @param config Neural config for initialization
+ * @returns Adapted neural genome
+ */
+export function adaptNeuralTopology(
+  genome: NeuralGenomeData,
+  newMuscleCount: number,
+  _config: NeuralConfig
+): NeuralGenomeData {
+  const { inputSize, hiddenSize } = genome.topology;
+  const oldOutputSize = genome.topology.outputSize;
+
+  // Calculate weight boundaries
+  const inputToHiddenCount = inputSize * hiddenSize + hiddenSize;  // weights + bias
+  const oldHiddenToOutputCount = hiddenSize * oldOutputSize + oldOutputSize;
+
+  // Keep input->hidden weights unchanged
+  const inputToHiddenWeights = genome.weights.slice(0, inputToHiddenCount);
+
+  // Adapt hidden->output weights
+  const oldHiddenToOutputWeights = genome.weights.slice(
+    inputToHiddenCount,
+    inputToHiddenCount + oldHiddenToOutputCount
+  );
+
+  // Initialize new output layer weights
+  const newHiddenToOutputWeights: number[] = [];
+
+  // For each new output neuron
+  for (let o = 0; o < newMuscleCount; o++) {
+    // Copy weights from old output if available, else Xavier init
+    if (o < oldOutputSize) {
+      // Copy weights for this output neuron
+      for (let h = 0; h < hiddenSize; h++) {
+        const oldIdx = o * hiddenSize + h;
+        newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldIdx]);
+      }
+    } else {
+      // Xavier initialization for new neurons
+      const scale = Math.sqrt(2 / (hiddenSize + newMuscleCount));
+      for (let h = 0; h < hiddenSize; h++) {
+        newHiddenToOutputWeights.push((Math.random() * 2 - 1) * scale);
+      }
+    }
+  }
+
+  // Add biases (after all weights)
+  for (let o = 0; o < newMuscleCount; o++) {
+    if (o < oldOutputSize) {
+      // Copy old bias
+      const oldBiasIdx = hiddenSize * oldOutputSize + o;
+      newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldBiasIdx] ?? 0);
+    } else {
+      // Zero bias for new neurons
+      newHiddenToOutputWeights.push(0);
+    }
+  }
+
+  return {
+    weights: [...inputToHiddenWeights, ...newHiddenToOutputWeights],
+    topology: {
+      inputSize,
+      hiddenSize,
+      outputSize: newMuscleCount
+    },
+    activation: genome.activation
   };
 }

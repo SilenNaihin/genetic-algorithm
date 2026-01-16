@@ -8,6 +8,8 @@ import type {
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
 import { generateId } from '../utils/id';
 import { distance, clamp, normalize } from '../utils/math';
+import type { NeuralGenomeData } from '../neural/NeuralGenome';
+import { cloneNeuralGenome } from '../neural/NeuralGenome';
 
 export interface MutationConfig {
   rate: number;           // Probability of mutation per gene
@@ -395,5 +397,76 @@ export function mutateGenome(
     }
   }
 
+  // Mutate neural genome if present
+  if (genome.neuralGenome) {
+    newGenome.neuralGenome = mutateNeuralGenome(
+      genome.neuralGenome,
+      config.rate,
+      config.magnitude
+    );
+  }
+
   return newGenome;
+}
+
+// =============================================================================
+// NEURAL NETWORK WEIGHT MUTATION
+// =============================================================================
+
+/**
+ * Generate a random number from standard normal distribution.
+ * Uses Box-Muller transform.
+ */
+function randomGaussian(): number {
+  const u1 = Math.random();
+  const u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/**
+ * Mutate neural network weights.
+ *
+ * Each weight has a probability of being perturbed by Gaussian noise.
+ * This is the standard mutation operator for neuroevolution.
+ *
+ * @param weights - Flat array of network weights
+ * @param mutationRate - Probability each weight mutates (0-1)
+ * @param mutationMagnitude - Standard deviation of Gaussian perturbation
+ * @returns New mutated weight array
+ */
+export function mutateNeuralWeights(
+  weights: number[],
+  mutationRate: number,
+  mutationMagnitude: number
+): number[] {
+  return weights.map(w => {
+    if (Math.random() < mutationRate) {
+      // Gaussian perturbation
+      return w + randomGaussian() * mutationMagnitude;
+    }
+    return w;
+  });
+}
+
+/**
+ * Mutate a complete neural genome.
+ *
+ * @param neuralGenome - Neural genome to mutate
+ * @param mutationRate - Probability each weight mutates
+ * @param mutationMagnitude - Standard deviation of perturbation
+ * @returns New mutated neural genome
+ */
+export function mutateNeuralGenome(
+  neuralGenome: NeuralGenomeData,
+  mutationRate: number,
+  mutationMagnitude: number
+): NeuralGenomeData {
+  return {
+    ...cloneNeuralGenome(neuralGenome),
+    weights: mutateNeuralWeights(
+      neuralGenome.weights,
+      mutationRate,
+      mutationMagnitude
+    )
+  };
 }

@@ -1,4 +1,5 @@
 import type { CreatureGenome, Vector3 } from './genome';
+import type { ActivationType } from '../neural/activations';
 
 export interface FitnessWeights {
   baseFitness: number;           // Starting fitness value
@@ -62,6 +63,14 @@ export interface SimulationConfig {
 
   // Fitness function
   fitnessWeights: FitnessWeights;
+
+  // Neural network settings (neuroevolution)
+  useNeuralNet: boolean;              // Enable neural network control
+  neuralMode: 'hybrid' | 'pure';      // How NN output is used
+  neuralHiddenSize: number;           // Neurons in hidden layer
+  neuralActivation: ActivationType;   // Activation function
+  weightMutationRate: number;         // Probability each weight mutates
+  weightMutationMagnitude: number;    // Std dev of weight perturbation
 }
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -87,7 +96,15 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   pelletCount: 3,
   arenaSize: 10,
 
-  fitnessWeights: DEFAULT_FITNESS_WEIGHTS
+  fitnessWeights: DEFAULT_FITNESS_WEIGHTS,
+
+  // Neural network defaults (disabled by default)
+  useNeuralNet: false,
+  neuralMode: 'hybrid',
+  neuralHiddenSize: 8,
+  neuralActivation: 'tanh',
+  weightMutationRate: 0.1,
+  weightMutationMagnitude: 0.3
 };
 
 export interface CreatureState {

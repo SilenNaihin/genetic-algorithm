@@ -102,7 +102,7 @@ export class GraphPanel {
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
             fill: false,
             tension: 0.3,
-            pointRadius: 4,
+            pointRadius: 2,
             pointBackgroundColor: '#10b981',
             borderWidth: 2
           },
@@ -113,9 +113,20 @@ export class GraphPanel {
             backgroundColor: 'rgba(99, 102, 241, 0.1)',
             fill: false,
             tension: 0.3,
-            pointRadius: 3,
+            pointRadius: 1.5,
             pointBackgroundColor: '#6366f1',
-            borderWidth: 2
+            borderWidth: 1
+          },
+          {
+            label: 'Avg (10-gen)',
+            data: [],
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            fill: false,
+            tension: 0.4,
+            pointRadius: 0,
+            borderWidth: 3,
+            borderDash: []
           },
           {
             label: 'Worst',
@@ -124,9 +135,9 @@ export class GraphPanel {
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
             fill: false,
             tension: 0.3,
-            pointRadius: 3,
+            pointRadius: 1.5,
             pointBackgroundColor: '#ef4444',
-            borderWidth: 2
+            borderWidth: 1
           }
         ]
       },
@@ -233,12 +244,36 @@ export class GraphPanel {
     const avgData = history.map(h => h.average);
     const worstData = history.map(h => h.worst);
 
+    // Compute 10-generation rolling average
+    const rollingAvgData = this.computeRollingAverage(avgData, 10);
+
     this.chart.data.labels = labels;
     this.chart.data.datasets[0].data = bestData;
     this.chart.data.datasets[1].data = avgData;
-    this.chart.data.datasets[2].data = worstData;
+    this.chart.data.datasets[2].data = rollingAvgData;
+    this.chart.data.datasets[3].data = worstData;
 
     this.chart.update('none');  // No animation for frequent updates
+  }
+
+  private computeRollingAverage(data: number[], windowSize: number): (number | null)[] {
+    const result: (number | null)[] = [];
+
+    for (let i = 0; i < data.length; i++) {
+      if (i < windowSize - 1) {
+        // Not enough data points yet - use partial window
+        const slice = data.slice(0, i + 1);
+        const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+        result.push(Math.round(avg * 10) / 10);
+      } else {
+        // Full window available
+        const slice = data.slice(i - windowSize + 1, i + 1);
+        const avg = slice.reduce((a, b) => a + b, 0) / windowSize;
+        result.push(Math.round(avg * 10) / 10);
+      }
+    }
+
+    return result;
   }
 
   show(): void {

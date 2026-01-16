@@ -4,11 +4,13 @@ import type {
   MuscleGene,
   GenomeConstraints,
   Vector3,
-  HSL
+  HSL,
+  SimulationConfig
 } from '../types';
 import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
 import { generateId } from '../utils/id';
 import { distance, randomRange, randomInt } from '../utils/math';
+import { initializeNeuralGenome } from '../neural/NeuralGenome';
 
 function randomVector3(radius: number): Vector3 {
   return {
@@ -38,9 +40,23 @@ function randomUnitVector(): Vector3 {
   };
 }
 
+export interface RandomGenomeOptions {
+  constraints?: GenomeConstraints;
+  simulationConfig?: Partial<SimulationConfig>;
+}
+
 export function generateRandomGenome(
-  constraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
+  constraintsOrOptions: GenomeConstraints | RandomGenomeOptions = DEFAULT_GENOME_CONSTRAINTS
 ): CreatureGenome {
+  // Handle both old signature (just constraints) and new signature (options object)
+  const constraints: GenomeConstraints = 'minNodes' in constraintsOrOptions
+    ? constraintsOrOptions
+    : (constraintsOrOptions.constraints || DEFAULT_GENOME_CONSTRAINTS);
+
+  const simulationConfig = 'simulationConfig' in constraintsOrOptions
+    ? constraintsOrOptions.simulationConfig
+    : undefined;
+
   const id = generateId('creature');
 
   // To connect N nodes, we need at least N-1 muscles (spanning tree)
@@ -151,6 +167,19 @@ export function generateRandomGenome(
     });
   }
 
+  // Initialize neural genome if enabled
+  const useNeural = simulationConfig?.useNeuralNet ?? false;
+  const neuralGenome = useNeural
+    ? initializeNeuralGenome(muscles.length, {
+        useNeuralNet: true,
+        neuralMode: simulationConfig?.neuralMode || 'hybrid',
+        hiddenSize: simulationConfig?.neuralHiddenSize || 8,
+        activation: simulationConfig?.neuralActivation || 'tanh',
+        weightMutationRate: simulationConfig?.weightMutationRate || 0.1,
+        weightMutationMagnitude: simulationConfig?.weightMutationMagnitude || 0.3
+      })
+    : undefined;
+
   return {
     id,
     generation: 0,
@@ -159,7 +188,8 @@ export function generateRandomGenome(
     nodes,
     muscles,
     globalFrequencyMultiplier: randomRange(0.5, 1.5),
-    controllerType: 'oscillator',
+    controllerType: useNeural ? 'neural' : 'oscillator',
+    neuralGenome,
     color: randomHSL()
   };
 }

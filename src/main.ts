@@ -6,7 +6,9 @@ import { Creature } from './core/Creature';
 import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, FitnessWeights } from './types';
 import { GraphPanel } from './ui/GraphPanel';
 import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
+import { NeuralVisualizer } from './ui/NeuralVisualizer';
 import { RunStorage } from './storage/RunStorage';
+import { gatherSensorInputs, SENSOR_NAMES, createNetworkFromGenome } from './neural';
 
 // Global storage instance
 const runStorage = new RunStorage();
@@ -114,6 +116,7 @@ class EvolutionApp {
   // Graph panels
   private graphPanel: GraphPanel | null = null;
   private creatureTypesPanel: CreatureTypesPanel | null = null;
+  private neuralVisualizer: NeuralVisualizer | null = null;
   private creatureTypeHistory: CreatureTypeEntry[] = [];
 
   // Config
@@ -396,6 +399,105 @@ class EvolutionApp {
           <button class="btn btn-secondary btn-small" id="reset-fitness-btn" style="width: 100%;">Reset to Defaults</button>
         </div>
       </div>
+
+      <!-- Neural Network Settings Panel - Fixed Left Side -->
+      <div id="neural-settings-panel" style="
+        position: fixed;
+        top: 50%;
+        left: 20px;
+        transform: translateY(-50%);
+        width: 280px;
+        max-height: 90vh;
+        overflow-y: auto;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        border: 1px solid var(--border-light);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      ">
+        <div style="
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--border);
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--text-primary);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        ">
+          <span>Neural Network</span>
+          <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" id="use-neural-checkbox" style="
+              width: 18px;
+              height: 18px;
+              cursor: pointer;
+              accent-color: var(--accent);
+            ">
+          </label>
+        </div>
+        <div id="neural-options" style="padding: 16px 20px; display: none; flex-direction: column;">
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Mode</span>
+            </div>
+            <select id="neural-mode-select" style="
+              width: 100%;
+              padding: 8px 12px;
+              background: var(--bg-tertiary);
+              color: var(--text-primary);
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+              display: block;
+            ">
+              <option value="hybrid">Hybrid</option>
+              <option value="pure">Pure</option>
+            </select>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Hybrid modulates oscillator</div>
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Hidden Size</span>
+              <span style="font-size: 13px; color: var(--text-primary);" id="neural-hidden-value">8</span>
+            </div>
+            <input type="range" style="width: 100%; display: block;" id="neural-hidden-slider" min="4" max="32" step="4" value="8">
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Activation</span>
+            </div>
+            <select id="neural-activation-select" style="
+              width: 100%;
+              padding: 8px 12px;
+              background: var(--bg-tertiary);
+              color: var(--text-primary);
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+              display: block;
+            ">
+              <option value="tanh">tanh</option>
+              <option value="relu">ReLU</option>
+              <option value="sigmoid">sigmoid</option>
+            </select>
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Weight Mut. Rate</span>
+              <span style="font-size: 13px; color: var(--text-primary);" id="weight-mut-rate-value">10%</span>
+            </div>
+            <input type="range" style="width: 100%; display: block;" id="weight-mut-rate-slider" min="1" max="50" value="10">
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Weight Mut. Mag</span>
+              <span style="font-size: 13px; color: var(--text-primary);" id="weight-mut-mag-value">0.3</span>
+            </div>
+            <input type="range" style="width: 100%; display: block;" id="weight-mut-mag-slider" min="0.1" max="1.0" step="0.1" value="0.3">
+          </div>
+        </div>
+      </div>
     `;
 
     this.container.appendChild(this.menuScreen);
@@ -471,6 +573,49 @@ class EvolutionApp {
     useCrossoverCheckbox.addEventListener('change', () => {
       this.config.useCrossover = useCrossoverCheckbox.checked;
       enforceAtLeastOne();
+      this.updateSettingsInfoBox();
+    });
+
+    // Neural network controls
+    const useNeuralCheckbox = document.getElementById('use-neural-checkbox') as HTMLInputElement;
+    const neuralOptions = document.getElementById('neural-options') as HTMLElement;
+    const neuralModeSelect = document.getElementById('neural-mode-select') as HTMLSelectElement;
+    const neuralHiddenSlider = document.getElementById('neural-hidden-slider') as HTMLInputElement;
+    const neuralActivationSelect = document.getElementById('neural-activation-select') as HTMLSelectElement;
+    const weightMutRateSlider = document.getElementById('weight-mut-rate-slider') as HTMLInputElement;
+    const weightMutMagSlider = document.getElementById('weight-mut-mag-slider') as HTMLInputElement;
+
+    useNeuralCheckbox.addEventListener('change', () => {
+      this.config.useNeuralNet = useNeuralCheckbox.checked;
+      neuralOptions.style.display = useNeuralCheckbox.checked ? 'block' : 'none';
+      this.updateSettingsInfoBox();
+    });
+
+    neuralModeSelect.addEventListener('change', () => {
+      this.config.neuralMode = neuralModeSelect.value as 'hybrid' | 'pure';
+      this.updateSettingsInfoBox();
+    });
+
+    neuralHiddenSlider.addEventListener('input', () => {
+      this.config.neuralHiddenSize = parseInt(neuralHiddenSlider.value);
+      document.getElementById('neural-hidden-value')!.textContent = neuralHiddenSlider.value;
+      this.updateSettingsInfoBox();
+    });
+
+    neuralActivationSelect.addEventListener('change', () => {
+      this.config.neuralActivation = neuralActivationSelect.value as 'tanh' | 'relu' | 'sigmoid';
+      this.updateSettingsInfoBox();
+    });
+
+    weightMutRateSlider.addEventListener('input', () => {
+      this.config.weightMutationRate = parseInt(weightMutRateSlider.value) / 100;
+      document.getElementById('weight-mut-rate-value')!.textContent = weightMutRateSlider.value + '%';
+      this.updateSettingsInfoBox();
+    });
+
+    weightMutMagSlider.addEventListener('input', () => {
+      this.config.weightMutationMagnitude = parseFloat(weightMutMagSlider.value);
+      document.getElementById('weight-mut-mag-value')!.textContent = weightMutMagSlider.value;
       this.updateSettingsInfoBox();
     });
 
@@ -626,7 +771,9 @@ class EvolutionApp {
       group.add(mesh);
     }
 
-    for (const muscle of genome.muscles) {
+    const muscleMeshes: THREE.Mesh[] = [];
+    for (let muscleIdx = 0; muscleIdx < genome.muscles.length; muscleIdx++) {
+      const muscle = genome.muscles[muscleIdx];
       const nodeA = nodeMeshes.get(muscle.nodeA);
       const nodeB = nodeMeshes.get(muscle.nodeB);
       if (!nodeA || !nodeB) continue;
@@ -661,12 +808,18 @@ class EvolutionApp {
         new THREE.CylinderGeometry(thickness, thickness, 1, 8),
         muscleMaterial
       );
-      mesh.userData = { nodeA: muscle.nodeA, nodeB: muscle.nodeB };
+      mesh.userData = {
+        nodeA: muscle.nodeA,
+        nodeB: muscle.nodeB,
+        muscleIndex: muscleIdx,
+        baseColor: muscleColor.clone()
+      };
       this.updateMuscleMesh(mesh, nodeA.position, nodeB.position);
+      muscleMeshes.push(mesh);
       group.add(mesh);
     }
 
-    group.userData = { genome, nodeMeshes };
+    group.userData = { genome, nodeMeshes, muscleMeshes };
     return group;
   }
 
@@ -843,8 +996,19 @@ class EvolutionApp {
     this.gridUI.querySelector('#run-10x-btn')?.addEventListener('click', () => this.autoRun(10));
     this.gridUI.querySelector('#run-100x-btn')?.addEventListener('click', () => this.autoRun(100));
     this.gridUI.querySelector('#graph-btn')?.addEventListener('click', () => {
-      this.graphPanel?.toggle();
-      this.creatureTypesPanel?.toggle();
+      // Sync both panels: show both if any are hidden, hide both if both are visible
+      const graphVisible = this.graphPanel?.isShowing() ?? false;
+      const typesVisible = this.creatureTypesPanel?.isShowing() ?? false;
+
+      if (graphVisible && typesVisible) {
+        // Both visible -> hide both
+        this.graphPanel?.hide();
+        this.creatureTypesPanel?.hide();
+      } else {
+        // At least one hidden -> show both
+        this.graphPanel?.show();
+        this.creatureTypesPanel?.show();
+      }
     });
     this.gridUI.querySelector('#reset-btn')?.addEventListener('click', () => this.reset());
   }
@@ -1707,14 +1871,14 @@ class EvolutionApp {
     this.replayModal = document.createElement('div');
     this.replayModal.className = 'modal-overlay';
     this.replayModal.innerHTML = `
-      <div class="modal-content" style="max-width: 1400px; width: 95vw;">
+      <div class="modal-content" style="max-width: 1600px; width: 98vw;">
         <div class="modal-header">
           <span class="modal-title">Simulation Replay</span>
           <button class="btn-icon" id="close-replay">&times;</button>
         </div>
-        <div class="modal-body" style="display: flex; gap: 20px;">
+        <div class="modal-body" style="display: flex; gap: 16px; flex-wrap: wrap;">
           <!-- Left: Replay viewer -->
-          <div style="flex: 0 0 500px;">
+          <div style="flex: 0 0 480px;">
             <div id="replay-container" style="width: 500px; height: 350px; border-radius: 12px; overflow: hidden;"></div>
             <div style="margin-top: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -1743,8 +1907,15 @@ class EvolutionApp {
             <div style="color: var(--text-muted);">Loading genome...</div>
           </div>
 
+          <!-- Neural Network Visualization (shown only for neural creatures) -->
+          <div id="neural-panel" style="flex: 0 0 280px; max-height: 500px; background: var(--bg-tertiary); border-radius: 12px; padding: 16px; display: none;">
+            <div style="color: var(--accent); font-weight: 600; font-size: 13px; margin-bottom: 12px; border-bottom: 1px solid var(--border-light); padding-bottom: 4px;">NEURAL NETWORK</div>
+            <div id="neural-viz-container" style="margin-bottom: 12px;"></div>
+            <div id="neural-info" style="font-size: 11px; font-family: monospace; color: var(--text-secondary);"></div>
+          </div>
+
           <!-- Right: Family tree -->
-          <div id="family-tree-panel" style="flex: 1; min-width: 350px; max-height: 500px; overflow: auto; background: var(--bg-tertiary); border-radius: 12px; padding: 16px;">
+          <div id="family-tree-panel" style="flex: 1 1 300px; min-width: 280px; max-height: 500px; overflow: auto; background: var(--bg-tertiary); border-radius: 12px; padding: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border-light); padding-bottom: 4px;">
               <div style="color: var(--accent); font-weight: 600; font-size: 13px;">FAMILY TREE</div>
               <select id="lineage-mode-select" style="
@@ -1979,6 +2150,13 @@ class EvolutionApp {
         alert('Run not found');
         return;
       }
+      console.log('Loading run:', {
+        id: run.id,
+        hasBestCreature: !!run.bestCreature,
+        hasLongestSurvivor: !!run.longestSurvivor,
+        bestCreatureGen: run.bestCreature?.generation,
+        longestSurvivorGens: run.longestSurvivor?.generations
+      });
 
       // Get the max generation for this run
       const maxGen = run.generationCount - 1;
@@ -2004,12 +2182,31 @@ class EvolutionApp {
       this.simulationResults = results;
       this.runName = run.name || '';
 
-      // Restore fitness history from storage, or initialize empty
-      this.fitnessHistory = run.fitnessHistory || [];
+      // Restore fitness history from storage, or rebuild from current results
+      if (run.fitnessHistory && run.fitnessHistory.length > 0) {
+        this.fitnessHistory = run.fitnessHistory;
+      } else {
+        // Fallback: rebuild from current results only
+        this.fitnessHistory = [];
+        const validResults = results.filter(r => !isNaN(r.finalFitness) && isFinite(r.finalFitness));
+        if (validResults.length > 0) {
+          const best = Math.max(...validResults.map(r => r.finalFitness));
+          const avg = validResults.reduce((sum, r) => sum + r.finalFitness, 0) / validResults.length;
+          const worst = Math.min(...validResults.map(r => r.finalFitness));
+          this.fitnessHistory.push({ generation: maxGen, best, average: avg, worst });
+        }
+      }
+      console.log('Fitness history loaded:', {
+        hasData: !!run.fitnessHistory,
+        entries: this.fitnessHistory.length,
+        sample: this.fitnessHistory[0]
+      });
 
-      // Update graph if we have history and show it by default
-      if (this.graphPanel && this.fitnessHistory.length > 0) {
-        this.graphPanel.updateData(this.fitnessHistory);
+      // Always show both graphs when loading a run
+      if (this.graphPanel) {
+        if (this.fitnessHistory.length > 0) {
+          this.graphPanel.updateData(this.fitnessHistory);
+        }
         this.graphPanel.show();
       }
 
@@ -2034,15 +2231,23 @@ class EvolutionApp {
         });
       }
 
-      if (this.creatureTypesPanel && this.creatureTypeHistory.length > 0) {
-        this.creatureTypesPanel.updateData(this.creatureTypeHistory);
+      if (this.creatureTypesPanel) {
+        if (this.creatureTypeHistory.length > 0) {
+          this.creatureTypesPanel.updateData(this.creatureTypeHistory);
+        }
         this.creatureTypesPanel.show();
       }
 
       // Restore best creature ever
       if (run.bestCreature) {
-        this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
-        this.bestCreatureGeneration = run.bestCreature.generation;
+        try {
+          this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
+          this.bestCreatureGeneration = run.bestCreature.generation;
+        } catch (e) {
+          console.error('Failed to expand best creature:', e);
+          this.bestCreatureEver = null;
+          this.bestCreatureGeneration = 0;
+        }
       } else {
         // Fallback: compute from current results for older runs without this data
         const validResults = results.filter(r => !r.disqualified && isFinite(r.finalFitness));
@@ -2058,8 +2263,14 @@ class EvolutionApp {
 
       // Restore longest surviving creature
       if (run.longestSurvivor) {
-        this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
-        this.longestSurvivingGenerations = run.longestSurvivor.generations;
+        try {
+          this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
+          this.longestSurvivingGenerations = run.longestSurvivor.generations;
+        } catch (e) {
+          console.error('Failed to expand longest survivor:', e);
+          this.longestSurvivingCreature = null;
+          this.longestSurvivingGenerations = 0;
+        }
       } else {
         // Fallback: compute from current results for older runs without this data
         const validResults = results.filter(r => !r.disqualified && isFinite(r.finalFitness));
@@ -2104,6 +2315,12 @@ class EvolutionApp {
       // Set evolution step - we're ready to mutate (start next generation)
       this.evolutionStep = 'idle';
       this.updateNextButton();
+      console.log('After loading, state:', {
+        hasBestCreatureEver: !!this.bestCreatureEver,
+        hasLongestSurvivingCreature: !!this.longestSurvivingCreature,
+        bestCreatureGeneration: this.bestCreatureGeneration,
+        longestSurvivingGenerations: this.longestSurvivingGenerations
+      });
       this.updateStats();
       this.updateSettingsInfoBox();
 
@@ -2287,16 +2504,28 @@ class EvolutionApp {
 
       // Restore best creature and longest survivor
       if (run.bestCreature) {
-        this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
-        this.bestCreatureGeneration = run.bestCreature.generation;
+        try {
+          this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
+          this.bestCreatureGeneration = run.bestCreature.generation;
+        } catch (e) {
+          console.error('Failed to expand best creature in fork:', e);
+          this.bestCreatureEver = null;
+          this.bestCreatureGeneration = 0;
+        }
       } else {
         this.bestCreatureEver = null;
         this.bestCreatureGeneration = 0;
       }
 
       if (run.longestSurvivor) {
-        this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
-        this.longestSurvivingGenerations = run.longestSurvivor.generations;
+        try {
+          this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
+          this.longestSurvivingGenerations = run.longestSurvivor.generations;
+        } catch (e) {
+          console.error('Failed to expand longest survivor in fork:', e);
+          this.longestSurvivingCreature = null;
+          this.longestSurvivingGenerations = 0;
+        }
       } else {
         this.longestSurvivingCreature = null;
         this.longestSurvivingGenerations = 0;
@@ -2654,8 +2883,68 @@ class EvolutionApp {
 
     viewer.innerHTML = html;
 
+    // Set up neural visualization if creature has neural genome
+    this.setupNeuralVisualization(genome);
+
     // Build and render family tree in the separate panel
     this.buildAndRenderFamilyTree(genome);
+  }
+
+  private setupNeuralVisualization(genome: CreatureGenome): void {
+    const neuralPanel = document.getElementById('neural-panel');
+    const neuralVizContainer = document.getElementById('neural-viz-container');
+    const neuralInfo = document.getElementById('neural-info');
+
+    if (!neuralPanel || !neuralVizContainer || !neuralInfo) return;
+
+    // Dispose existing visualizer
+    if (this.neuralVisualizer) {
+      this.neuralVisualizer.dispose();
+      this.neuralVisualizer = null;
+    }
+
+    // Check if creature has neural genome
+    if (!genome.neuralGenome || genome.controllerType !== 'neural') {
+      neuralPanel.style.display = 'none';
+      return;
+    }
+
+    // Show neural panel
+    neuralPanel.style.display = 'block';
+
+    // Create visualizer
+    neuralVizContainer.innerHTML = '';
+    this.neuralVisualizer = new NeuralVisualizer(neuralVizContainer, {
+      width: 248,
+      height: 160,
+      showLabels: true,
+      showWeights: true
+    });
+
+    // Get muscle names for labels
+    const muscleNames = genome.muscles.map((m) => {
+      const nodeAIndex = genome.nodes.findIndex(n => n.id === m.nodeA) + 1;
+      const nodeBIndex = genome.nodes.findIndex(n => n.id === m.nodeB) + 1;
+      return `${nodeAIndex}-${nodeBIndex}`;
+    });
+
+    this.neuralVisualizer.setGenome(genome.neuralGenome, muscleNames);
+
+    // Show neural network info
+    const { topology, activation } = genome.neuralGenome;
+    const weightCount = genome.neuralGenome.weights.length;
+    neuralInfo.innerHTML = `
+      <div style="margin-bottom: 4px;"><span style="color: var(--text-muted);">Mode:</span> ${this.config.neuralMode || 'hybrid'}</div>
+      <div style="margin-bottom: 4px;"><span style="color: var(--text-muted);">Topology:</span> ${topology.inputSize} → ${topology.hiddenSize} → ${topology.outputSize}</div>
+      <div style="margin-bottom: 4px;"><span style="color: var(--text-muted);">Activation:</span> ${activation}</div>
+      <div style="margin-bottom: 4px;"><span style="color: var(--text-muted);">Weights:</span> ${weightCount}</div>
+      <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light);">
+        <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 4px;">SENSOR INPUTS</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; font-size: 9px;">
+          ${SENSOR_NAMES.map((name, i) => `<div style="color: ${i < 3 ? 'var(--accent)' : i < 6 ? 'var(--success)' : 'var(--text-secondary)'}">${name}</div>`).join('')}
+        </div>
+      </div>
+    `;
   }
 
   private async buildAndRenderFamilyTree(genome: CreatureGenome): Promise<void> {
@@ -2981,11 +3270,99 @@ class EvolutionApp {
         document.getElementById('replay-time')!.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(totalTime)}`;
         document.getElementById('replay-fitness')!.textContent = currentFitness.toFixed(1);
         (document.getElementById('replay-fitness-fill') as HTMLElement).style.width = `${(currentFitness / maxFitness) * 100}%`;
+
+        // Update neural visualization if creature has neural genome
+        if (this.neuralVisualizer && this.selectedResult.genome.neuralGenome) {
+          // Calculate sensor inputs from current frame
+          const com = frame.centerOfMass;
+
+          // Find active pellet
+          const activePelletData = this.selectedResult.pellets.find(p =>
+            p.spawnedAtFrame <= this.replayFrame &&
+            (p.collectedAtFrame === null || this.replayFrame < p.collectedAtFrame)
+          );
+
+          let pelletDir = { x: 0, y: 0, z: 0 };
+          let normalizedDist = 1;
+
+          if (activePelletData) {
+            const dx = activePelletData.position.x - com.x;
+            const dy = activePelletData.position.y - com.y;
+            const dz = activePelletData.position.z - com.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist > 0.01) {
+              pelletDir = { x: dx / dist, y: dy / dist, z: dz / dist };
+            }
+            normalizedDist = Math.min(dist / 20, 1);
+          }
+
+          // Calculate velocity from previous frame
+          let velocityDir = { x: 0, y: 0, z: 0 };
+          if (this.replayFrame > 0) {
+            const prevFrame = frames[this.replayFrame - 1];
+            const vx = com.x - prevFrame.centerOfMass.x;
+            const vy = com.y - prevFrame.centerOfMass.y;
+            const vz = com.z - prevFrame.centerOfMass.z;
+            const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+            if (speed > 0.001) {
+              velocityDir = { x: vx / speed, y: vy / speed, z: vz / speed };
+            }
+          }
+
+          const sensorInputs = gatherSensorInputs(pelletDir, velocityDir, normalizedDist, currentTime);
+          this.neuralVisualizer.updateActivations(sensorInputs);
+
+          // Update muscle colors based on neural activations (heatmap overlay)
+          this.updateMuscleHeatmap(sensorInputs);
+        }
       }
     }
 
     this.replayRenderer.render(this.replayScene, this.replayCamera);
   };
+
+  private updateMuscleHeatmap(sensorInputs: number[]): void {
+    if (!this.replayCreature || !this.selectedResult?.genome.neuralGenome) return;
+
+    const muscleMeshes = this.replayCreature.userData.muscleMeshes as THREE.Mesh[] | undefined;
+    if (!muscleMeshes) return;
+
+    // Create network and compute outputs
+    const network = createNetworkFromGenome(this.selectedResult.genome.neuralGenome);
+    const outputs = network.predict(sensorInputs);
+
+    // Update each muscle's color based on its neural activation
+    for (let i = 0; i < muscleMeshes.length && i < outputs.length; i++) {
+      const mesh = muscleMeshes[i];
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      const activation = outputs[i]; // In range [-1, 1] for tanh
+
+      // Map activation to color:
+      // -1 (contracting) = red/orange
+      //  0 (neutral) = original color
+      // +1 (expanding) = green/cyan
+      const baseColor = mesh.userData.baseColor as THREE.Color;
+
+      if (Math.abs(activation) > 0.1) {
+        // Significant activation - show heatmap color
+        const hue = activation > 0
+          ? THREE.MathUtils.lerp(0.33, 0.5, activation)   // Green to cyan for positive
+          : THREE.MathUtils.lerp(0.08, 0.0, -activation); // Orange to red for negative
+        const saturation = 0.9;
+        const lightness = 0.4 + Math.abs(activation) * 0.2;
+
+        const heatColor = new THREE.Color().setHSL(hue, saturation, lightness);
+        material.color.copy(heatColor);
+        material.emissive.copy(heatColor);
+        material.emissiveIntensity = 0.3 + Math.abs(activation) * 0.4;
+      } else {
+        // Low activation - use base color
+        material.color.copy(baseColor);
+        material.emissive.copy(baseColor);
+        material.emissiveIntensity = 0.15;
+      }
+    }
+  }
 
   private formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
@@ -3063,7 +3440,7 @@ class EvolutionApp {
     await this.runSimulationStep();
     this.createCreatureCards();
     this.evolutionStep = 'idle';
-    this.recordFitnessHistory();
+    await this.recordFitnessHistory();
 
     // Auto-save generation 0
     await runStorage.saveGeneration(this.generation, this.simulationResults);
@@ -3099,7 +3476,7 @@ class EvolutionApp {
         this.updateNextButton('Sorting...');
         await this.runSortStep(false);
         this.evolutionStep = 'idle';
-        this.recordFitnessHistory();
+        await this.recordFitnessHistory();
       }
 
       this.updateStats();
@@ -3413,7 +3790,7 @@ class EvolutionApp {
     }
   }
 
-  private recordFitnessHistory(): void {
+  private async recordFitnessHistory(): Promise<void> {
     const validResults = this.simulationResults.filter(r => !isNaN(r.finalFitness) && isFinite(r.finalFitness));
     if (validResults.length === 0) return;
 
@@ -3451,9 +3828,6 @@ class EvolutionApp {
       worst
     });
 
-    // Save fitness history to storage
-    runStorage.updateFitnessHistory(this.fitnessHistory);
-
     // Update creature type history
     const nodeCountDistribution = new Map<number, number>();
     for (const result of this.simulationResults) {
@@ -3465,8 +3839,13 @@ class EvolutionApp {
       nodeCountDistribution
     });
 
-    // Save creature type history to storage
-    runStorage.updateCreatureTypeHistory(this.creatureTypeHistory);
+    // Save histories to storage (await to ensure persistence)
+    try {
+      await runStorage.updateFitnessHistory(this.fitnessHistory);
+      await runStorage.updateCreatureTypeHistory(this.creatureTypeHistory);
+    } catch (e) {
+      console.error('Failed to save history to storage:', e);
+    }
 
     if (this.graphPanel) {
       this.graphPanel.updateData(this.fitnessHistory);
@@ -3511,7 +3890,7 @@ class EvolutionApp {
         await this.runSortStep(true);  // Fast mode
 
         this.evolutionStep = 'idle';
-        this.recordFitnessHistory();
+        await this.recordFitnessHistory();
         this.updateStats();
 
         // Small yield to let UI update

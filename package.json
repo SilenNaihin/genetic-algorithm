@@ -43,6 +43,7 @@
     "@types/dat.gui": "^0.7.13",
     "@types/three": "^0.182.0",
     "@vitest/ui": "^4.0.17",
+    "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.1.0",
     "jscpd": "^4.0.7",
     "knip": "^5.81.0",

@@ -2,6 +2,11 @@ import * as CANNON from 'cannon-es';
 import type { CreatureGenome, Vector3, SimulationConfig } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 import { dot, normalize, subtract, length } from '../utils/math';
+import {
+  NeuralNetwork,
+  createNetworkFromGenome,
+  gatherSensorInputs
+} from '../neural';
 
 export interface SimulationFrame {
   time: number;
@@ -269,6 +274,15 @@ export function simulateCreature(
     });
   }
 
+  // Create neural network if enabled
+  let neuralNetwork: NeuralNetwork | null = null;
+  const useNeural = config.useNeuralNet && genome.controllerType === 'neural' && genome.neuralGenome;
+  const neuralMode = config.neuralMode || 'hybrid';
+
+  if (useNeural && genome.neuralGenome) {
+    neuralNetwork = createNetworkFromGenome(genome.neuralGenome);
+  }
+
   // Reset pellet angle tracker for each new creature simulation
   lastPelletAngle = null;
 
@@ -451,37 +465,72 @@ export function simulateCreature(
       normalizedDistance = Math.min(dist / MAX_PELLET_DISTANCE, 1);
     }
 
+    // Get neural network outputs if enabled
+    let neuralOutputs: number[] | null = null;
+    if (neuralNetwork) {
+      const sensorInputs = gatherSensorInputs(
+        pelletDirection,
+        velocityDirection,
+        normalizedDistance,
+        simulationTime
+      );
+      neuralOutputs = neuralNetwork.predict(sensorInputs);
+    }
+
     // Update springs with multi-factor modulated oscillation (v2)
-    for (const {
-      spring, frequency, amplitude, phase, baseRestLength,
-      directionBias, biasStrength,
-      velocityBias, velocityStrength,
-      distanceBias, distanceStrength
-    } of springs) {
-      // Base oscillation
-      const baseContraction = Math.sin(simulationTime * frequency * Math.PI * 2 + phase);
+    // Or use neural network control if enabled
+    for (let springIdx = 0; springIdx < springs.length; springIdx++) {
+      const {
+        spring, frequency, amplitude, phase, baseRestLength,
+        directionBias, biasStrength,
+        velocityBias, velocityStrength,
+        distanceBias, distanceStrength
+      } = springs[springIdx];
 
-      // v1: Direction modulation
-      // dot product gives -1 to 1: 1 = pellet in same direction as bias, -1 = opposite
-      const directionMatch = dot(pelletDirection, directionBias);
-      const directionMod = directionMatch * biasStrength;
+      let finalContraction: number;
 
-      // v2: Velocity modulation (proprioception)
-      // Activates when creature is moving in the muscle's preferred direction
-      const velocityMatch = dot(velocityDirection, velocityBias);
-      const velocityMod = velocityMatch * velocityStrength;
+      if (neuralOutputs && springIdx < neuralOutputs.length) {
+        // Neural network control
+        const nnOutput = neuralOutputs[springIdx];  // Already in [-1, 1] range from tanh
 
-      // v2: Distance modulation
-      // distanceBias > 0: activate more when NEAR (nearness = 1 - normalizedDistance)
-      // distanceBias < 0: activate more when FAR
-      const nearness = 1 - normalizedDistance;
-      const distanceMod = (distanceBias * nearness) * distanceStrength;
+        if (neuralMode === 'pure') {
+          // Pure mode: NN directly controls contraction
+          // nnOutput is in [-1, 1], map to contraction range
+          finalContraction = nnOutput * amplitude;
+        } else {
+          // Hybrid mode: NN output modulates base oscillator
+          const baseContraction = Math.sin(simulationTime * frequency * Math.PI * 2 + phase);
+          // NN output acts as a modulation factor (0.5 to 1.5 range)
+          const nnModulation = 0.5 + (nnOutput + 1) * 0.5;  // Map [-1,1] to [0.5, 1.5]
+          finalContraction = baseContraction * amplitude * nnModulation;
+        }
+      } else {
+        // Oscillator-based control (original behavior)
+        // Base oscillation
+        const baseContraction = Math.sin(simulationTime * frequency * Math.PI * 2 + phase);
 
-      // Combined modulation (clamped to prevent extreme values)
-      const modulation = Math.max(0.1, Math.min(2.5, 1 + directionMod + velocityMod + distanceMod));
+        // v1: Direction modulation
+        // dot product gives -1 to 1: 1 = pellet in same direction as bias, -1 = opposite
+        const directionMatch = dot(pelletDirection, directionBias);
+        const directionMod = directionMatch * biasStrength;
 
-      // Final contraction with modulation
-      const finalContraction = baseContraction * amplitude * modulation;
+        // v2: Velocity modulation (proprioception)
+        // Activates when creature is moving in the muscle's preferred direction
+        const velocityMatch = dot(velocityDirection, velocityBias);
+        const velocityMod = velocityMatch * velocityStrength;
+
+        // v2: Distance modulation
+        // distanceBias > 0: activate more when NEAR (nearness = 1 - normalizedDistance)
+        // distanceBias < 0: activate more when FAR
+        const nearness = 1 - normalizedDistance;
+        const distanceMod = (distanceBias * nearness) * distanceStrength;
+
+        // Combined modulation (clamped to prevent extreme values)
+        const modulation = Math.max(0.1, Math.min(2.5, 1 + directionMod + velocityMod + distanceMod));
+
+        // Final contraction with modulation
+        finalContraction = baseContraction * amplitude * modulation;
+      }
 
       spring.restLength = baseRestLength * (1 - finalContraction);
       spring.applyForce();

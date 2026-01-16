@@ -42,7 +42,11 @@ export class Population {
     const population = new Population(config, genomeConstraints);
 
     for (let i = 0; i < config.populationSize; i++) {
-      const genome = generateRandomGenome(genomeConstraints);
+      // Pass simulation config to enable neural genome initialization if configured
+      const genome = generateRandomGenome({
+        constraints: genomeConstraints,
+        simulationConfig: config
+      });
       const creature = new Creature(genome);
       population.creatures.push(creature);
     }
