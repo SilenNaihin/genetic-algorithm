@@ -33,14 +33,11 @@
   "dependencies": {
     "cannon-es": "^0.20.0",
     "chart.js": "^4.5.1",
-    "dat.gui": "^0.7.9",
     "three": "^0.182.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "zustand": "^5.0.10"
+    "vite": "^7.3.1"
   },
   "devDependencies": {
-    "@types/dat.gui": "^0.7.13",
     "@types/three": "^0.182.0",
     "@vitest/ui": "^4.0.17",
     "fake-indexeddb": "^6.2.5",

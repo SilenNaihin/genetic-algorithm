@@ -1,0 +1,114 @@
+{
+  "project": "Frontend Refactoring - main.ts Decomposition",
+  "goal": "Break down main.ts (4072 lines) into smaller modules (<500 lines each) with perfect parity",
+  "approach": "Extract one component at a time, verify with tests after each step",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Cleanup - Remove incomplete extractions",
+      "description": "Delete untracked WIP files that are out of sync with main.ts",
+      "files_to_delete": [
+        "src/ui/MenuScreen.ts",
+        "src/ui/CreatureGrid.ts",
+        "src/ui/ReplayViewer.ts",
+        "src/ui/StatsPanel.ts",
+        "src/ui/LoadRunsModal.ts",
+        "src/ui/GenomeInspector.ts",
+        "src/ui/FamilyTreeViewer.ts",
+        "src/core/EvolutionEngine.ts",
+        "src/rendering/SharedRenderer.ts",
+        "src/types/ui.ts"
+      ],
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 2,
+      "name": "Extract AppState types",
+      "description": "Move type definitions (AppState, EvolutionStep, Config, CreatureCard, AncestorInfo) to src/types/app.ts",
+      "estimated_lines": "~80 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 3,
+      "name": "Extract CreatureMeshFactory",
+      "description": "Extract createCreatureMesh and updateMuscleMesh to src/rendering/CreatureMeshFactory.ts",
+      "estimated_lines": "~120 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 4,
+      "name": "Extract TooltipManager",
+      "description": "Extract tooltip creation, show/hide logic to src/ui/TooltipManager.ts",
+      "estimated_lines": "~50 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 5,
+      "name": "Extract PreviewRenderer",
+      "description": "Extract 3D preview animation (setupPreview, regeneratePreviewCreature, animatePreview) to src/rendering/PreviewRenderer.ts",
+      "estimated_lines": "~200 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 6,
+      "name": "Extract ReplayController",
+      "description": "Extract replay modal and animation logic to src/ui/ReplayController.ts",
+      "estimated_lines": "~400 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 7,
+      "name": "Extract CreatureCardRenderer",
+      "description": "Extract creature card creation and tooltip logic to src/ui/CreatureCardRenderer.ts",
+      "estimated_lines": "~350 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 8,
+      "name": "Extract GenerationNavigator",
+      "description": "Extract generation navigation, load/save, fork logic to src/ui/GenerationNavigator.ts",
+      "estimated_lines": "~450 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 9,
+      "name": "Extract StatsRenderer",
+      "description": "Extract getStatsHTML, updateStats, step indicators to src/ui/StatsRenderer.ts",
+      "estimated_lines": "~300 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 10,
+      "name": "Extract MenuBuilder",
+      "description": "Extract createMenuScreen and slider setup to src/ui/MenuBuilder.ts",
+      "estimated_lines": "~500 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 11,
+      "name": "Extract SimulationController",
+      "description": "Extract simulation/evolution logic (startSimulation, executeNextStep, autoRun) to src/simulation/SimulationController.ts",
+      "estimated_lines": "~400 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 12,
+      "name": "Extract LoadRunsModal",
+      "description": "Extract load runs modal creation and logic to src/ui/LoadRunsModal.ts",
+      "estimated_lines": "~200 lines",
+      "verification": "npm test && npm run build"
+    },
+    {
+      "id": 13,
+      "name": "Final cleanup",
+      "description": "Review main.ts, ensure it's under 500 lines, final verification",
+      "verification": "npm test && npm run build && wc -l src/main.ts"
+    }
+  ],
+  "notes": [
+    "Each phase should be committed separately",
+    "User will manually test after each phase",
+    "If any phase breaks functionality, revert and reassess",
+    "Target: main.ts < 500 lines, all new files < 500 lines"
+  ]
+}

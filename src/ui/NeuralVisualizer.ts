@@ -210,7 +210,7 @@ export class NeuralVisualizer {
     x: number,
     yPositions: number[],
     activations: number[],
-    layer: 'input' | 'hidden' | 'output'
+    _layer: 'input' | 'hidden' | 'output'
   ): void {
     const nodeRadius = 6;
 

@@ -7,7 +7,6 @@
  */
 
 import type { NeuralGenomeData, NeuralTopology } from '../neural';
-import { calculateWeightCount } from '../neural';
 
 export interface BrainEvolutionData {
   gen1Weights: number[];      // Average weights from generation 1
@@ -28,7 +27,6 @@ const DEFAULT_OPTIONS: BrainEvolutionPanelOptions = {
 };
 
 export class BrainEvolutionPanel {
-  private container: HTMLElement;
   private panel: HTMLElement;
   private diffCanvas: HTMLCanvasElement;
   private histCanvas: HTMLCanvasElement;
@@ -39,7 +37,6 @@ export class BrainEvolutionPanel {
   private isVisible: boolean = false;
 
   constructor(container: HTMLElement, options: Partial<BrainEvolutionPanelOptions> = {}) {
-    this.container = container;
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
     // Create panel container

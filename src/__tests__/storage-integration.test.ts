@@ -547,7 +547,7 @@ describe('RunStorage Integration', () => {
       const result = createMockSimulationResult(150);
       result.genome.survivalStreak = 8;
 
-      await storage.updateLongestSurvivor(result, 8);
+      await storage.updateLongestSurvivor(result, 8, 10);
       const run = await storage.getRun(runId);
 
       expect(run?.longestSurvivor?.result.genome.survivalStreak).toBe(8);
@@ -805,24 +805,20 @@ describe('RunStorage Integration', () => {
       expect(loaded?.[0].disqualified).toBe('frequency_exceeded');
     });
 
-    it('neural network weights survive round-trip', async () => {
+    it('neural genome weights survive round-trip', async () => {
       const runId = await storage.createRun(DEFAULT_CONFIG);
       const result = createMockSimulationResult();
-      result.genome.neuralNetwork = {
-        inputSize: 6,
-        hiddenSize: 8,
-        outputSize: 4,
-        weightsIH: Array(48).fill(0).map(() => Math.random()),
-        weightsHO: Array(32).fill(0).map(() => Math.random()),
-        biasH: Array(8).fill(0).map(() => Math.random()),
-        biasO: Array(4).fill(0).map(() => Math.random())
+      result.genome.neuralGenome = {
+        topology: { inputSize: 6, hiddenSize: 8, outputSize: 4 },
+        weights: Array(104).fill(0).map(() => Math.random()), // 6*8 + 8 + 8*4 + 4 = 104
+        activation: 'tanh'
       };
 
       await storage.saveGeneration(0, [result]);
       const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
-      expect(loaded?.[0].genome.neuralNetwork).toBeDefined();
-      expect(loaded?.[0].genome.neuralNetwork?.weightsIH.length).toBe(48);
+      expect(loaded?.[0].genome.neuralGenome).toBeDefined();
+      expect(loaded?.[0].genome.neuralGenome?.weights.length).toBe(104);
     });
   });
 
