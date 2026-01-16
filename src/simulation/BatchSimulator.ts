@@ -348,12 +348,15 @@ export function simulateCreature(
 
   // FITNESS MODEL (edge-based, XZ ground distance):
   // - Starts at 0
-  // - 0-80 points for XZ progress toward current pellet (capped at 80)
-  // - +20 points when pellet is actually collected (requires reaching correct Y height)
-  // - After first pellet: -20 max penalty if moving AWAY from next pellet
-  // - Total per pellet: 100 (80 progress + 20 collection)
-  // - Movement bonus: 0-25 points for NET displacement over time (discourages flailing)
-  const MOVEMENT_BONUS_CAP = 25;  // Maximum bonus for directed locomotion
+  // - 0-progressMax points for XZ progress toward current pellet
+  // - +bonus points when pellet is actually collected (pelletPoints - progressMax)
+  // - After first pellet: -regressionPenalty max if moving AWAY from next pellet
+  // - Movement bonus: 0-movementMax points for NET displacement over time
+  // Get fitness values from config (with defaults for backwards compatibility)
+  const pelletPoints = config.fitnessPelletPoints ?? 100;
+  const progressMax = config.fitnessProgressMax ?? 80;
+  const movementMax = config.fitnessMovementMax ?? 25;
+  const regressionPenalty = config.fitnessRegressionPenalty ?? 20;
   const TARGET_DISPLACEMENT_RATE = 1.0;  // Units/second for full bonus (net displacement, not total)
 
   const calculateCurrentFitness = (
@@ -372,10 +375,10 @@ export function simulateCreature(
       z: isFinite(centerOfMass.z) ? centerOfMass.z : 0
     };
 
-    // Base: 100 points per collected pellet (80 progress + 20 collection bonus)
-    let fitness = pelletsCollectedCount * 100;
+    // Base: pelletPoints per collected pellet
+    let fitness = pelletsCollectedCount * pelletPoints;
 
-    // Progress toward current pellet (0-80 points, using XZ ground distance from EDGE)
+    // Progress toward current pellet (0-progressMax points, using XZ ground distance from EDGE)
     const activePellet = getActivePellet();
     if (activePellet && activePellet.initialDistance > 0) {
       // Calculate current edge-to-pellet ground distance (XZ only)
@@ -386,23 +389,23 @@ export function simulateCreature(
         const progress = Math.max(0, Math.min(1,
           (activePellet.initialDistance - currentEdgeDist) / activePellet.initialDistance
         ));
-        // Cap at 80 points (remaining 20 comes from actually collecting)
-        fitness += progress * 80;
+        // Cap at progressMax points (remaining comes from actually collecting)
+        fitness += progress * progressMax;
 
         // Track closest edge distance for penalty calculation
         if (currentEdgeDist < closestEdgeDistanceToCurrentPellet) {
           closestEdgeDistanceToCurrentPellet = currentEdgeDist;
         }
 
-        // PENALTY: After first pellet, penalize up to -20 for moving AWAY from pellet
+        // PENALTY: After first pellet, penalize up to -regressionPenalty for moving AWAY from pellet
         // Only apply if we've collected at least one pellet and are moving away
         if (pelletsCollectedCount > 0 && currentEdgeDist > closestEdgeDistanceToCurrentPellet) {
           // How much further we've moved from our closest approach
           const regressionDist = currentEdgeDist - closestEdgeDistanceToCurrentPellet;
-          // Penalty scales with regression, max -20 points
-          // Full -20 penalty when regression equals half the initial distance
+          // Penalty scales with regression, max -regressionPenalty points
+          // Full penalty when regression equals half the initial distance
           const regressionRatio = Math.min(1, regressionDist / (activePellet.initialDistance * 0.5));
-          fitness -= regressionRatio * 20;
+          fitness -= regressionRatio * regressionPenalty;
         }
       }
     }
@@ -414,7 +417,7 @@ export function simulateCreature(
     if (currentTime > 0.5) {  // Only apply after settling period
       const displacementRate = currentNetDisplacement / currentTime;  // Units per second
       const movementRatio = Math.min(1, displacementRate / TARGET_DISPLACEMENT_RATE);
-      fitness += movementRatio * MOVEMENT_BONUS_CAP;
+      fitness += movementRatio * movementMax;
     }
 
     // Ensure fitness is never negative (minimum 0)
@@ -716,11 +719,11 @@ export function simulateCreature(
     };
   }
 
-  // SIMPLE FITNESS MODEL:
-  // - 100 points per collected pellet
-  // - 0-80 points for progress toward current pellet
-  // - 0-25 points for XZ net displacement over time (discourages flailing, ignores falling)
-  // - After first pellet: up to -20 penalty for moving away
+  // SIMPLE FITNESS MODEL (values configurable via SimulationConfig):
+  // - pelletPoints per collected pellet (default 100)
+  // - 0-progressMax points for progress toward current pellet (default 80)
+  // - 0-movementMax points for XZ net displacement over time (default 25)
+  // - After first pellet: up to -regressionPenalty for moving away (default 20)
   const finalFitness = calculateCurrentFitness(validFinalCOM, pelletsCollected, validNetDisplacementXZ, simulationTime);
 
   return {

@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
-import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, type FitnessHistoryEntry, type Vector3 } from '../types';
+import { DEFAULT_CONFIG, type FitnessHistoryEntry, type Vector3, type SimulationConfig } from '../types';
+
+// Legacy mock weights for testing the old fitness recalculation tests
+// The real implementation now uses SimulationConfig with different fields
+const LEGACY_FITNESS_WEIGHTS = {
+  pelletWeight: 100,
+  proximityWeight: 2,
+  proximityMaxDistance: 20,
+  movementWeight: 0.5,
+  movementCap: 25,
+  distanceWeight: 1,
+  distanceCap: 50,
+  baseFitness: 10
+};
 
 // Mock IndexedDB for testing
 // The actual RunStorage class is in main.ts - we test the interface it should expose
@@ -448,11 +461,12 @@ describe('Fitness Recalculation', () => {
     spawnedAtFrame: number;
   }
 
-  // Inline the function for testing (will be imported from storage/RunStorage.ts after refactor)
+  // Legacy inline test function for the old fitness model
+  // The real implementation in RunStorage.ts uses the new SimulationConfig model
   function recalculateFitnessOverTime(
     frames: SimulationFrame[],
     pellets: PelletData[],
-    weights: typeof DEFAULT_FITNESS_WEIGHTS,
+    weights: { baseFitness: number; pelletWeight: number; movementWeight: number; movementCap: number },
     disqualified: string | null
   ): number[] {
     if (frames.length === 0) return [];
@@ -489,7 +503,7 @@ describe('Fitness Recalculation', () => {
   }
 
   it('returns empty array for empty frames', () => {
-    const result = recalculateFitnessOverTime([], [], DEFAULT_FITNESS_WEIGHTS, null);
+    const result = recalculateFitnessOverTime([], [], LEGACY_FITNESS_WEIGHTS, null);
     expect(result).toEqual([]);
   });
 
@@ -499,7 +513,7 @@ describe('Fitness Recalculation', () => {
       { time: 0.1, nodePositions: new Map(), centerOfMass: { x: 1, y: 0, z: 0 }, activePelletIndex: 0 }
     ];
 
-    const result = recalculateFitnessOverTime(frames, [], DEFAULT_FITNESS_WEIGHTS, 'high frequency');
+    const result = recalculateFitnessOverTime(frames, [], LEGACY_FITNESS_WEIGHTS, 'high frequency');
 
     expect(result).toEqual([1, 1]);
   });
@@ -509,7 +523,7 @@ describe('Fitness Recalculation', () => {
       { time: 0, nodePositions: new Map(), centerOfMass: { x: 0, y: 0, z: 0 }, activePelletIndex: 0 }
     ];
 
-    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 50, pelletWeight: 0, movementWeight: 0 };
+    const weights = { ...LEGACY_FITNESS_WEIGHTS, baseFitness: 50, pelletWeight: 0, movementWeight: 0 };
     const result = recalculateFitnessOverTime(frames, [], weights, null);
 
     expect(result[0]).toBe(50);
@@ -525,7 +539,7 @@ describe('Fitness Recalculation', () => {
       { id: 'p1', position: { x: 1, y: 0, z: 0 }, collectedAtFrame: 0, spawnedAtFrame: 0 }
     ];
 
-    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 10, pelletWeight: 100, movementWeight: 0 };
+    const weights = { ...LEGACY_FITNESS_WEIGHTS, baseFitness: 10, pelletWeight: 100, movementWeight: 0 };
     const result = recalculateFitnessOverTime(frames, pellets, weights, null);
 
     expect(result[0]).toBe(110); // 10 base + 100 pellet
@@ -539,7 +553,7 @@ describe('Fitness Recalculation', () => {
     ];
 
     const weights = {
-      ...DEFAULT_FITNESS_WEIGHTS,
+      ...LEGACY_FITNESS_WEIGHTS,
       baseFitness: 10,
       pelletWeight: 0,
       movementWeight: 2,
@@ -559,7 +573,7 @@ describe('Fitness Recalculation', () => {
     ];
 
     const weights = {
-      ...DEFAULT_FITNESS_WEIGHTS,
+      ...LEGACY_FITNESS_WEIGHTS,
       baseFitness: 10,
       pelletWeight: 0,
       movementWeight: 10,
@@ -580,7 +594,7 @@ describe('Fitness Recalculation', () => {
       activePelletIndex: 0
     }));
 
-    const result = recalculateFitnessOverTime(frames, [], DEFAULT_FITNESS_WEIGHTS, null);
+    const result = recalculateFitnessOverTime(frames, [], LEGACY_FITNESS_WEIGHTS, null);
 
     expect(result.length).toBe(10);
   });

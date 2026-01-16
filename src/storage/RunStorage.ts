@@ -1,5 +1,5 @@
 import { CreatureSimulationResult, PelletData, SimulationFrame } from '../simulation/BatchSimulator';
-import { DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3, FitnessWeights } from '../types';
+import { SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3, DEFAULT_CONFIG } from '../types';
 
 // Serializable creature type entry (Map converted to array of [nodeCount, count] pairs)
 export interface StoredCreatureTypeEntry {
@@ -16,7 +16,7 @@ export interface SavedRun {
   fitnessHistory?: FitnessHistoryEntry[];
   creatureTypeHistory?: StoredCreatureTypeEntry[];
   bestCreature?: { result: CompactCreatureResult; generation: number };
-  longestSurvivor?: { result: CompactCreatureResult; generations: number };
+  longestSurvivor?: { result: CompactCreatureResult; generations: number; diedAtGeneration: number };
 }
 
 export interface GenerationData {
@@ -34,32 +34,31 @@ export interface CompactCreatureResult {
   pelletData: { position: Vector3; collectedAtFrame: number | null }[];
 }
 
+/**
+ * Recalculate fitness over time using simplified fitness model.
+ * Used for replay visualization.
+ */
 export function recalculateFitnessOverTime(
   frames: SimulationFrame[],
   pellets: PelletData[],
-  weights: FitnessWeights,
+  config: SimulationConfig,
   disqualified: string | null
 ): number[] {
   if (frames.length === 0) return [];
-  if (disqualified) return frames.map(() => 1);
+  if (disqualified) return frames.map(() => 0);
 
   const fitnessOverTime: number[] = [];
   const initialCOM = frames[0].centerOfMass;
-  let distanceTraveled = 0;
-  let lastCOM: Vector3 | null = null;
+
+  // Get fitness config (with defaults for legacy runs)
+  const pelletPoints = config.fitnessPelletPoints ?? DEFAULT_CONFIG.fitnessPelletPoints;
+  const progressMax = config.fitnessProgressMax ?? DEFAULT_CONFIG.fitnessProgressMax;
+  const movementMax = config.fitnessMovementMax ?? DEFAULT_CONFIG.fitnessMovementMax;
 
   for (let i = 0; i < frames.length; i++) {
     const frame = frames[i];
     const com = frame.centerOfMass;
-
-    // Track distance traveled
-    if (lastCOM) {
-      const dx = com.x - lastCOM.x;
-      const dy = com.y - lastCOM.y;
-      const dz = com.z - lastCOM.z;
-      distanceTraveled += Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-    lastCOM = com;
+    const time = frame.time;
 
     // Count pellets collected by this frame
     const pelletsCollected = pellets.filter(p =>
@@ -71,32 +70,31 @@ export function recalculateFitnessOverTime(
       p.collectedAtFrame === null || p.collectedAtFrame > i
     );
 
-    // Calculate fitness
-    let f = weights.baseFitness;
-    f += pelletsCollected * weights.pelletWeight;
+    // Base: points per pellet collected
+    let f = pelletsCollected * pelletPoints;
 
-    // Proximity bonus
-    if (activePellet) {
-      const pdx = com.x - activePellet.position.x;
-      const pdy = com.y - activePellet.position.y;
-      const pdz = com.z - activePellet.position.z;
-      const pelletDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
-      f += Math.max(0, weights.proximityMaxDistance - pelletDist) * weights.proximityWeight;
+    // Progress toward current pellet (0 to progressMax)
+    if (activePellet && activePellet.initialDistance > 0) {
+      const dx = com.x - activePellet.position.x;
+      const dz = com.z - activePellet.position.z;
+      const currentDist = Math.sqrt(dx * dx + dz * dz);
+      const progress = Math.max(0, Math.min(1,
+        (activePellet.initialDistance - currentDist) / activePellet.initialDistance
+      ));
+      f += progress * progressMax;
     }
 
-    // Movement bonus
-    f += Math.min(distanceTraveled * weights.movementWeight, weights.movementCap);
-
-    // Distance bonus (net displacement from start)
-    if (weights.distanceWeight > 0) {
+    // Movement bonus (net XZ displacement rate)
+    if (time > 0.5) {
       const netDx = com.x - initialCOM.x;
-      const netDy = com.y - initialCOM.y;
       const netDz = com.z - initialCOM.z;
-      const netDisp = Math.sqrt(netDx * netDx + netDy * netDy + netDz * netDz);
-      f += Math.min(netDisp * weights.distanceWeight, weights.distanceCap);
+      const netDisp = Math.sqrt(netDx * netDx + netDz * netDz);
+      const dispRate = netDisp / time;
+      const movementRatio = Math.min(1, dispRate / 1.0); // 1 unit/sec = full bonus
+      f += movementRatio * movementMax;
     }
 
-    fitnessOverTime.push(Math.max(f, 1));
+    fitnessOverTime.push(Math.max(f, 0));
   }
 
   return fitnessOverTime;
@@ -240,7 +238,7 @@ export class RunStorage {
     });
   }
 
-  expandCreatureResult(r: CompactCreatureResult, fitnessWeights: FitnessWeights): CreatureSimulationResult {
+  expandCreatureResult(r: CompactCreatureResult, config: SimulationConfig): CreatureSimulationResult {
     const frames = this.expandFrames(r.frames, r.genome);
     const pellets: PelletData[] = r.pelletData.map((p, i) => ({
       id: `pellet_${i}`,
@@ -249,7 +247,7 @@ export class RunStorage {
       spawnedAtFrame: 0,
       initialDistance: 5  // Default for legacy data
     }));
-    const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, fitnessWeights, r.disqualified);
+    const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, config, r.disqualified);
 
     return {
       genome: r.genome,
@@ -305,7 +303,7 @@ export class RunStorage {
     });
   }
 
-  async loadGeneration(runId: string, gen: number, fitnessWeights?: FitnessWeights): Promise<CreatureSimulationResult[] | null> {
+  async loadGeneration(runId: string, gen: number, config?: SimulationConfig): Promise<CreatureSimulationResult[] | null> {
     return new Promise((resolve, reject) => {
       if (!this.db) return reject(new Error('DB not initialized'));
       const tx = this.db.transaction('generations', 'readonly');
@@ -316,7 +314,7 @@ export class RunStorage {
         const genData = request.result as GenerationData | undefined;
         if (!genData) return resolve(null);
 
-        const weights = fitnessWeights || DEFAULT_FITNESS_WEIGHTS;
+        const simConfig = config || DEFAULT_CONFIG;
 
         const results: CreatureSimulationResult[] = genData.results.map(r => {
           const frames = this.expandFrames(r.frames, r.genome);
@@ -328,7 +326,7 @@ export class RunStorage {
             initialDistance: 5  // Default for legacy data
           }));
 
-          const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, weights, r.disqualified);
+          const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, simConfig, r.disqualified);
 
           return {
             genome: r.genome,
@@ -448,13 +446,14 @@ export class RunStorage {
     }
   }
 
-  async updateLongestSurvivor(creature: CreatureSimulationResult, generations: number): Promise<void> {
+  async updateLongestSurvivor(creature: CreatureSimulationResult, generations: number, diedAtGeneration: number): Promise<void> {
     if (!this.currentRunId) return;
     const run = await this.getRun(this.currentRunId);
     if (run) {
       run.longestSurvivor = {
         result: this.compactCreatureResult(creature),
-        generations
+        generations,
+        diedAtGeneration
       };
       await this.putRun(run);
     }

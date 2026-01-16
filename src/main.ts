@@ -3,7 +3,7 @@ import { generateRandomGenome } from './core/Genome';
 import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
 import { Creature } from './core/Creature';
-import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, SimulationConfig, CreatureGenome, FitnessHistoryEntry, FitnessWeights } from './types';
+import { DEFAULT_CONFIG, SimulationConfig, CreatureGenome, FitnessHistoryEntry } from './types';
 import { GraphPanel } from './ui/GraphPanel';
 import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
 import { NeuralVisualizer } from './ui/NeuralVisualizer';
@@ -108,6 +108,7 @@ class EvolutionApp {
   // Longest surviving creature tracking (most generations in lineage)
   private longestSurvivingCreature: CreatureSimulationResult | null = null;
   private longestSurvivingGenerations: number = 0;
+  private longestSurvivingDiedAt: number = 0;
 
   // Creature cards
   private creatureCards: CreatureCard[] = [];
@@ -159,9 +160,6 @@ class EvolutionApp {
     // Initialize storage first
     await runStorage.init();
 
-    // Load saved fitness weights from localStorage
-    this.loadFitnessWeights();
-
     this.setupSharedRenderer();
     this.createMenuScreen();
     this.createGridUI();
@@ -170,27 +168,6 @@ class EvolutionApp {
     this.graphPanel = new GraphPanel();
     this.creatureTypesPanel = new CreatureTypesPanel();
     this.showMenu();
-  }
-
-  private saveFitnessWeights(): void {
-    try {
-      localStorage.setItem('evolutionLab_fitnessWeights', JSON.stringify(this.config.fitnessWeights));
-    } catch (e) {
-      console.warn('Failed to save fitness weights to localStorage:', e);
-    }
-  }
-
-  private loadFitnessWeights(): void {
-    try {
-      const saved = localStorage.getItem('evolutionLab_fitnessWeights');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Merge with defaults to handle any new fields
-        this.config.fitnessWeights = { ...DEFAULT_FITNESS_WEIGHTS, ...parsed };
-      }
-    } catch (e) {
-      console.warn('Failed to load fitness weights from localStorage:', e);
-    }
   }
 
   private setupSharedRenderer(): void {
@@ -358,67 +335,35 @@ class EvolutionApp {
         <div style="padding: 12px 16px;">
           <div class="param-group" style="margin-bottom: 12px;">
             <div class="param-label">
-              <span class="param-name">Pellet Weight</span>
-              <span class="param-value" id="pellet-weight-value">${this.config.fitnessWeights.pelletWeight}</span>
+              <span class="param-name">Pellet Points</span>
+              <span class="param-value" id="fitness-pellet-value">${this.config.fitnessPelletPoints}</span>
             </div>
-            <input type="range" class="param-slider" id="pellet-weight-slider" min="0" max="200" value="${this.config.fitnessWeights.pelletWeight}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per pellet</div>
+            <input type="range" class="param-slider" id="fitness-pellet-slider" min="10" max="200" value="${this.config.fitnessPelletPoints}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per pellet collected</div>
           </div>
           <div class="param-group" style="margin-bottom: 12px;">
             <div class="param-label">
-              <span class="param-name">Proximity Weight</span>
-              <span class="param-value" id="proximity-weight-value">${this.config.fitnessWeights.proximityWeight}</span>
+              <span class="param-name">Progress Max</span>
+              <span class="param-value" id="fitness-progress-value">${this.config.fitnessProgressMax}</span>
             </div>
-            <input type="range" class="param-slider" id="proximity-weight-slider" min="0" max="10" step="0.5" value="${this.config.fitnessWeights.proximityWeight}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Bonus for being close</div>
+            <input type="range" class="param-slider" id="fitness-progress-slider" min="0" max="150" value="${this.config.fitnessProgressMax}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max progress bonus toward pellet</div>
           </div>
           <div class="param-group" style="margin-bottom: 12px;">
             <div class="param-label">
-              <span class="param-name">Proximity Distance</span>
-              <span class="param-value" id="proximity-dist-value">${this.config.fitnessWeights.proximityMaxDistance}</span>
+              <span class="param-name">Movement Max</span>
+              <span class="param-value" id="fitness-movement-value">${this.config.fitnessMovementMax}</span>
             </div>
-            <input type="range" class="param-slider" id="proximity-dist-slider" min="5" max="50" value="${this.config.fitnessWeights.proximityMaxDistance}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max distance for bonus</div>
+            <input type="range" class="param-slider" id="fitness-movement-slider" min="0" max="100" value="${this.config.fitnessMovementMax}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max bonus for net displacement</div>
           </div>
           <div class="param-group" style="margin-bottom: 12px;">
             <div class="param-label">
-              <span class="param-name">Movement Weight</span>
-              <span class="param-value" id="movement-weight-value">${this.config.fitnessWeights.movementWeight}</span>
+              <span class="param-name">Regression Penalty</span>
+              <span class="param-value" id="fitness-regression-value">${this.config.fitnessRegressionPenalty}</span>
             </div>
-            <input type="range" class="param-slider" id="movement-weight-slider" min="0" max="5" step="0.1" value="${this.config.fitnessWeights.movementWeight}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per unit moved</div>
-          </div>
-          <div class="param-group" style="margin-bottom: 12px;">
-            <div class="param-label">
-              <span class="param-name">Movement Cap</span>
-              <span class="param-value" id="movement-cap-value">${this.config.fitnessWeights.movementCap}</span>
-            </div>
-            <input type="range" class="param-slider" id="movement-cap-slider" min="0" max="50" value="${this.config.fitnessWeights.movementCap}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max movement bonus</div>
-          </div>
-          <div class="param-group" style="margin-bottom: 12px;">
-            <div class="param-label">
-              <span class="param-name">Distance Weight</span>
-              <span class="param-value" id="distance-weight-value">${this.config.fitnessWeights.distanceWeight}</span>
-            </div>
-            <input type="range" class="param-slider" id="distance-weight-slider" min="0" max="10" step="0.5" value="${this.config.fitnessWeights.distanceWeight}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per unit displaced</div>
-          </div>
-          <div class="param-group" style="margin-bottom: 12px;">
-            <div class="param-label">
-              <span class="param-name">Distance Cap</span>
-              <span class="param-value" id="distance-cap-value">${this.config.fitnessWeights.distanceCap}</span>
-            </div>
-            <input type="range" class="param-slider" id="distance-cap-slider" min="0" max="100" value="${this.config.fitnessWeights.distanceCap}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max distance bonus</div>
-          </div>
-          <div class="param-group" style="margin-bottom: 12px;">
-            <div class="param-label">
-              <span class="param-name">Base Fitness</span>
-              <span class="param-value" id="base-fitness-value">${this.config.fitnessWeights.baseFitness}</span>
-            </div>
-            <input type="range" class="param-slider" id="base-fitness-slider" min="0" max="50" value="${this.config.fitnessWeights.baseFitness}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Starting fitness</div>
+            <input type="range" class="param-slider" id="fitness-regression-slider" min="0" max="50" value="${this.config.fitnessRegressionPenalty}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Penalty for moving away after 1st pellet</div>
           </div>
           <button class="btn btn-secondary btn-small" id="reset-fitness-btn" style="width: 100%;">Reset to Defaults</button>
         </div>
@@ -692,33 +637,28 @@ class EvolutionApp {
       this.regeneratePreviewCreature();
     });
 
-    // Fitness sliders
-    this.setupMenuFitnessSlider('pellet-weight', 'pelletWeight', 0);
-    this.setupMenuFitnessSlider('proximity-weight', 'proximityWeight', 1);
-    this.setupMenuFitnessSlider('proximity-dist', 'proximityMaxDistance', 0);
-    this.setupMenuFitnessSlider('movement-weight', 'movementWeight', 1);
-    this.setupMenuFitnessSlider('movement-cap', 'movementCap', 0);
-    this.setupMenuFitnessSlider('distance-weight', 'distanceWeight', 1);
-    this.setupMenuFitnessSlider('distance-cap', 'distanceCap', 0);
-    this.setupMenuFitnessSlider('base-fitness', 'baseFitness', 0);
+    // New fitness sliders
+    this.setupFitnessSlider('fitness-pellet', 'fitnessPelletPoints');
+    this.setupFitnessSlider('fitness-progress', 'fitnessProgressMax');
+    this.setupFitnessSlider('fitness-movement', 'fitnessMovementMax');
+    this.setupFitnessSlider('fitness-regression', 'fitnessRegressionPenalty');
 
     // Reset fitness button
     document.getElementById('reset-fitness-btn')?.addEventListener('click', () => {
-      this.resetFitnessWeights();
+      this.resetFitnessDefaults();
     });
   }
 
-  private setupMenuFitnessSlider(sliderId: string, weightKey: keyof FitnessWeights, decimals: number): void {
+  private setupFitnessSlider(sliderId: string, configKey: 'fitnessPelletPoints' | 'fitnessProgressMax' | 'fitnessMovementMax' | 'fitnessRegressionPenalty'): void {
     const slider = document.getElementById(`${sliderId}-slider`) as HTMLInputElement;
     const valueDisplay = document.getElementById(`${sliderId}-value`) as HTMLElement;
 
     if (!slider || !valueDisplay) return;
 
     slider.addEventListener('input', () => {
-      const value = parseFloat(slider.value);
-      this.config.fitnessWeights[weightKey] = value;
-      valueDisplay.textContent = decimals > 0 ? value.toFixed(decimals) : value.toString();
-      this.saveFitnessWeights();
+      const value = parseInt(slider.value);
+      this.config[configKey] = value;
+      valueDisplay.textContent = value.toString();
     });
   }
 
@@ -1177,7 +1117,7 @@ class EvolutionApp {
 
       ${this.longestSurvivingCreature ? `
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Longest Survivor: <span style="color: #a855f7;">${this.getCreatureName(this.longestSurvivingCreature.genome)}</span></div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Longest Survivor <span style="color: var(--text-secondary);">(${this.longestSurvivingGenerations} gens, to Gen ${this.longestSurvivingDiedAt})</span>: <span style="color: #a855f7;">${this.getCreatureName(this.longestSurvivingCreature.genome)}</span></div>
           <div id="longest-creature-card" style="
             width: 80px;
             height: 80px;
@@ -1269,7 +1209,6 @@ class EvolutionApp {
   }
 
   private getSettingsInfoHTML(): string {
-    const fw = this.config.fitnessWeights;
     return `
       <div style="color: var(--text-secondary); font-weight: 600; margin-bottom: 8px;">Settings</div>
       <div style="display: grid; grid-template-columns: auto auto; gap: 4px 12px;">
@@ -1294,15 +1233,14 @@ class EvolutionApp {
         <svg id="fitness-dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
           <polyline points="9 18 15 12 9 6"></polyline>
         </svg>
-        <span>Fitness Weights</span>
+        <span>Fitness Config</span>
       </div>
       <div id="fitness-dropdown-content" style="display: none; margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
         <div style="display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10px;">
-          <span style="color: var(--text-muted);">Pellet:</span><span style="color: var(--text-secondary);">${fw.pelletWeight}</span>
-          <span style="color: var(--text-muted);">Proximity:</span><span style="color: var(--text-secondary);">${fw.proximityWeight} (max ${fw.proximityMaxDistance})</span>
-          <span style="color: var(--text-muted);">Movement:</span><span style="color: var(--text-secondary);">${fw.movementWeight} (cap ${fw.movementCap})</span>
-          <span style="color: var(--text-muted);">Distance:</span><span style="color: var(--text-secondary);">${fw.distanceWeight} (cap ${fw.distanceCap})</span>
-          <span style="color: var(--text-muted);">Base:</span><span style="color: var(--text-secondary);">${fw.baseFitness}</span>
+          <span style="color: var(--text-muted);">Pellet Points:</span><span style="color: var(--text-secondary);">${this.config.fitnessPelletPoints}</span>
+          <span style="color: var(--text-muted);">Progress Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessProgressMax}</span>
+          <span style="color: var(--text-muted);">Movement Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessMovementMax}</span>
+          <span style="color: var(--text-muted);">Regression Penalty:</span><span style="color: var(--text-secondary);">${this.config.fitnessRegressionPenalty}</span>
         </div>
       </div>
     `;
@@ -2233,7 +2171,7 @@ class EvolutionApp {
       }
 
       // Load the most recent generation
-      const results = await runStorage.loadGeneration(runId, maxGen, this.config.fitnessWeights);
+      const results = await runStorage.loadGeneration(runId, maxGen, this.config);
       if (!results) {
         alert('Could not load generation data');
         return;
@@ -2308,7 +2246,7 @@ class EvolutionApp {
       // Restore best creature ever
       if (run.bestCreature) {
         try {
-          this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
+          this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config);
           this.bestCreatureGeneration = run.bestCreature.generation;
         } catch (e) {
           console.error('Failed to expand best creature:', e);
@@ -2331,12 +2269,14 @@ class EvolutionApp {
       // Restore longest surviving creature
       if (run.longestSurvivor) {
         try {
-          this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
+          this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config);
           this.longestSurvivingGenerations = run.longestSurvivor.generations;
+          this.longestSurvivingDiedAt = run.longestSurvivor.diedAtGeneration ?? maxGen;
         } catch (e) {
           console.error('Failed to expand longest survivor:', e);
           this.longestSurvivingCreature = null;
           this.longestSurvivingGenerations = 0;
+          this.longestSurvivingDiedAt = 0;
         }
       } else {
         // Fallback: compute from current results for older runs without this data
@@ -2348,13 +2288,16 @@ class EvolutionApp {
           if (longest.genome.survivalStreak && longest.genome.survivalStreak > 0) {
             this.longestSurvivingCreature = longest;
             this.longestSurvivingGenerations = longest.genome.survivalStreak;
+            this.longestSurvivingDiedAt = maxGen;
           } else {
             this.longestSurvivingCreature = null;
             this.longestSurvivingGenerations = 0;
+            this.longestSurvivingDiedAt = 0;
           }
         } else {
           this.longestSurvivingCreature = null;
           this.longestSurvivingGenerations = 0;
+          this.longestSurvivingDiedAt = 0;
         }
       }
 
@@ -2530,7 +2473,7 @@ class EvolutionApp {
     // Try to load current generation results from storage if they exist
     const currentRunId = runStorage.getCurrentRunId();
     if (currentRunId && this.generation <= this.maxGeneration) {
-      const results = await runStorage.loadGeneration(currentRunId, this.generation, this.config.fitnessWeights);
+      const results = await runStorage.loadGeneration(currentRunId, this.generation, this.config);
       if (results && results.length > 0) {
         this.simulationResults = results;
         // If we're at 'simulate' step (before sort), don't sort the cards yet
@@ -2572,7 +2515,7 @@ class EvolutionApp {
       // Restore best creature and longest survivor
       if (run.bestCreature) {
         try {
-          this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config.fitnessWeights);
+          this.bestCreatureEver = runStorage.expandCreatureResult(run.bestCreature.result, this.config);
           this.bestCreatureGeneration = run.bestCreature.generation;
         } catch (e) {
           console.error('Failed to expand best creature in fork:', e);
@@ -2586,20 +2529,23 @@ class EvolutionApp {
 
       if (run.longestSurvivor) {
         try {
-          this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config.fitnessWeights);
+          this.longestSurvivingCreature = runStorage.expandCreatureResult(run.longestSurvivor.result, this.config);
           this.longestSurvivingGenerations = run.longestSurvivor.generations;
+          this.longestSurvivingDiedAt = run.longestSurvivor.diedAtGeneration ?? this.generation;
         } catch (e) {
           console.error('Failed to expand longest survivor in fork:', e);
           this.longestSurvivingCreature = null;
           this.longestSurvivingGenerations = 0;
+          this.longestSurvivingDiedAt = 0;
         }
       } else {
         this.longestSurvivingCreature = null;
         this.longestSurvivingGenerations = 0;
+        this.longestSurvivingDiedAt = 0;
       }
 
       // Load the generation results
-      const results = await runStorage.loadGeneration(newRunId, this.generation, this.config.fitnessWeights);
+      const results = await runStorage.loadGeneration(newRunId, this.generation, this.config);
       if (results) {
         this.simulationResults = results;
 
@@ -2676,7 +2622,7 @@ class EvolutionApp {
     if (!currentRunId) return;
 
     try {
-      const results = await runStorage.loadGeneration(currentRunId, gen, this.config.fitnessWeights);
+      const results = await runStorage.loadGeneration(currentRunId, gen, this.config);
       if (!results) {
         alert(`Could not load generation ${gen}`);
         return;
@@ -3058,7 +3004,7 @@ class EvolutionApp {
     const maxGen = Math.max(genome.generation, this.generation, this.maxGeneration);
     for (let gen = maxGen - 1; gen >= 0; gen--) {
       try {
-        const results = await runStorage.loadGeneration(currentRunId, gen, this.config.fitnessWeights);
+        const results = await runStorage.loadGeneration(currentRunId, gen, this.config);
         if (results) {
           for (const result of results) {
             if (!ancestorMap.has(result.genome.id)) {
@@ -3884,8 +3830,9 @@ class EvolutionApp {
     if (longestSurvivor && longestSurvivor.genome.survivalStreak > this.longestSurvivingGenerations) {
       this.longestSurvivingCreature = longestSurvivor;
       this.longestSurvivingGenerations = longestSurvivor.genome.survivalStreak;
+      this.longestSurvivingDiedAt = this.generation;
       console.log(`New longest surviving creature! ${this.getCreatureName(longestSurvivor.genome)} survived ${longestSurvivor.genome.survivalStreak} consecutive generations`);
-      runStorage.updateLongestSurvivor(longestSurvivor, longestSurvivor.genome.survivalStreak);
+      runStorage.updateLongestSurvivor(longestSurvivor, longestSurvivor.genome.survivalStreak, this.generation);
     }
 
     this.fitnessHistory.push({
@@ -3978,30 +3925,26 @@ class EvolutionApp {
   // FITNESS PANEL
   // ============================================
 
-  private resetFitnessWeights(): void {
-    this.config.fitnessWeights = { ...DEFAULT_FITNESS_WEIGHTS };
+  private resetFitnessDefaults(): void {
+    // Reset to default values
+    this.config.fitnessPelletPoints = DEFAULT_CONFIG.fitnessPelletPoints;
+    this.config.fitnessProgressMax = DEFAULT_CONFIG.fitnessProgressMax;
+    this.config.fitnessMovementMax = DEFAULT_CONFIG.fitnessMovementMax;
+    this.config.fitnessRegressionPenalty = DEFAULT_CONFIG.fitnessRegressionPenalty;
 
     // Update all sliders (in menu)
-    const weights = this.config.fitnessWeights;
-    this.updateFitnessSlider('pellet-weight', weights.pelletWeight, 0);
-    this.updateFitnessSlider('proximity-weight', weights.proximityWeight, 1);
-    this.updateFitnessSlider('proximity-dist', weights.proximityMaxDistance, 0);
-    this.updateFitnessSlider('movement-weight', weights.movementWeight, 1);
-    this.updateFitnessSlider('movement-cap', weights.movementCap, 0);
-    this.updateFitnessSlider('distance-weight', weights.distanceWeight, 1);
-    this.updateFitnessSlider('distance-cap', weights.distanceCap, 0);
-    this.updateFitnessSlider('base-fitness', weights.baseFitness, 0);
-
-    // Save to localStorage
-    this.saveFitnessWeights();
+    this.updateFitnessSliderUI('fitness-pellet', this.config.fitnessPelletPoints);
+    this.updateFitnessSliderUI('fitness-progress', this.config.fitnessProgressMax);
+    this.updateFitnessSliderUI('fitness-movement', this.config.fitnessMovementMax);
+    this.updateFitnessSliderUI('fitness-regression', this.config.fitnessRegressionPenalty);
   }
 
-  private updateFitnessSlider(sliderId: string, value: number, decimals: number): void {
+  private updateFitnessSliderUI(sliderId: string, value: number): void {
     const slider = document.getElementById(`${sliderId}-slider`) as HTMLInputElement;
     const valueDisplay = document.getElementById(`${sliderId}-value`) as HTMLElement;
 
     if (slider) slider.value = value.toString();
-    if (valueDisplay) valueDisplay.textContent = decimals > 0 ? value.toFixed(decimals) : value.toString();
+    if (valueDisplay) valueDisplay.textContent = value.toString();
   }
 
   private reset(): void {
@@ -4022,6 +3965,7 @@ class EvolutionApp {
     this.bestCreatureGeneration = 0;
     this.longestSurvivingCreature = null;
     this.longestSurvivingGenerations = 0;
+    this.longestSurvivingDiedAt = 0;
     if (this.gridContainer) this.gridContainer.innerHTML = '';
     if (this.graphPanel) this.graphPanel.hide();
     if (this.creatureTypesPanel) this.creatureTypesPanel.hide();

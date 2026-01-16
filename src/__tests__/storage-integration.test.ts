@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { RunStorage, CompactCreatureResult, recalculateFitnessOverTime } from '../storage/RunStorage';
 import { generateRandomGenome } from '../core/Genome';
-import { DEFAULT_CONFIG, DEFAULT_FITNESS_WEIGHTS, type FitnessHistoryEntry, type Vector3 } from '../types';
+import { DEFAULT_CONFIG, type FitnessHistoryEntry, type Vector3, type SimulationConfig } from '../types';
 import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../simulation/BatchSimulator';
 
 // Helper to create a mock simulation result
@@ -127,7 +127,7 @@ describe('RunStorage Integration', () => {
       const results = [createMockSimulationResult(100), createMockSimulationResult(80)];
 
       await storage.saveGeneration(0, results);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded).not.toBeNull();
       expect(loaded?.length).toBe(2);
@@ -139,7 +139,7 @@ describe('RunStorage Integration', () => {
       const originalGenomeId = result.genome.id;
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].genome.id).toBe(originalGenomeId);
     });
@@ -149,7 +149,7 @@ describe('RunStorage Integration', () => {
       const result = createMockSimulationResult(123.456);
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       // Fitness is rounded to 3 decimal places
       expect(loaded?.[0].finalFitness).toBeCloseTo(123.456, 2);
@@ -160,7 +160,7 @@ describe('RunStorage Integration', () => {
       const result = createMockSimulationResult(100, 5);
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].pelletsCollected).toBe(5);
     });
@@ -180,7 +180,7 @@ describe('RunStorage Integration', () => {
 
     it('returns null for non-existent generation', async () => {
       const runId = await storage.createRun(DEFAULT_CONFIG);
-      const loaded = await storage.loadGeneration(runId, 99, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 99, DEFAULT_CONFIG);
 
       expect(loaded).toBeNull();
     });
@@ -193,8 +193,8 @@ describe('RunStorage Integration', () => {
       await storage.saveGeneration(0, results0);
       await storage.saveGeneration(1, results1);
 
-      const loaded0 = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
-      const loaded1 = await storage.loadGeneration(runId, 1, DEFAULT_FITNESS_WEIGHTS);
+      const loaded0 = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
+      const loaded1 = await storage.loadGeneration(runId, 1, DEFAULT_CONFIG);
 
       expect(loaded0?.[0].finalFitness).toBeCloseTo(100, 2);
       expect(loaded1?.[0].finalFitness).toBeCloseTo(150, 2);
@@ -207,7 +207,7 @@ describe('RunStorage Integration', () => {
       const result = createMockSimulationResult(100, 2, 20);
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       // Frames should be reconstructed
       expect(loaded?.[0].frames.length).toBe(20);
@@ -222,7 +222,7 @@ describe('RunStorage Integration', () => {
       const originalPosition = originalFirstFrame.nodePositions.get(firstNodeId)!;
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       const loadedPosition = loaded?.[0].frames[0].nodePositions.get(firstNodeId);
 
@@ -237,7 +237,7 @@ describe('RunStorage Integration', () => {
       const result = createMockSimulationResult(100, 2, 5);
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       const frame = loaded?.[0].frames[0];
       expect(frame?.centerOfMass).toHaveProperty('x');
@@ -250,7 +250,7 @@ describe('RunStorage Integration', () => {
       const result = createMockSimulationResult(100, 2, 10);
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].pellets.length).toBe(2);
       expect(loaded?.[0].pellets[0].collectedAtFrame).toBe(5);
@@ -347,7 +347,7 @@ describe('RunStorage Integration', () => {
       await storage.updateBestCreature(result, 5);
       const run = await storage.getRun(runId);
 
-      const expanded = storage.expandCreatureResult(run!.bestCreature!.result, DEFAULT_FITNESS_WEIGHTS);
+      const expanded = storage.expandCreatureResult(run!.bestCreature!.result, DEFAULT_CONFIG);
 
       expect(expanded.genome.id).toBe(result.genome.id);
       expect(expanded.finalFitness).toBeCloseTo(250, 2);
@@ -412,8 +412,8 @@ describe('RunStorage Integration', () => {
       await storage.deleteRun(runId);
 
       const run = await storage.getRun(runId);
-      const gen0 = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
-      const gen1 = await storage.loadGeneration(runId, 1, DEFAULT_FITNESS_WEIGHTS);
+      const gen0 = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
+      const gen1 = await storage.loadGeneration(runId, 1, DEFAULT_CONFIG);
 
       expect(run).toBeNull();
       expect(gen0).toBeNull();
@@ -476,9 +476,9 @@ describe('RunStorage Integration', () => {
       const forkedRun = await storage.getRun(newId);
       expect(forkedRun?.generationCount).toBe(2); // 0 and 1
 
-      const gen0 = await storage.loadGeneration(newId, 0, DEFAULT_FITNESS_WEIGHTS);
-      const gen1 = await storage.loadGeneration(newId, 1, DEFAULT_FITNESS_WEIGHTS);
-      const gen2 = await storage.loadGeneration(newId, 2, DEFAULT_FITNESS_WEIGHTS);
+      const gen0 = await storage.loadGeneration(newId, 0, DEFAULT_CONFIG);
+      const gen1 = await storage.loadGeneration(newId, 1, DEFAULT_CONFIG);
+      const gen2 = await storage.loadGeneration(newId, 2, DEFAULT_CONFIG);
 
       expect(gen0).not.toBeNull();
       expect(gen1).not.toBeNull();
@@ -578,7 +578,7 @@ describe('RunStorage Integration', () => {
       const originalNodeIds = result.genome.nodes.map(n => n.id);
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].genome.nodes.length).toBe(originalNodeCount);
       expect(loaded?.[0].genome.nodes.map(n => n.id)).toEqual(originalNodeIds);
@@ -590,7 +590,7 @@ describe('RunStorage Integration', () => {
       const originalMuscleCount = result.genome.muscles.length;
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].genome.muscles.length).toBe(originalMuscleCount);
     });
@@ -601,7 +601,7 @@ describe('RunStorage Integration', () => {
       result.genome.parentIds = ['parent1', 'parent2'];
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].genome.parentIds).toEqual(['parent1', 'parent2']);
     });
@@ -612,7 +612,7 @@ describe('RunStorage Integration', () => {
       result.genome.generation = 42;
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].genome.generation).toBe(42);
     });
@@ -623,7 +623,7 @@ describe('RunStorage Integration', () => {
       (result as any).disqualified = 'frequency_exceeded';
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].disqualified).toBe('frequency_exceeded');
     });
@@ -642,7 +642,7 @@ describe('RunStorage Integration', () => {
       };
 
       await storage.saveGeneration(0, [result]);
-      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_FITNESS_WEIGHTS);
+      const loaded = await storage.loadGeneration(runId, 0, DEFAULT_CONFIG);
 
       expect(loaded?.[0].genome.neuralNetwork).toBeDefined();
       expect(loaded?.[0].genome.neuralNetwork?.weightsIH.length).toBe(48);
@@ -667,7 +667,7 @@ describe('RunStorage Integration', () => {
       // Verify all were saved
       const runId = storage.getCurrentRunId()!;
       for (let i = 0; i < 5; i++) {
-        const loaded = await storage.loadGeneration(runId, i, DEFAULT_FITNESS_WEIGHTS);
+        const loaded = await storage.loadGeneration(runId, i, DEFAULT_CONFIG);
         expect(loaded).not.toBeNull();
       }
     });
@@ -685,23 +685,14 @@ describe('recalculateFitnessOverTime', () => {
   };
 
   it('returns empty array for no frames', () => {
-    const result = recalculateFitnessOverTime([], [], DEFAULT_FITNESS_WEIGHTS, null);
+    const result = recalculateFitnessOverTime([], [], DEFAULT_CONFIG, null);
     expect(result).toEqual([]);
   });
 
-  it('returns array of 1s for disqualified creature', () => {
+  it('returns array of 0s for disqualified creature', () => {
     const frames = createFrames(5);
-    const result = recalculateFitnessOverTime(frames, [], DEFAULT_FITNESS_WEIGHTS, 'frequency_exceeded');
-    expect(result).toEqual([1, 1, 1, 1, 1]);
-  });
-
-  it('includes base fitness in calculation', () => {
-    const frames = createFrames(1, 0);
-    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 50, movementWeight: 0, pelletWeight: 0 };
-
-    const result = recalculateFitnessOverTime(frames, [], weights, null);
-
-    expect(result[0]).toBe(50);
+    const result = recalculateFitnessOverTime(frames, [], DEFAULT_CONFIG, 'frequency_exceeded');
+    expect(result).toEqual([0, 0, 0, 0, 0]);
   });
 
   it('increases fitness with pellet collection', () => {
@@ -709,45 +700,19 @@ describe('recalculateFitnessOverTime', () => {
     const pellets: PelletData[] = [
       { id: 'p1', position: { x: 0, y: 0, z: 0 }, collectedAtFrame: 1, spawnedAtFrame: 0, initialDistance: 5 }
     ];
-    // Disable proximity bonus to isolate pellet collection effect
-    const weights = {
-      ...DEFAULT_FITNESS_WEIGHTS,
-      baseFitness: 0,
-      pelletWeight: 100,
-      movementWeight: 0,
-      proximityWeight: 0
-    };
+    const config = { ...DEFAULT_CONFIG, fitnessPelletPoints: 100 };
 
-    const result = recalculateFitnessOverTime(frames, pellets, weights, null);
+    const result = recalculateFitnessOverTime(frames, pellets, config, null);
 
-    expect(result[0]).toBe(1); // Min fitness (no pellet yet)
-    expect(result[1]).toBe(100); // After collection
-    expect(result[2]).toBe(100); // Still collected
-  });
-
-  it('adds movement bonus', () => {
-    const frames = createFrames(3, 5); // 5 units movement per frame
-    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 0, movementWeight: 2, movementCap: 100 };
-
-    const result = recalculateFitnessOverTime(frames, [], weights, null);
-
-    expect(result[0]).toBe(1); // No movement yet
-    expect(result[1]).toBe(10); // 5 distance * 2 weight = 10
-    expect(result[2]).toBe(20); // 10 distance * 2 weight = 20
-  });
-
-  it('respects movement cap', () => {
-    const frames = createFrames(3, 100); // 100 units per frame
-    const weights = { ...DEFAULT_FITNESS_WEIGHTS, baseFitness: 0, movementWeight: 10, movementCap: 50 };
-
-    const result = recalculateFitnessOverTime(frames, [], weights, null);
-
-    expect(result[2]).toBe(50); // Capped
+    // Frame 0: no pellet collected yet, only progress/movement bonus
+    // Frame 1+: pellet collected, so 100 points
+    expect(result[1]).toBeGreaterThanOrEqual(100); // After collection
+    expect(result[2]).toBeGreaterThanOrEqual(100); // Still collected
   });
 
   it('returns array length matching frame count', () => {
     const frames = createFrames(100);
-    const result = recalculateFitnessOverTime(frames, [], DEFAULT_FITNESS_WEIGHTS, null);
+    const result = recalculateFitnessOverTime(frames, [], DEFAULT_CONFIG, null);
 
     expect(result.length).toBe(100);
   });

@@ -1,30 +1,6 @@
 import type { CreatureGenome, Vector3 } from './genome';
 import type { ActivationType } from '../neural/activations';
 
-export interface FitnessWeights {
-  baseFitness: number;           // Starting fitness value
-  pelletWeight: number;          // Points per pellet collected
-  progressWeight: number;        // Points for progress toward pellet (0-100 per pellet)
-  proximityWeight: number;       // Multiplier for proximity bonus (closer to pellet)
-  proximityMaxDistance: number;  // Distance at which proximity bonus starts
-  movementWeight: number;        // Points for movement (capped)
-  movementCap: number;           // Maximum movement bonus
-  distanceWeight: number;        // Points per unit of net displacement
-  distanceCap: number;           // Maximum distance bonus
-}
-
-export const DEFAULT_FITNESS_WEIGHTS: FitnessWeights = {
-  baseFitness: 10,
-  pelletWeight: 100,
-  progressWeight: 1,           // 0-100 points per pellet based on progress toward it
-  proximityWeight: 2.5,
-  proximityMaxDistance: 20,
-  movementWeight: 1,
-  movementCap: 5,
-  distanceWeight: 0,
-  distanceCap: 50
-};
-
 export enum SimulationPhase {
   MENU = 'menu',
   GENERATING = 'generating',
@@ -61,8 +37,11 @@ export interface SimulationConfig {
   pelletCount: number;          // Number of pellets per arena
   arenaSize: number;            // Size of simulation arena
 
-  // Fitness function
-  fitnessWeights: FitnessWeights;
+  // Fitness function (simple model)
+  fitnessPelletPoints: number;      // Points per pellet collected (default 100)
+  fitnessProgressMax: number;       // Max points for progress toward pellet (default 80)
+  fitnessMovementMax: number;       // Max movement bonus (default 25)
+  fitnessRegressionPenalty: number; // Max penalty for moving away after 1st pellet (default 20)
 
   // Neural network settings (neuroevolution)
   useNeuralNet: boolean;              // Enable neural network control
@@ -96,7 +75,11 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   pelletCount: 3,
   arenaSize: 10,
 
-  fitnessWeights: DEFAULT_FITNESS_WEIGHTS,
+  // Fitness function defaults
+  fitnessPelletPoints: 100,
+  fitnessProgressMax: 80,
+  fitnessMovementMax: 25,
+  fitnessRegressionPenalty: 20,
 
   // Neural network defaults (disabled by default)
   useNeuralNet: false,
