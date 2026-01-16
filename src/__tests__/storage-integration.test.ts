@@ -353,19 +353,85 @@ describe('RunStorage Integration', () => {
       expect(expanded.finalFitness).toBeCloseTo(250, 2);
       expect(expanded.frames.length).toBe(15);
     });
+
+    it('bestCreature persists after saving more generations', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const bestResult = createMockSimulationResult(300);
+      const bestGenomeId = bestResult.genome.id;
+
+      // Save best creature at gen 5
+      await storage.updateBestCreature(bestResult, 5);
+
+      // Save more generations (simulating continued evolution)
+      for (let gen = 6; gen <= 10; gen++) {
+        const results = [createMockSimulationResult(100 + gen)]; // Lower fitness than best
+        await storage.saveGeneration(gen, results);
+      }
+
+      // Verify best creature is still the one from gen 5
+      const run = await storage.getRun(runId);
+      expect(run?.bestCreature).toBeDefined();
+      expect(run?.bestCreature?.generation).toBe(5);
+      expect(run?.bestCreature?.result.fitness).toBeCloseTo(300, 2);
+      expect(run?.bestCreature?.result.genome.id).toBe(bestGenomeId);
+    });
+
+    it('bestCreature persists after updating fitness history', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const bestResult = createMockSimulationResult(500);
+      const bestGenomeId = bestResult.genome.id;
+
+      // Save best creature
+      await storage.updateBestCreature(bestResult, 10);
+
+      // Update fitness history multiple times
+      await storage.updateFitnessHistory([{ generation: 0, best: 100, average: 50, worst: 10 }]);
+      await storage.updateFitnessHistory([
+        { generation: 0, best: 100, average: 50, worst: 10 },
+        { generation: 1, best: 150, average: 75, worst: 20 }
+      ]);
+
+      // Verify best creature is still there
+      const run = await storage.getRun(runId);
+      expect(run?.bestCreature).toBeDefined();
+      expect(run?.bestCreature?.generation).toBe(10);
+      expect(run?.bestCreature?.result.fitness).toBeCloseTo(500, 2);
+      expect(run?.bestCreature?.result.genome.id).toBe(bestGenomeId);
+    });
+
+    it('bestCreature persists after reload (simulated)', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+      const bestResult = createMockSimulationResult(400);
+      const bestGenomeId = bestResult.genome.id;
+
+      // Save best creature
+      await storage.updateBestCreature(bestResult, 7);
+
+      // Simulate "closing" by clearing currentRunId and "reopening" by getting run fresh
+      storage.setCurrentRunId(null);
+
+      // Get the run as if loading it fresh
+      const loadedRun = await storage.getRun(runId);
+
+      expect(loadedRun?.bestCreature).toBeDefined();
+      expect(loadedRun?.bestCreature?.generation).toBe(7);
+      expect(loadedRun?.bestCreature?.result.fitness).toBeCloseTo(400, 2);
+      expect(loadedRun?.bestCreature?.result.genome.id).toBe(bestGenomeId);
+    });
   });
 
   describe('Longest Survivor Tracking', () => {
-    it('stores longest survivor', async () => {
+    it('stores longest survivor with diedAtGeneration', async () => {
       const runId = await storage.createRun(DEFAULT_CONFIG);
       const result = createMockSimulationResult(150);
       result.genome.survivalStreak = 12;
 
-      await storage.updateLongestSurvivor(result, 12);
+      await storage.updateLongestSurvivor(result, 12, 25);
       const run = await storage.getRun(runId);
 
       expect(run?.longestSurvivor).toBeDefined();
       expect(run?.longestSurvivor?.generations).toBe(12);
+      expect(run?.longestSurvivor?.diedAtGeneration).toBe(25);
     });
 
     it('preserves survival streak in genome', async () => {

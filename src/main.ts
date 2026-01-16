@@ -3424,6 +3424,13 @@ class EvolutionApp {
     this.viewingGeneration = null;  // Viewing current (live) generation
     this.runName = '';  // Reset run name for new run
 
+    // Reset best creature tracking for new run
+    this.bestCreatureEver = null;
+    this.bestCreatureGeneration = 0;
+    this.longestSurvivingCreature = null;
+    this.longestSurvivingGenerations = 0;
+    this.longestSurvivingDiedAt = 0;
+
     // Create a new run in storage
     await runStorage.createRun(this.config);
 
