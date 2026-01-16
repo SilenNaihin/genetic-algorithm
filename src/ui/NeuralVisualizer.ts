@@ -146,7 +146,7 @@ export class NeuralVisualizer {
 
     // Draw labels
     if (this.options.showLabels) {
-      this.drawLabels(ctx, layerX, inputY, outputY);
+      this.drawLabels(ctx, layerX, inputY, outputY, outputs);
     }
   }
 
@@ -234,13 +234,7 @@ export class NeuralVisualizer {
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Draw activation value for output nodes
-      if (layer === 'output' && this.options.showLabels) {
-        ctx.fillStyle = '#888';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(activation.toFixed(2), x + nodeRadius + 4, y + 3);
-      }
+      // Activation values are now drawn in drawLabels for output nodes
     }
   }
 
@@ -248,7 +242,8 @@ export class NeuralVisualizer {
     ctx: CanvasRenderingContext2D,
     layerX: number[],
     inputY: number[],
-    outputY: number[]
+    outputY: number[],
+    outputs: number[]
   ): void {
     ctx.font = '8px sans-serif';
     ctx.fillStyle = '#666';
@@ -260,13 +255,18 @@ export class NeuralVisualizer {
       ctx.fillText(shortNames[i], layerX[0] - 10, inputY[i] + 3);
     }
 
-    // Output labels (muscle indices or names)
+    // Output labels: muscle ID (nodes it connects) and activation value
     ctx.textAlign = 'left';
     for (let i = 0; i < outputY.length; i++) {
-      const label = this.muscleNames[i] || `M${i}`;
-      // Truncate long labels
-      const shortLabel = label.length > 5 ? label.substring(0, 5) : label;
-      ctx.fillText(shortLabel, layerX[2] + 10, outputY[i] + 3);
+      const muscleId = this.muscleNames[i] || `M${i}`;
+      const activation = outputs[i] || 0;
+      // Show muscle ID (which nodes it connects, e.g. "1-3") and activation
+      ctx.fillStyle = '#888';
+      ctx.font = '8px monospace';
+      ctx.fillText(muscleId, layerX[2] + 10, outputY[i] + 3);
+      // Show activation value slightly dimmer
+      ctx.fillStyle = '#666';
+      ctx.fillText(activation.toFixed(1), layerX[2] + 34, outputY[i] + 3);
     }
 
     // Layer titles

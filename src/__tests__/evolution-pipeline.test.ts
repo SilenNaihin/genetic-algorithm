@@ -63,18 +63,24 @@ describe('Evolution Pipeline', () => {
       expect(preservedElites.length).toBe(2);
     });
 
-    it('offspring have incremented generation numbers', async () => {
-      const population = Population.createInitial({ ...TEST_CONFIG, eliteCount: 0 });
+    it('new offspring have incremented generation numbers', async () => {
+      const population = Population.createInitial({ ...TEST_CONFIG, cullPercentage: 0.5 });
 
       population.creatures.forEach((c, i) => {
         c.state.fitness = i * 10;
         c.genome.generation = 0;
       });
 
+      // Track survivor IDs before evolution
+      const survivorCount = Math.ceil(population.creatures.length * (1 - TEST_CONFIG.cullPercentage));
+      const sortedCreatures = [...population.creatures].sort((a, b) => b.state.fitness - a.state.fitness);
+      const survivorIds = new Set(sortedCreatures.slice(0, survivorCount).map(c => c.genome.id));
+
       const newGenomes = population.evolve();
 
-      // All non-elite offspring should be generation 1
-      expect(newGenomes.every(g => g.generation >= 1)).toBe(true);
+      // Survivors keep their generation, new offspring should have generation >= 1
+      const newOffspring = newGenomes.filter(g => !survivorIds.has(g.id));
+      expect(newOffspring.every(g => g.generation >= 1)).toBe(true);
     });
 
     it('runs 5 generations without error', async () => {
@@ -294,39 +300,48 @@ describe('Evolution Pipeline', () => {
   });
 
   describe('Mutation/Crossover Mode Toggle', () => {
-    it('mutation-only mode creates offspring via cloning', () => {
-      const config = { ...TEST_CONFIG, useMutation: true, useCrossover: false };
+    it('mutation-only mode creates new offspring via cloning', () => {
+      const config = { ...TEST_CONFIG, useMutation: true, useCrossover: false, cullPercentage: 0.5 };
       const population = Population.createInitial(config);
 
       population.creatures.forEach((c, i) => {
         c.state.fitness = i * 10;
       });
 
+      // Track survivor IDs before evolution
+      const survivorCount = Math.ceil(population.creatures.length * (1 - config.cullPercentage));
+      const sortedCreatures = [...population.creatures].sort((a, b) => b.state.fitness - a.state.fitness);
+      const survivorIds = new Set(sortedCreatures.slice(0, survivorCount).map(c => c.genome.id));
+
       const newGenomes = population.evolve();
 
-      // Non-elite offspring should be clones (single parent)
-      const nonEliteOffspring = newGenomes.filter(g =>
-        !population.creatures.slice(-config.eliteCount).map(c => c.genome.id).includes(g.id)
-      );
+      // New offspring (not survivors) should be clones (single parent)
+      const newOffspring = newGenomes.filter(g => !survivorIds.has(g.id));
 
-      for (const offspring of nonEliteOffspring) {
+      for (const offspring of newOffspring) {
         expect(offspring.parentIds.length).toBe(1);
       }
     });
 
-    it('crossover-only mode uses two parents when crossover rate is high', () => {
-      const config = { ...TEST_CONFIG, useMutation: false, useCrossover: true, eliteCount: 0, crossoverRate: 1.0 };
+    it('crossover-only mode uses two parents for new offspring when crossover rate is high', () => {
+      const config = { ...TEST_CONFIG, useMutation: false, useCrossover: true, cullPercentage: 0.5, crossoverRate: 1.0 };
       const population = Population.createInitial(config);
 
       population.creatures.forEach((c, i) => {
         c.state.fitness = i * 10;
       });
 
+      // Track survivor IDs before evolution
+      const survivorCount = Math.ceil(population.creatures.length * (1 - config.cullPercentage));
+      const sortedCreatures = [...population.creatures].sort((a, b) => b.state.fitness - a.state.fitness);
+      const survivorIds = new Set(sortedCreatures.slice(0, survivorCount).map(c => c.genome.id));
+
       const newGenomes = population.evolve();
 
-      // Most offspring should have two parents (crossover) when crossoverRate is 1.0
-      const twoParentCount = newGenomes.filter(g => g.parentIds.length === 2).length;
-      expect(twoParentCount).toBeGreaterThan(newGenomes.length / 2);
+      // New offspring (not survivors) should have two parents (crossover) when crossoverRate is 1.0
+      const newOffspring = newGenomes.filter(g => !survivorIds.has(g.id));
+      const twoParentCount = newOffspring.filter(g => g.parentIds.length === 2).length;
+      expect(twoParentCount).toBeGreaterThan(newOffspring.length / 2);
     });
   });
 

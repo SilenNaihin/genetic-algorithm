@@ -451,6 +451,9 @@ describe('RunStorage Integration', () => {
       await storage.saveGeneration(1, results);
       await storage.saveGeneration(2, results);
 
+      // Small delay to ensure different timestamp for fork
+      await new Promise(resolve => setTimeout(resolve, 5));
+
       const newId = await storage.forkRun(sourceId, 1);
 
       expect(newId).not.toBe(sourceId);
