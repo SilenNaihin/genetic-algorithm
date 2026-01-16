@@ -161,7 +161,9 @@ export class RunStorage {
       const tx = this.db.transaction('runs', 'readwrite');
       const store = tx.objectStore('runs');
       const request = store.put(run);
-      request.onsuccess = () => resolve();
+      // Wait for transaction to complete (not just request) for durability
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
       request.onerror = () => reject(request.error);
     });
   }
@@ -298,7 +300,9 @@ export class RunStorage {
       const tx = this.db.transaction('generations', 'readwrite');
       const store = tx.objectStore('generations');
       const request = store.put(genData);
-      request.onsuccess = () => resolve();
+      // Wait for transaction to complete (not just request) for durability
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
       request.onerror = () => reject(request.error);
     });
   }

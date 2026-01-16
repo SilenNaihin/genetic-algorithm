@@ -285,6 +285,80 @@ describe('RunStorage Integration', () => {
 
       expect(run?.fitnessHistory?.length).toBe(2);
     });
+
+    it('fitness history persists after simulated reload', async () => {
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+
+      // Save multiple generations of fitness history
+      const history = [
+        { generation: 0, best: 100, average: 50, worst: 10 },
+        { generation: 1, best: 150, average: 75, worst: 20 },
+        { generation: 2, best: 180, average: 90, worst: 30 },
+        { generation: 3, best: 200, average: 100, worst: 40 },
+        { generation: 4, best: 220, average: 110, worst: 50 }
+      ];
+      await storage.updateFitnessHistory(history);
+
+      // Also save some generations to make it realistic
+      for (let gen = 0; gen <= 4; gen++) {
+        const results = [createMockSimulationResult(100 + gen * 20)];
+        await storage.saveGeneration(gen, results);
+      }
+
+      // Simulate app "restart" by clearing currentRunId
+      storage.setCurrentRunId(null);
+
+      // Load the run fresh (like loadRun does after restart)
+      const loadedRun = await storage.getRun(runId);
+
+      // Verify fitness history persisted
+      expect(loadedRun?.fitnessHistory).toBeDefined();
+      expect(loadedRun?.fitnessHistory?.length).toBe(5);
+      expect(loadedRun?.fitnessHistory?.[0]).toEqual({ generation: 0, best: 100, average: 50, worst: 10 });
+      expect(loadedRun?.fitnessHistory?.[4]).toEqual({ generation: 4, best: 220, average: 110, worst: 50 });
+    });
+
+    it('fitness history persists after saveGeneration calls (interleaved)', async () => {
+      // This test mimics the actual app flow: after each generation,
+      // saveGeneration and updateFitnessHistory are both called
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+
+      // Simulate running 5 generations with interleaved saves
+      for (let gen = 0; gen <= 4; gen++) {
+        // Save generation data
+        const results = [createMockSimulationResult(100 + gen * 20)];
+        await storage.saveGeneration(gen, results);
+
+        // Update fitness history (full array up to current gen)
+        const history = [];
+        for (let g = 0; g <= gen; g++) {
+          history.push({
+            generation: g,
+            best: 100 + g * 20,
+            average: 50 + g * 10,
+            worst: 10 + g * 5
+          });
+        }
+        await storage.updateFitnessHistory(history);
+      }
+
+      // Simulate app "restart"
+      storage.setCurrentRunId(null);
+
+      // Load run fresh
+      const loadedRun = await storage.getRun(runId);
+
+      // Verify all 5 generations of fitness history persisted
+      expect(loadedRun?.fitnessHistory).toBeDefined();
+      expect(loadedRun?.fitnessHistory?.length).toBe(5);
+      expect(loadedRun?.generationCount).toBe(5);
+
+      // Verify data integrity
+      for (let g = 0; g <= 4; g++) {
+        expect(loadedRun?.fitnessHistory?.[g]?.generation).toBe(g);
+        expect(loadedRun?.fitnessHistory?.[g]?.best).toBe(100 + g * 20);
+      }
+    });
   });
 
   describe('Creature Type History', () => {
