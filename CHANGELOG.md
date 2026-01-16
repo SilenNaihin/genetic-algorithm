@@ -5,6 +5,18 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Added
+- **Brain Evolution Comparison**: New panel to visualize how neural networks evolve over generations
+  - **Diff View**: Shows weight changes between Gen 1 average and current generation average
+    - Green connections = strengthened weights (positive change)
+    - Red connections = weakened weights (negative change)
+    - Line thickness indicates magnitude of change
+  - **Weight Distribution Histogram**: Overlapping histogram comparing weight distributions
+    - Blue = Gen 1 weights, Red = Current generation weights
+    - Shows how weight distributions shift during evolution
+  - Access via "Compare Brains" button under Best Ever creature (neural net runs only)
+- **Longest Survivor Death Generation**: Tracks which generation the longest surviving creature finally died
+  - Display format: "12 gens, to Gen 25" (survived 12 generations, died at generation 25)
+  - Persisted to IndexedDB with run data
 - **Genome Viewer**: Click on a creature in replay mode to view its complete genome including nodes, muscles, and all perception parameters
 - **Family Tree Visualization**: View the creature's ancestry up to 5 generations back in a dedicated panel, showing parents, grandparents, and ancestors with their fitness scores and body structure. Loads all stored generations to trace complete lineage.
 - **Movement Bonus**: 0-25 points for XZ net displacement over time
@@ -33,7 +45,13 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - +4 unit buffer accounts for full muscle extension (chain of muscles can extend far)
 - **Creature XZ radius from genome**: Calculated from genome node positions (rest state) with 1.3x buffer for potential extension, independent of current physics state
 
+### Changed
+- **Neural Network Output Labels**: Output neurons now show muscle IDs (e.g., "1-3") indicating which body nodes the muscle connects, alongside activation values
+
 ### Fixed
+- **Best Creature Persistence**: Fixed bug where "Best Ever" creature wasn't correctly restored when loading a saved run
+  - `updateBestCreature` and `updateLongestSurvivor` now properly await IndexedDB writes
+  - Best creature tracking fields reset when starting new runs
 - **Generation counter bug**: Mutation no longer increments generation. Generation is only incremented during clone/crossover, preventing creatures from showing Gen 22 when simulation is on Gen 11.
 - **Pellet spawning from origin**: First pellet now spawns relative to creature's spawn position, not world origin
 - **Creatures starting with 50 points**: Removed Y component from distance calculations so falling/settling doesn't count as progress
@@ -85,7 +103,7 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 - Fix control panel and graph positioning
 
 ### Infrastructure
-- Comprehensive test suite (139 tests)
+- Comprehensive test suite (280 tests)
 - Claude Code configuration for development
 - TypeScript with Vite build system
 - Three.js for rendering, cannon-es for physics

@@ -7,6 +7,7 @@ import { DEFAULT_CONFIG, SimulationConfig, CreatureGenome, FitnessHistoryEntry }
 import { GraphPanel } from './ui/GraphPanel';
 import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
 import { NeuralVisualizer } from './ui/NeuralVisualizer';
+import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPanel';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputs, SENSOR_NAMES, createNetworkFromGenome } from './neural';
 
@@ -118,6 +119,7 @@ class EvolutionApp {
   private graphPanel: GraphPanel | null = null;
   private creatureTypesPanel: CreatureTypesPanel | null = null;
   private neuralVisualizer: NeuralVisualizer | null = null;
+  private brainEvolutionPanel: BrainEvolutionPanel | null = null;
   private creatureTypeHistory: CreatureTypeEntry[] = [];
 
   // Config
@@ -167,6 +169,7 @@ class EvolutionApp {
     this.createReplayModal();
     this.graphPanel = new GraphPanel();
     this.creatureTypesPanel = new CreatureTypesPanel();
+    this.brainEvolutionPanel = new BrainEvolutionPanel(document.body);
     this.showMenu();
   }
 
@@ -1174,6 +1177,19 @@ class EvolutionApp {
               border-radius: 4px;
             ">${bestEverFitness}</span>
           </div>
+          ${this.config.useNeuralNet && this.generation > 0 ? `
+            <button id="compare-brains-btn" style="
+              margin-top: 8px;
+              padding: 4px 8px;
+              font-size: 10px;
+              background: var(--bg-tertiary);
+              border: 1px solid var(--border);
+              border-radius: 4px;
+              color: var(--text-muted);
+              cursor: pointer;
+              transition: all 0.2s;
+            ">Compare Brains</button>
+          ` : ''}
         </div>
       ` : ''}
     `;
@@ -1356,9 +1372,81 @@ class EvolutionApp {
             }
           });
         }
+
+        // Add compare brains button handler
+        const compareBrainsBtn = document.getElementById('compare-brains-btn');
+        if (compareBrainsBtn) {
+          compareBrainsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showBrainEvolutionComparison();
+          });
+        }
       }
     }
     if (this.stepIndicator) this.stepIndicator.innerHTML = this.getStepIndicatorHTML();
+  }
+
+  /**
+   * Show brain evolution comparison between gen 1 and current generation
+   */
+  private async showBrainEvolutionComparison(): Promise<void> {
+    if (!this.brainEvolutionPanel || !this.config.useNeuralNet) return;
+
+    const currentRunId = runStorage.getCurrentRunId();
+    if (!currentRunId) return;
+
+    try {
+      // Load generation 1 (or 0 if 1 doesn't exist)
+      let gen1Results = await runStorage.loadGeneration(currentRunId, 1, this.config);
+      if (!gen1Results) {
+        gen1Results = await runStorage.loadGeneration(currentRunId, 0, this.config);
+      }
+
+      // Use current simulation results for current generation
+      const currentResults = this.simulationResults;
+
+      if (!gen1Results || gen1Results.length === 0 || currentResults.length === 0) {
+        console.warn('Not enough data for brain comparison');
+        return;
+      }
+
+      // Extract neural genomes
+      const gen1Genomes = gen1Results
+        .filter(r => r.genome.neuralGenome)
+        .map(r => r.genome.neuralGenome!);
+
+      const currentGenomes = currentResults
+        .filter(r => r.genome.neuralGenome)
+        .map(r => r.genome.neuralGenome!);
+
+      if (gen1Genomes.length === 0 || currentGenomes.length === 0) {
+        console.warn('No neural genomes found for comparison');
+        return;
+      }
+
+      // Compute average weights
+      const gen1AvgWeights = BrainEvolutionPanel.computeAverageWeights(gen1Genomes);
+      const currentAvgWeights = BrainEvolutionPanel.computeAverageWeights(currentGenomes);
+
+      if (!gen1AvgWeights || !currentAvgWeights) {
+        console.warn('Could not compute average weights');
+        return;
+      }
+
+      // Set data and show panel
+      const data: BrainEvolutionData = {
+        gen1Weights: gen1AvgWeights,
+        currentWeights: currentAvgWeights,
+        topology: gen1Genomes[0].topology,
+        gen1Label: 'Gen 1',
+        currentLabel: `Gen ${this.generation}`
+      };
+
+      this.brainEvolutionPanel.setData(data);
+      this.brainEvolutionPanel.show();
+    } catch (e) {
+      console.error('Failed to load brain evolution data:', e);
+    }
   }
 
   private showBestCreatureTooltip(e: MouseEvent): void {

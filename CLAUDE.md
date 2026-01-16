@@ -16,12 +16,13 @@ src/
 ├── __tests__/        # Vitest tests
 ├── core/             # Domain models (Creature, Genome, Pellet)
 ├── genetics/         # Evolution (Selection, Crossover, Mutation, Population)
+├── neural/           # Neural network for neuroevolution
 ├── physics/          # Cannon-ES physics (BodyFactory, PhysicsWorld)
 ├── rendering/        # Three.js visualization
 ├── simulation/       # Headless simulation (BatchSimulator)
 ├── storage/          # IndexedDB persistence (RunStorage)
 ├── types/            # TypeScript interfaces
-├── ui/               # UI components (GraphPanel)
+├── ui/               # UI components (GraphPanel, NeuralVisualizer, BrainEvolutionPanel)
 ├── utils/            # Shared utilities (math, id)
 └── main.ts           # Application entry point
 ```
@@ -70,7 +71,7 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-139 tests covering: genetics, genome, simulation, storage, math utilities.
+280 tests covering: genetics, genome, simulation, storage, neural networks, brain evolution, math utilities.
 
 ## Global Commands
 
@@ -80,7 +81,12 @@ npm test -- --run  # Run once (no watch)
 
 ## Context Tips
 
-- `main.ts` is large (~2800 lines) - contains EvolutionApp class with all UI
+- `main.ts` is large (~4000 lines) - contains EvolutionApp class with all UI
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
 - Fitness: 0-80 progress (XZ ground distance from edge) + 20 collection bonus per pellet
+- Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
+  - 8 sensor inputs (pellet direction, velocity, distance, time phase)
+  - Single hidden layer with configurable size
+  - Outputs control muscle activations
+  - BrainEvolutionPanel visualizes weight changes across generations
