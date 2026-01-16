@@ -418,6 +418,40 @@ describe('RunStorage Integration', () => {
       expect(loadedRun?.bestCreature?.result.fitness).toBeCloseTo(400, 2);
       expect(loadedRun?.bestCreature?.result.genome.id).toBe(bestGenomeId);
     });
+
+    it('early generation best creature is preserved over lower-fitness later generations', async () => {
+      // This test catches the bug where bestCreature shows recent generation's best
+      // instead of the all-time best from an earlier generation
+      const runId = await storage.createRun(DEFAULT_CONFIG);
+
+      // Generation 5 has the all-time best (fitness 500)
+      const allTimeBest = createMockSimulationResult(500);
+      allTimeBest.genome.id = 'all-time-best-genome';
+      await storage.updateBestCreature(allTimeBest, 5);
+
+      // Save several later generations with LOWER fitness
+      for (let gen = 6; gen <= 20; gen++) {
+        const results = [
+          createMockSimulationResult(200 + gen),  // Lower than 500
+          createMockSimulationResult(150 + gen),
+          createMockSimulationResult(100 + gen)
+        ];
+        await storage.saveGeneration(gen, results);
+      }
+
+      // Simulate app reload - clear currentRunId
+      storage.setCurrentRunId(null);
+
+      // Load the run fresh (like loadRun does)
+      const loadedRun = await storage.getRun(runId);
+
+      // Most recent generation (20) has best fitness of ~220, but all-time best is 500
+      // The bug would show gen 20's best instead of gen 5's best
+      expect(loadedRun?.bestCreature).toBeDefined();
+      expect(loadedRun?.bestCreature?.generation).toBe(5);
+      expect(loadedRun?.bestCreature?.result.fitness).toBeCloseTo(500, 2);
+      expect(loadedRun?.bestCreature?.result.genome.id).toBe('all-time-best-genome');
+    });
   });
 
   describe('Longest Survivor Tracking', () => {

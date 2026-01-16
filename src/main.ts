@@ -3825,7 +3825,7 @@ class EvolutionApp {
         this.bestCreatureEver = bestResult;
         this.bestCreatureGeneration = this.generation;
         console.log(`New best creature ever! Fitness: ${bestResult.finalFitness.toFixed(1)} at generation ${this.generation}`);
-        runStorage.updateBestCreature(bestResult, this.generation);
+        await runStorage.updateBestCreature(bestResult, this.generation);
       }
     }
 
@@ -3839,7 +3839,7 @@ class EvolutionApp {
       this.longestSurvivingGenerations = longestSurvivor.genome.survivalStreak;
       this.longestSurvivingDiedAt = this.generation;
       console.log(`New longest surviving creature! ${this.getCreatureName(longestSurvivor.genome)} survived ${longestSurvivor.genome.survivalStreak} consecutive generations`);
-      runStorage.updateLongestSurvivor(longestSurvivor, longestSurvivor.genome.survivalStreak, this.generation);
+      await runStorage.updateLongestSurvivor(longestSurvivor, longestSurvivor.genome.survivalStreak, this.generation);
     }
 
     this.fitnessHistory.push({
