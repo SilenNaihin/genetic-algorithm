@@ -11,6 +11,7 @@ import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
 import { NeuralVisualizer } from './ui/NeuralVisualizer';
 import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPanel';
 import { createInfoTooltip, NEURAL_TOOLTIPS } from './ui/InfoTooltip';
+import { TooltipManager, tooltipRow, tooltipTitle } from './ui/TooltipManager';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, SENSOR_NAMES, createNetworkFromGenome, NEURAL_INPUT_SIZE_PURE } from './neural';
 import {
@@ -101,7 +102,7 @@ class EvolutionApp {
   private statsPanel: HTMLElement | null = null;
   private controlPanel: HTMLElement | null = null;
   private progressContainer: HTMLElement | null = null;
-  private tooltip: HTMLElement | null = null;
+  private tooltipManager: TooltipManager | null = null;
   private replayModal: HTMLElement | null = null;
   private stepIndicator: HTMLElement | null = null;
   private loadRunsModal: HTMLElement | null = null;
@@ -1483,94 +1484,48 @@ class EvolutionApp {
   }
 
   private showBestCreatureTooltip(e: MouseEvent): void {
-    if (!this.tooltip || !this.bestCreatureEver) return;
+    if (!this.tooltipManager || !this.bestCreatureEver) return;
 
     const result = this.bestCreatureEver;
     const genome = result.genome;
 
-    this.tooltip.innerHTML = `
-      <div class="tooltip-title" style="color: #ffd700;">Best Ever</div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Generation</span>
-        <span class="tooltip-value">${this.bestCreatureGeneration}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Fitness</span>
-        <span class="tooltip-value" style="color: #ffd700">${result.finalFitness.toFixed(1)}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Pellets</span>
-        <span class="tooltip-value">${result.pelletsCollected}/${result.pellets.length}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Distance</span>
-        <span class="tooltip-value">${result.distanceTraveled.toFixed(1)}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Nodes</span>
-        <span class="tooltip-value">${genome.nodes.length}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Muscles</span>
-        <span class="tooltip-value">${genome.muscles.length}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Parents</span>
-        <span class="tooltip-value">${genome.parentIds.length > 0 ? genome.parentIds.length : 'None'}</span>
-      </div>
+    const html = `
+      ${tooltipTitle('Best Ever', undefined, 'color: #ffd700')}
+      ${tooltipRow('Generation', this.bestCreatureGeneration)}
+      ${tooltipRow('Fitness', result.finalFitness.toFixed(1), 'color: #ffd700')}
+      ${tooltipRow('Pellets', `${result.pelletsCollected}/${result.pellets.length}`)}
+      ${tooltipRow('Distance', result.distanceTraveled.toFixed(1))}
+      ${tooltipRow('Nodes', genome.nodes.length)}
+      ${tooltipRow('Muscles', genome.muscles.length)}
+      ${tooltipRow('Parents', genome.parentIds.length > 0 ? genome.parentIds.length : 'None')}
       <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">Click to replay</div>
     `;
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    this.tooltip.style.left = `${rect.right + 10}px`;
-    this.tooltip.style.top = `${rect.top}px`;
-    this.tooltip.classList.add('visible');
+    this.tooltipManager.show(html, rect);
   }
 
   private showLongestSurvivingTooltip(e: MouseEvent): void {
-    if (!this.tooltip || !this.longestSurvivingCreature) return;
+    if (!this.tooltipManager || !this.longestSurvivingCreature) return;
 
     const result = this.longestSurvivingCreature;
     const genome = result.genome;
     const creatureName = this.getCreatureName(genome);
 
-    this.tooltip.innerHTML = `
-      <div class="tooltip-title" style="color: #a855f7;">${creatureName}</div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Survived</span>
-        <span class="tooltip-value" style="color: #a855f7">${genome.survivalStreak} consecutive gens</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Fitness</span>
-        <span class="tooltip-value">${result.finalFitness.toFixed(1)}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Pellets</span>
-        <span class="tooltip-value">${result.pelletsCollected}/${result.pellets.length}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Distance</span>
-        <span class="tooltip-value">${result.distanceTraveled.toFixed(1)}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Nodes</span>
-        <span class="tooltip-value">${genome.nodes.length}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Muscles</span>
-        <span class="tooltip-value">${genome.muscles.length}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Origin</span>
-        <span class="tooltip-value">${genome.parentIds.length === 0 ? 'Original' : genome.parentIds.length === 1 ? 'Mutant' : 'Crossover'}</span>
-      </div>
+    const html = `
+      ${tooltipTitle(creatureName, undefined, 'color: #a855f7')}
+      ${tooltipRow('Survived', `${genome.survivalStreak} consecutive gens`, 'color: #a855f7')}
+      ${tooltipRow('Fitness', result.finalFitness.toFixed(1))}
+      ${tooltipRow('Pellets', `${result.pelletsCollected}/${result.pellets.length}`)}
+      ${tooltipRow('Distance', result.distanceTraveled.toFixed(1))}
+      ${tooltipRow('Nodes', genome.nodes.length)}
+      ${tooltipRow('Muscles', genome.muscles.length)}
+      ${tooltipRow('Origin', genome.parentIds.length === 0 ? 'Original' : genome.parentIds.length === 1 ? 'Mutant' : 'Crossover')}
       <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">Click to replay</div>
     `;
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    this.tooltip.style.left = `${rect.right + 10}px`;
-    this.tooltip.style.top = `${rect.top}px`;
-    this.tooltip.classList.add('visible');
+    this.tooltipManager.show(html, rect);
   }
 
   private updateNextButton(customText?: string): void {
@@ -1853,8 +1808,7 @@ class EvolutionApp {
 
   private showCardTooltip(e: MouseEvent, card: CreatureCard): void {
     const result = card.result;
-    if (!result) return;
-    if (!this.tooltip) return;
+    if (!result || !this.tooltipManager) return;
 
     const genome = result.genome;
     const creatureName = this.getCreatureName(genome);
@@ -1889,8 +1843,8 @@ class EvolutionApp {
                         parentCount === 1 ? 'Mutant' :
                         `Crossover (${parentCount} parents)`;
 
-    this.tooltip.innerHTML = `
-      <div class="tooltip-title">${creatureName} <span style="color: var(--text-muted); font-size: 12px;">#${card.rank}</span></div>
+    const html = `
+      ${tooltipTitle(creatureName, `#${card.rank}`)}
 
       ${result.disqualified ? `
         <div style="margin-bottom: 8px; padding: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; border-radius: 4px;">
@@ -1900,79 +1854,31 @@ class EvolutionApp {
       ` : ''}
 
       <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-        <div class="tooltip-row">
-          <span class="tooltip-label">Fitness</span>
-          <span class="tooltip-value" style="color: ${result.disqualified ? '#ef4444' : 'var(--success)'}">${fitness.toFixed(1)}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Pellets</span>
-          <span class="tooltip-value">${result.pelletsCollected}/${result.pellets.length}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Distance</span>
-          <span class="tooltip-value">${result.distanceTraveled.toFixed(1)}</span>
-        </div>
+        ${tooltipRow('Fitness', fitness.toFixed(1), `color: ${result.disqualified ? '#ef4444' : 'var(--success)'}`)}
+        ${tooltipRow('Pellets', `${result.pelletsCollected}/${result.pellets.length}`)}
+        ${tooltipRow('Distance', result.distanceTraveled.toFixed(1))}
       </div>
 
       <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
         <div style="font-size: 11px; color: var(--accent-light); margin-bottom: 4px;">Genetics</div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Generation</span>
-          <span class="tooltip-value">${genCount}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Origin</span>
-          <span class="tooltip-value" style="color: ${parentCount === 0 ? '#7a8494' : parentCount === 1 ? '#f59e0b' : '#6366f1'}">${lineageText}</span>
-        </div>
+        ${tooltipRow('Generation', genCount)}
+        ${tooltipRow('Origin', lineageText, `color: ${parentCount === 0 ? '#7a8494' : parentCount === 1 ? '#f59e0b' : '#6366f1'}`)}
       </div>
 
       <div>
         <div style="font-size: 11px; color: var(--accent-light); margin-bottom: 4px;">Structure</div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Nodes</span>
-          <span class="tooltip-value">${genome.nodes.length}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Muscles</span>
-          <span class="tooltip-value">${genome.muscles.length}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg Stiffness</span>
-          <span class="tooltip-value">${avgStiffness.toFixed(0)}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg Frequency</span>
-          <span class="tooltip-value">${avgFrequency.toFixed(1)} Hz</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Global Speed</span>
-          <span class="tooltip-value">${genome.globalFrequencyMultiplier.toFixed(2)}x</span>
-        </div>
+        ${tooltipRow('Nodes', genome.nodes.length)}
+        ${tooltipRow('Muscles', genome.muscles.length)}
+        ${tooltipRow('Avg Stiffness', avgStiffness.toFixed(0))}
+        ${tooltipRow('Avg Frequency', `${avgFrequency.toFixed(1)} Hz`)}
+        ${tooltipRow('Global Speed', `${genome.globalFrequencyMultiplier.toFixed(2)}x`)}
       </div>
 
       <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">${result.disqualified ? 'Replay unavailable' : 'Click to replay'}</div>
     `;
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const tooltipHeight = 320; // Approximate height of tooltip
-
-    // Position to the right of the card
-    let left = rect.right + 10;
-    let top = rect.top;
-
-    // If tooltip would go off the bottom, position it to show from bottom up
-    if (top + tooltipHeight > window.innerHeight) {
-      top = Math.max(10, window.innerHeight - tooltipHeight - 10);
-    }
-
-    // If tooltip would go off the right, position to the left of the card
-    if (left + 200 > window.innerWidth) {
-      left = rect.left - 210;
-    }
-
-    this.tooltip.style.left = `${left}px`;
-    this.tooltip.style.top = `${top}px`;
-    this.tooltip.classList.add('visible');
+    this.tooltipManager.show(html, rect);
   }
 
   // ============================================
@@ -1980,13 +1886,11 @@ class EvolutionApp {
   // ============================================
 
   private createTooltip(): void {
-    this.tooltip = document.createElement('div');
-    this.tooltip.className = 'creature-tooltip glass';
-    document.body.appendChild(this.tooltip);
+    this.tooltipManager = new TooltipManager();
   }
 
   private hideTooltip(): void {
-    if (this.tooltip) this.tooltip.classList.remove('visible');
+    this.tooltipManager?.hide();
   }
 
   // ============================================
