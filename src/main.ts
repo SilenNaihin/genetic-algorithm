@@ -3,67 +3,28 @@ import { generateRandomGenome } from './core/Genome';
 import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
 import { Creature } from './core/Creature';
-import { DEFAULT_CONFIG, SimulationConfig, CreatureGenome, FitnessHistoryEntry } from './types';
+import { DEFAULT_CONFIG, CreatureGenome, FitnessHistoryEntry } from './types';
 import { GraphPanel } from './ui/GraphPanel';
 import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
 import { NeuralVisualizer } from './ui/NeuralVisualizer';
 import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPanel';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputs, SENSOR_NAMES, createNetworkFromGenome } from './neural';
+import {
+  AppState,
+  EvolutionStep,
+  Config,
+  CreatureCard,
+  AncestorInfo,
+  FamilyTreeNode,
+  GRID_COLS,
+  GRID_ROWS,
+  CARD_SIZE,
+  CARD_GAP
+} from './types/app';
 
 // Global storage instance
 const runStorage = new RunStorage();
-
-type AppState = 'menu' | 'grid' | 'replay';
-type EvolutionStep = 'idle' | 'mutate' | 'simulate' | 'sort';
-
-interface Config extends SimulationConfig {
-  gravity: number;
-  mutationRate: number;
-  simulationDuration: number;
-  pelletCount: number;
-}
-
-interface CreatureCard {
-  element: HTMLElement;
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  result: CreatureSimulationResult | null;
-  rank: number;
-  gridIndex: number;
-  isDead: boolean;
-  isMutated: boolean;
-  isElite: boolean;
-  parentId: string | null;  // Track lineage
-  // For animation
-  currentX: number;
-  currentY: number;
-  targetX: number;
-  targetY: number;
-}
-
-// Family tree types
-interface AncestorInfo {
-  id: string;
-  generation: number;
-  fitness: number;
-  pelletsCollected: number;
-  nodeCount: number;
-  muscleCount: number;
-  color: { h: number; s: number; l: number };
-  parentIds: string[];
-}
-
-interface FamilyTreeNode {
-  creature: AncestorInfo;
-  parents: FamilyTreeNode[];
-}
-
-// Grid layout constants
-const GRID_COLS = 10;
-const GRID_ROWS = 10;
-const CARD_SIZE = 80;
-const CARD_GAP = 8;
 
 class EvolutionApp {
   private container: HTMLElement;
@@ -354,11 +315,27 @@ class EvolutionApp {
           </div>
           <div class="param-group" style="margin-bottom: 12px;">
             <div class="param-label">
-              <span class="param-name">Movement Max</span>
-              <span class="param-value" id="fitness-movement-value">${this.config.fitnessMovementMax}</span>
+              <span class="param-name">Net Displacement Max</span>
+              <span class="param-value" id="fitness-net-displacement-value">${this.config.fitnessNetDisplacementMax}</span>
             </div>
-            <input type="range" class="param-slider" id="fitness-movement-slider" min="0" max="100" value="${this.config.fitnessMovementMax}">
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max bonus for net displacement</div>
+            <input type="range" class="param-slider" id="fitness-net-displacement-slider" min="0" max="50" value="${this.config.fitnessNetDisplacementMax}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max bonus for straight-line distance from start</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Distance Per Unit</span>
+              <span class="param-value" id="fitness-distance-per-unit-value">${this.config.fitnessDistancePerUnit}</span>
+            </div>
+            <input type="range" class="param-slider" id="fitness-distance-per-unit-slider" min="0" max="10" value="${this.config.fitnessDistancePerUnit}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Points per unit of distance traveled</div>
+          </div>
+          <div class="param-group" style="margin-bottom: 12px;">
+            <div class="param-label">
+              <span class="param-name">Distance Traveled Max</span>
+              <span class="param-value" id="fitness-distance-traveled-value">${this.config.fitnessDistanceTraveledMax}</span>
+            </div>
+            <input type="range" class="param-slider" id="fitness-distance-traveled-slider" min="0" max="50" value="${this.config.fitnessDistanceTraveledMax}">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Max bonus for total distance traveled</div>
           </div>
           <div class="param-group" style="margin-bottom: 12px;">
             <div class="param-label">
@@ -467,6 +444,22 @@ class EvolutionApp {
               <span style="font-size: 13px; color: var(--text-primary);" id="weight-mut-mag-value">0.3</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="weight-mut-mag-slider" min="0.1" max="1.0" step="0.1" value="0.3">
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Dead Zone</span>
+              <span style="font-size: 13px; color: var(--text-primary);" id="dead-zone-value">0.1</span>
+            </div>
+            <input type="range" style="width: 100%; display: block;" id="dead-zone-slider" min="0" max="0.5" step="0.05" value="0.1">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Pure mode: outputs below this become 0</div>
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 13px; color: var(--text-secondary);">Efficiency Penalty</span>
+              <span style="font-size: 13px; color: var(--text-primary);" id="efficiency-penalty-value">0.5</span>
+            </div>
+            <input type="range" style="width: 100%; display: block;" id="efficiency-penalty-slider" min="0" max="2" step="0.1" value="0.5">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Penalty per unit of muscle activation</div>
           </div>
         </div>
       </div>
@@ -634,6 +627,20 @@ class EvolutionApp {
       this.updateSettingsInfoBox();
     });
 
+    const deadZoneSlider = document.getElementById('dead-zone-slider') as HTMLInputElement;
+    deadZoneSlider.addEventListener('input', () => {
+      this.config.neuralDeadZone = parseFloat(deadZoneSlider.value);
+      document.getElementById('dead-zone-value')!.textContent = deadZoneSlider.value;
+      this.updateSettingsInfoBox();
+    });
+
+    const efficiencyPenaltySlider = document.getElementById('efficiency-penalty-slider') as HTMLInputElement;
+    efficiencyPenaltySlider.addEventListener('input', () => {
+      this.config.fitnessEfficiencyPenalty = parseFloat(efficiencyPenaltySlider.value);
+      document.getElementById('efficiency-penalty-value')!.textContent = efficiencyPenaltySlider.value;
+      this.updateSettingsInfoBox();
+    });
+
     const frequencySlider2 = document.getElementById('frequency-slider') as HTMLInputElement;
     frequencySlider2.addEventListener('change', () => {
       // Regenerate on frequency change to show max frequency effect
@@ -643,7 +650,9 @@ class EvolutionApp {
     // New fitness sliders
     this.setupFitnessSlider('fitness-pellet', 'fitnessPelletPoints');
     this.setupFitnessSlider('fitness-progress', 'fitnessProgressMax');
-    this.setupFitnessSlider('fitness-movement', 'fitnessMovementMax');
+    this.setupFitnessSlider('fitness-net-displacement', 'fitnessNetDisplacementMax');
+    this.setupFitnessSlider('fitness-distance-per-unit', 'fitnessDistancePerUnit');
+    this.setupFitnessSlider('fitness-distance-traveled', 'fitnessDistanceTraveledMax');
     this.setupFitnessSlider('fitness-regression', 'fitnessRegressionPenalty');
 
     // Reset fitness button
@@ -652,7 +661,7 @@ class EvolutionApp {
     });
   }
 
-  private setupFitnessSlider(sliderId: string, configKey: 'fitnessPelletPoints' | 'fitnessProgressMax' | 'fitnessMovementMax' | 'fitnessRegressionPenalty'): void {
+  private setupFitnessSlider(sliderId: string, configKey: 'fitnessPelletPoints' | 'fitnessProgressMax' | 'fitnessNetDisplacementMax' | 'fitnessDistancePerUnit' | 'fitnessDistanceTraveledMax' | 'fitnessRegressionPenalty'): void {
     const slider = document.getElementById(`${sliderId}-slider`) as HTMLInputElement;
     const valueDisplay = document.getElementById(`${sliderId}-value`) as HTMLElement;
 
@@ -1255,7 +1264,9 @@ class EvolutionApp {
         <div style="display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10px;">
           <span style="color: var(--text-muted);">Pellet Points:</span><span style="color: var(--text-secondary);">${this.config.fitnessPelletPoints}</span>
           <span style="color: var(--text-muted);">Progress Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessProgressMax}</span>
-          <span style="color: var(--text-muted);">Movement Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessMovementMax}</span>
+          <span style="color: var(--text-muted);">Net Disp Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessNetDisplacementMax}</span>
+          <span style="color: var(--text-muted);">Dist/Unit:</span><span style="color: var(--text-secondary);">${this.config.fitnessDistancePerUnit}</span>
+          <span style="color: var(--text-muted);">Dist Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessDistanceTraveledMax}</span>
           <span style="color: var(--text-muted);">Regression Penalty:</span><span style="color: var(--text-secondary);">${this.config.fitnessRegressionPenalty}</span>
         </div>
       </div>
@@ -4024,13 +4035,17 @@ class EvolutionApp {
     // Reset to default values
     this.config.fitnessPelletPoints = DEFAULT_CONFIG.fitnessPelletPoints;
     this.config.fitnessProgressMax = DEFAULT_CONFIG.fitnessProgressMax;
-    this.config.fitnessMovementMax = DEFAULT_CONFIG.fitnessMovementMax;
+    this.config.fitnessNetDisplacementMax = DEFAULT_CONFIG.fitnessNetDisplacementMax;
+    this.config.fitnessDistancePerUnit = DEFAULT_CONFIG.fitnessDistancePerUnit;
+    this.config.fitnessDistanceTraveledMax = DEFAULT_CONFIG.fitnessDistanceTraveledMax;
     this.config.fitnessRegressionPenalty = DEFAULT_CONFIG.fitnessRegressionPenalty;
 
     // Update all sliders (in menu)
     this.updateFitnessSliderUI('fitness-pellet', this.config.fitnessPelletPoints);
     this.updateFitnessSliderUI('fitness-progress', this.config.fitnessProgressMax);
-    this.updateFitnessSliderUI('fitness-movement', this.config.fitnessMovementMax);
+    this.updateFitnessSliderUI('fitness-net-displacement', this.config.fitnessNetDisplacementMax);
+    this.updateFitnessSliderUI('fitness-distance-per-unit', this.config.fitnessDistancePerUnit);
+    this.updateFitnessSliderUI('fitness-distance-traveled', this.config.fitnessDistanceTraveledMax);
     this.updateFitnessSliderUI('fitness-regression', this.config.fitnessRegressionPenalty);
   }
 

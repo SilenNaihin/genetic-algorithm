@@ -19,7 +19,7 @@ export {
 } from './activations';
 
 // Neural network class
-export { NeuralNetwork } from './NeuralNetwork';
+export { NeuralNetwork, DEFAULT_OUTPUT_BIAS } from './NeuralNetwork';
 export type { NeuralNetworkConfig, ForwardResult } from './NeuralNetwork';
 
 // Genome data structures
@@ -31,11 +31,18 @@ export type {
 export {
   DEFAULT_NEURAL_CONFIG,
   NEURAL_INPUT_SIZE,
+  NEURAL_INPUT_SIZE_PURE,
+  NEURAL_INPUT_SIZE_HYBRID,
   SENSOR_NAMES,
+  SENSOR_NAMES_PURE,
+  SENSOR_NAMES_HYBRID,
+  getInputSizeForMode,
   initializeNeuralGenome,
   createNetworkFromGenome,
   cloneNeuralGenome,
   calculateWeightCount,
   validateNeuralGenome,
-  gatherSensorInputs
+  gatherSensorInputs,
+  gatherSensorInputsPure,
+  gatherSensorInputsHybrid
 } from './NeuralGenome';

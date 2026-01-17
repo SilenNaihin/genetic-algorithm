@@ -5,7 +5,8 @@ import { dot, normalize, subtract, length } from '../utils/math';
 import {
   NeuralNetwork,
   createNetworkFromGenome,
-  gatherSensorInputs
+  gatherSensorInputsPure,
+  gatherSensorInputsHybrid
 } from '../neural';
 
 export interface SimulationFrame {
@@ -333,6 +334,7 @@ export function simulateCreature(
   let initialCenterOfMass: Vector3 | null = null;  // Track starting position
   let pelletsCollected = 0;
   let disqualified: DisqualificationReason = null;  // Track if creature gets disqualified mid-simulation
+  let totalMuscleActivation = 0;  // Track total muscle activation for efficiency penalty
 
   // Thresholds for detecting physics explosion
   const POSITION_THRESHOLD = 50;  // If any node goes beyond 50 units from origin
@@ -351,19 +353,28 @@ export function simulateCreature(
   // - 0-progressMax points for XZ progress toward current pellet
   // - +bonus points when pellet is actually collected (pelletPoints - progressMax)
   // - After first pellet: -regressionPenalty max if moving AWAY from next pellet
-  // - Movement bonus: 0-movementMax points for NET displacement over time
+  // - Net displacement bonus: 0-netDisplacementMax points (rate-based)
+  // - Distance traveled bonus: 0-distanceTraveledMax points (distancePerUnit pts per unit)
   // Get fitness values from config (with defaults for backwards compatibility)
   const pelletPoints = config.fitnessPelletPoints ?? 100;
   const progressMax = config.fitnessProgressMax ?? 80;
-  const movementMax = config.fitnessMovementMax ?? 25;
+  const netDisplacementMax = config.fitnessNetDisplacementMax ?? 15;
+  const distancePerUnit = config.fitnessDistancePerUnit ?? 3;
+  const distanceTraveledMax = config.fitnessDistanceTraveledMax ?? 15;
   const regressionPenalty = config.fitnessRegressionPenalty ?? 20;
-  const TARGET_DISPLACEMENT_RATE = 1.0;  // Units/second for full bonus (net displacement, not total)
+  const efficiencyPenalty = config.fitnessEfficiencyPenalty ?? 0.5;
+  const TARGET_DISPLACEMENT_RATE = 1.0;  // Units/second for full bonus (net displacement)
+
+  // Neural network settings
+  const deadZone = config.neuralDeadZone ?? 0.1;
 
   const calculateCurrentFitness = (
     centerOfMass: Vector3,
     pelletsCollectedCount: number,
-    currentNetDisplacement: number,  // Straight-line distance from start (not total distance)
-    currentTime: number
+    currentNetDisplacement: number,  // Straight-line distance from start (XZ only)
+    currentDistanceTraveled: number, // Total distance traveled (XZ only)
+    currentTime: number,
+    currentMuscleActivation: number  // Total muscle activation (for efficiency penalty)
   ): number => {
     // If disqualified, always return 0
     if (disqualified) return 0;
@@ -410,14 +421,23 @@ export function simulateCreature(
       }
     }
 
-    // MOVEMENT BONUS: Reward NET displacement over time (stepping stone for evolution)
-    // Uses net displacement (straight-line from start) NOT total distance traveled
-    // This discourages flailing: lots of motion that goes nowhere gets 0 bonus
-    // A creature that walks in a straight line gets full bonus
+    // NET DISPLACEMENT BONUS: Reward straight-line distance from start (stepping stone for evolution)
+    // Encourages creatures to move away from origin rather than circle back
     if (currentTime > 0.5) {  // Only apply after settling period
       const displacementRate = currentNetDisplacement / currentTime;  // Units per second
-      const movementRatio = Math.min(1, displacementRate / TARGET_DISPLACEMENT_RATE);
-      fitness += movementRatio * movementMax;
+      const displacementRatio = Math.min(1, displacementRate / TARGET_DISPLACEMENT_RATE);
+      fitness += displacementRatio * netDisplacementMax;
+    }
+
+    // DISTANCE TRAVELED BONUS: Reward total distance covered
+    // distancePerUnit points per unit traveled, capped at distanceTraveledMax
+    const distanceBonus = Math.min(currentDistanceTraveled * distancePerUnit, distanceTraveledMax);
+    fitness += distanceBonus;
+
+    // EFFICIENCY PENALTY: Penalize excessive muscle activation (neural mode only)
+    // Encourages creatures to achieve results with less "effort"
+    if (useNeural && efficiencyPenalty > 0) {
+      fitness -= currentMuscleActivation * efficiencyPenalty;
     }
 
     // Ensure fitness is never negative (minimum 0)
@@ -471,13 +491,18 @@ export function simulateCreature(
     // Get neural network outputs if enabled
     let neuralOutputs: number[] | null = null;
     if (neuralNetwork) {
-      const sensorInputs = gatherSensorInputs(
-        pelletDirection,
-        velocityDirection,
-        normalizedDistance,
-        simulationTime
-      );
+      // Use mode-specific sensor inputs
+      const sensorInputs = neuralMode === 'pure'
+        ? gatherSensorInputsPure(pelletDirection, velocityDirection, normalizedDistance)
+        : gatherSensorInputsHybrid(pelletDirection, velocityDirection, normalizedDistance, simulationTime);
       neuralOutputs = neuralNetwork.predict(sensorInputs);
+
+      // Apply dead zone in pure mode (small outputs become 0)
+      if (neuralMode === 'pure' && deadZone > 0) {
+        neuralOutputs = neuralOutputs.map(output =>
+          Math.abs(output) < deadZone ? 0 : output
+        );
+      }
     }
 
     // Update springs with multi-factor modulated oscillation (v2)
@@ -495,6 +520,9 @@ export function simulateCreature(
       if (neuralOutputs && springIdx < neuralOutputs.length) {
         // Neural network control
         const nnOutput = neuralOutputs[springIdx];  // Already in [-1, 1] range from tanh
+
+        // Track muscle activation (absolute value) for efficiency penalty
+        totalMuscleActivation += Math.abs(nnOutput);
 
         if (neuralMode === 'pure') {
           // Pure mode: NN directly controls contraction
@@ -580,12 +608,11 @@ export function simulateCreature(
         z: isFinite(cz / totalMass) ? cz / totalMass : 0
       } : { x: 0, y: 0, z: 0 };
 
-      // Track distance traveled
+      // Track distance traveled (XZ only - vertical movement doesn't count)
       if (lastCenterOfMass) {
         const dx = centerOfMass.x - lastCenterOfMass.x;
-        const dy = centerOfMass.y - lastCenterOfMass.y;
         const dz = centerOfMass.z - lastCenterOfMass.z;
-        const frameDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const frameDist = Math.sqrt(dx * dx + dz * dz);
         // Only add if finite
         if (isFinite(frameDist)) {
           distanceTraveled += frameDist;
@@ -661,7 +688,7 @@ export function simulateCreature(
       });
 
       // Track fitness at this frame
-      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, currentNetDisplacement, simulationTime));
+      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, currentNetDisplacement, distanceTraveled, simulationTime, totalMuscleActivation));
 
       lastFrameTime = simulationTime;
     }
@@ -722,9 +749,11 @@ export function simulateCreature(
   // SIMPLE FITNESS MODEL (values configurable via SimulationConfig):
   // - pelletPoints per collected pellet (default 100)
   // - 0-progressMax points for progress toward current pellet (default 80)
-  // - 0-movementMax points for XZ net displacement over time (default 25)
+  // - Net displacement bonus: 0-netDisplacementMax points (default 15)
+  // - Distance traveled bonus: distancePerUnit pts/unit up to distanceTraveledMax (default 15)
   // - After first pellet: up to -regressionPenalty for moving away (default 20)
-  const finalFitness = calculateCurrentFitness(validFinalCOM, pelletsCollected, validNetDisplacementXZ, simulationTime);
+  // - Efficiency penalty: penalizes excessive muscle activation (neural mode)
+  const finalFitness = calculateCurrentFitness(validFinalCOM, pelletsCollected, validNetDisplacementXZ, distanceTraveled, simulationTime, totalMuscleActivation);
 
   return {
     genome,

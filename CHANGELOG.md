@@ -4,6 +4,31 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Changed
+- **Neural Network Optimization for Genetic Algorithms**:
+  - **Negative output biases** (-1.5 default): Muscles default to "off" state, must evolve to activate
+    - `tanh(-1.5) ≈ -0.9` means muscles start mostly inactive
+    - Creates evolutionary pressure to develop purposeful activation
+  - **Uniform weight initialization**: Replaced Xavier/Gaussian with uniform [-0.5, 0.5]
+    - Simpler search space for GA (no gradient assumptions)
+  - **Mode-specific inputs**: Pure mode uses 7 inputs (no time phase), hybrid uses 8
+    - Pure mode: NN has full control, time phase would just add noise
+    - Hybrid mode: time phase helps sync with base oscillation
+  - **Dead zone threshold** (0.1 default): Small outputs become exactly 0 in pure mode
+    - Enables true "muscle silence" rather than constant micro-activations
+  - **Efficiency penalty**: Fitness penalized by total muscle activation
+    - Encourages creatures to achieve results with less "effort"
+    - Configurable penalty per unit of activation (default 0.5)
+- **Split Movement Fitness**: Replaced single "Movement Max" with two separate components:
+  - **Net Displacement Bonus** (0-15 pts): Rate-based straight-line distance from start position
+    - Encourages creatures to move away from origin rather than circle back
+    - 1 unit/second = full bonus, applied after 0.5s settling period
+  - **Distance Traveled Bonus** (0-15 pts): Total ground distance covered
+    - 3 points per unit traveled (configurable)
+    - Rewards creatures that explore even if they return to start
+  - All distance calculations now XZ-only (vertical movement ignored)
+  - UI updated with separate sliders for each component
+
 ### Added
 - **Brain Evolution Comparison**: New panel to visualize how neural networks evolve over generations
   - **Diff View**: Shows weight changes between Gen 1 average and current generation average

@@ -52,17 +52,45 @@ export const DEFAULT_NEURAL_CONFIG: NeuralConfig = {
 
 /**
  * Number of sensor inputs for creatures.
+ *
+ * Pure mode (7 inputs): NN has full control, no time phase needed
  * - pellet_dir_x, pellet_dir_y, pellet_dir_z (3)
  * - velocity_x, velocity_y, velocity_z (3)
  * - pellet_distance (1)
- * - time_phase (1)
+ *
+ * Hybrid mode (8 inputs): NN modulates base oscillation, time phase helps sync
+ * - All of the above + time_phase (1)
  */
+export const NEURAL_INPUT_SIZE_PURE = 7;
+export const NEURAL_INPUT_SIZE_HYBRID = 8;
+
+/** @deprecated Use NEURAL_INPUT_SIZE_PURE or NEURAL_INPUT_SIZE_HYBRID */
 export const NEURAL_INPUT_SIZE = 8;
 
 /**
- * Sensor input names (for visualization).
+ * Get input size based on neural mode.
  */
-export const SENSOR_NAMES = [
+export function getInputSizeForMode(mode: 'pure' | 'hybrid'): number {
+  return mode === 'pure' ? NEURAL_INPUT_SIZE_PURE : NEURAL_INPUT_SIZE_HYBRID;
+}
+
+/**
+ * Sensor input names for pure mode (for visualization).
+ */
+export const SENSOR_NAMES_PURE = [
+  'pellet_dir_x',
+  'pellet_dir_y',
+  'pellet_dir_z',
+  'velocity_x',
+  'velocity_y',
+  'velocity_z',
+  'pellet_dist'
+];
+
+/**
+ * Sensor input names for hybrid mode (for visualization).
+ */
+export const SENSOR_NAMES_HYBRID = [
   'pellet_dir_x',
   'pellet_dir_y',
   'pellet_dir_z',
@@ -73,8 +101,11 @@ export const SENSOR_NAMES = [
   'time_phase'
 ];
 
+/** @deprecated Use SENSOR_NAMES_PURE or SENSOR_NAMES_HYBRID */
+export const SENSOR_NAMES = SENSOR_NAMES_HYBRID;
+
 /**
- * Create a new neural genome with Xavier-initialized weights.
+ * Create a new neural genome with GA-optimized initialized weights.
  *
  * @param numMuscles Number of output neurons (one per muscle)
  * @param config Neural network configuration
@@ -84,13 +115,16 @@ export function initializeNeuralGenome(
   numMuscles: number,
   config: NeuralConfig = DEFAULT_NEURAL_CONFIG
 ): NeuralGenomeData {
+  // Use mode-specific input size
+  const inputSize = getInputSizeForMode(config.neuralMode);
+
   const topology: NeuralTopology = {
-    inputSize: NEURAL_INPUT_SIZE,
+    inputSize,
     hiddenSize: config.hiddenSize,
     outputSize: numMuscles
   };
 
-  // Create network with Xavier initialization
+  // Create network with GA-optimized initialization
   const networkConfig: NeuralNetworkConfig = {
     ...topology,
     activation: config.activation
@@ -144,10 +178,30 @@ export function validateNeuralGenome(data: NeuralGenomeData): boolean {
 }
 
 /**
- * Gather sensor inputs from simulation state.
- * This is the bridge between physics and neural network.
+ * Gather sensor inputs from simulation state (pure mode - 7 inputs).
+ * No time phase since NN has full control over muscle timing.
  */
-export function gatherSensorInputs(
+export function gatherSensorInputsPure(
+  pelletDirection: { x: number; y: number; z: number },
+  velocityDirection: { x: number; y: number; z: number },
+  normalizedDistance: number
+): number[] {
+  return [
+    pelletDirection.x,
+    pelletDirection.y,
+    pelletDirection.z,
+    velocityDirection.x,
+    velocityDirection.y,
+    velocityDirection.z,
+    normalizedDistance
+  ];
+}
+
+/**
+ * Gather sensor inputs from simulation state (hybrid mode - 8 inputs).
+ * Includes time phase to help NN sync with base oscillation.
+ */
+export function gatherSensorInputsHybrid(
   pelletDirection: { x: number; y: number; z: number },
   velocityDirection: { x: number; y: number; z: number },
   normalizedDistance: number,
@@ -163,4 +217,16 @@ export function gatherSensorInputs(
     normalizedDistance,
     Math.sin(simulationTime * Math.PI * 2)  // time phase for rhythmic behavior
   ];
+}
+
+/**
+ * @deprecated Use gatherSensorInputsPure or gatherSensorInputsHybrid
+ */
+export function gatherSensorInputs(
+  pelletDirection: { x: number; y: number; z: number },
+  velocityDirection: { x: number; y: number; z: number },
+  normalizedDistance: number,
+  simulationTime: number
+): number[] {
+  return gatherSensorInputsHybrid(pelletDirection, velocityDirection, normalizedDistance, simulationTime);
 }

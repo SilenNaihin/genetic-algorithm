@@ -53,12 +53,26 @@ export function recalculateFitnessOverTime(
   // Get fitness config (with defaults for legacy runs)
   const pelletPoints = config.fitnessPelletPoints ?? DEFAULT_CONFIG.fitnessPelletPoints;
   const progressMax = config.fitnessProgressMax ?? DEFAULT_CONFIG.fitnessProgressMax;
-  const movementMax = config.fitnessMovementMax ?? DEFAULT_CONFIG.fitnessMovementMax;
+  const netDisplacementMax = config.fitnessNetDisplacementMax ?? DEFAULT_CONFIG.fitnessNetDisplacementMax;
+  const distancePerUnit = config.fitnessDistancePerUnit ?? DEFAULT_CONFIG.fitnessDistancePerUnit;
+  const distanceTraveledMax = config.fitnessDistanceTraveledMax ?? DEFAULT_CONFIG.fitnessDistanceTraveledMax;
+
+  // Track cumulative distance traveled (XZ only)
+  let distanceTraveled = 0;
+  let lastCOM = initialCOM;
 
   for (let i = 0; i < frames.length; i++) {
     const frame = frames[i];
     const com = frame.centerOfMass;
     const time = frame.time;
+
+    // Accumulate distance traveled (XZ only)
+    if (i > 0) {
+      const dx = com.x - lastCOM.x;
+      const dz = com.z - lastCOM.z;
+      distanceTraveled += Math.sqrt(dx * dx + dz * dz);
+    }
+    lastCOM = com;
 
     // Count pellets collected by this frame
     const pelletsCollected = pellets.filter(p =>
@@ -84,15 +98,19 @@ export function recalculateFitnessOverTime(
       f += progress * progressMax;
     }
 
-    // Movement bonus (net XZ displacement rate)
+    // Net displacement bonus (rate-based)
     if (time > 0.5) {
       const netDx = com.x - initialCOM.x;
       const netDz = com.z - initialCOM.z;
       const netDisp = Math.sqrt(netDx * netDx + netDz * netDz);
       const dispRate = netDisp / time;
-      const movementRatio = Math.min(1, dispRate / 1.0); // 1 unit/sec = full bonus
-      f += movementRatio * movementMax;
+      const displacementRatio = Math.min(1, dispRate / 1.0); // 1 unit/sec = full bonus
+      f += displacementRatio * netDisplacementMax;
     }
+
+    // Distance traveled bonus
+    const distanceBonus = Math.min(distanceTraveled * distancePerUnit, distanceTraveledMax);
+    f += distanceBonus;
 
     fitnessOverTime.push(Math.max(f, 0));
   }

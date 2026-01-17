@@ -71,7 +71,7 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-280 tests covering: genetics, genome, simulation, storage, neural networks, brain evolution, math utilities.
+282 tests covering: genetics, genome, simulation, storage, neural networks, brain evolution, math utilities.
 
 ## Global Commands
 
@@ -84,9 +84,10 @@ npm test -- --run  # Run once (no watch)
 - `main.ts` is large (~4000 lines) - contains EvolutionApp class with all UI
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
-- Fitness: 0-80 progress (XZ ground distance from edge) + 20 collection bonus per pellet
+- Fitness: 0-80 progress + 20 collection per pellet + 15 net displacement + 15 distance traveled (all XZ-only)
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
-  - 8 sensor inputs (pellet direction, velocity, distance, time phase)
-  - Single hidden layer with configurable size
-  - Outputs control muscle activations
+  - Pure mode: 7 inputs (no time phase), NN has full control
+  - Hybrid mode: 8 inputs (with time phase), NN modulates base oscillation
+  - GA-optimized: negative output biases (-1.5), uniform weights, dead zone threshold
+  - Efficiency penalty discourages excessive muscle activation
   - BrainEvolutionPanel visualizes weight changes across generations

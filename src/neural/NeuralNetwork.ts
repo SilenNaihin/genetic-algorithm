@@ -4,6 +4,10 @@
  * Architecture: Input -> Hidden (tanh) -> Output (tanh)
  *
  * Weights are evolved through genetic algorithms, NOT trained with gradients.
+ * Initialization is optimized for GA evolution:
+ * - Small uniform weights (not Gaussian - no gradient assumptions)
+ * - Negative output biases (default "off" state, must evolve to activate)
+ *
  * This class provides:
  * - Forward pass computation
  * - Weight serialization (to/from flat array for evolution)
@@ -12,8 +16,11 @@
 
 import { ActivationType, getActivation } from './activations';
 
+/** Default negative bias for output neurons (makes muscles default to "off") */
+export const DEFAULT_OUTPUT_BIAS = -1.5;
+
 export interface NeuralNetworkConfig {
-  inputSize: number;    // Number of sensor inputs (default: 8)
+  inputSize: number;    // Number of sensor inputs (7 for pure mode, 8 for hybrid)
   hiddenSize: number;   // Number of hidden neurons (default: 8)
   outputSize: number;   // Number of outputs (one per muscle)
   activation: ActivationType;  // Activation function (default: 'tanh')
@@ -62,30 +69,37 @@ export class NeuralNetwork {
   }
 
   /**
-   * Create a new network with Xavier/Glorot initialized weights.
-   * Xavier initialization: weights ~ N(0, sqrt(2 / (fan_in + fan_out)))
+   * Create a new network with GA-optimized initialization.
+   *
+   * Unlike gradient-based training which uses Xavier/Gaussian init,
+   * GA evolution benefits from:
+   * - Small uniform weights (simpler search space, no gradient assumptions)
+   * - Negative output biases (muscles default to "off", must evolve to activate)
    */
   static initialize(config: NeuralNetworkConfig): NeuralNetwork {
     const nn = new NeuralNetwork(config);
 
-    // Xavier initialization for input -> hidden
-    const stdIH = Math.sqrt(2 / (config.inputSize + config.hiddenSize));
+    // Uniform initialization for input -> hidden
+    // Range [-0.5, 0.5] gives reasonable starting activations
+    const weightRange = 0.5;
     for (let i = 0; i < config.inputSize; i++) {
       for (let j = 0; j < config.hiddenSize; j++) {
-        nn.weightsIH[i][j] = randomGaussian() * stdIH;
+        nn.weightsIH[i][j] = (Math.random() - 0.5) * 2 * weightRange;
       }
     }
-    // Biases start at 0
+    // Hidden biases start at 0 (no preference)
     nn.biasH.fill(0);
 
-    // Xavier initialization for hidden -> output
-    const stdHO = Math.sqrt(2 / (config.hiddenSize + config.outputSize));
+    // Uniform initialization for hidden -> output
     for (let i = 0; i < config.hiddenSize; i++) {
       for (let j = 0; j < config.outputSize; j++) {
-        nn.weightsHO[i][j] = randomGaussian() * stdHO;
+        nn.weightsHO[i][j] = (Math.random() - 0.5) * 2 * weightRange;
       }
     }
-    nn.biasO.fill(0);
+    // Output biases start negative (muscles default to "off")
+    // tanh(-1.5) ≈ -0.9, so muscles are mostly inactive until evolution
+    // learns to overcome this bias with positive weighted inputs
+    nn.biasO.fill(DEFAULT_OUTPUT_BIAS);
 
     return nn;
   }
@@ -244,14 +258,4 @@ export class NeuralNetwork {
       biasO: [...this.biasO]
     };
   }
-}
-
-/**
- * Generate a random number from standard normal distribution.
- * Uses Box-Muller transform.
- */
-function randomGaussian(): number {
-  const u1 = Math.random();
-  const u2 = Math.random();
-  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }

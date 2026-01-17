@@ -38,10 +38,12 @@ export interface SimulationConfig {
   arenaSize: number;            // Size of simulation arena
 
   // Fitness function (simple model)
-  fitnessPelletPoints: number;      // Points per pellet collected (default 100)
-  fitnessProgressMax: number;       // Max points for progress toward pellet (default 80)
-  fitnessMovementMax: number;       // Max movement bonus (default 25)
-  fitnessRegressionPenalty: number; // Max penalty for moving away after 1st pellet (default 20)
+  fitnessPelletPoints: number;          // Points per pellet collected (default 100)
+  fitnessProgressMax: number;           // Max points for progress toward pellet (default 80)
+  fitnessNetDisplacementMax: number;    // Max points for net displacement from start (default 15)
+  fitnessDistancePerUnit: number;       // Points per unit of distance traveled (default 3)
+  fitnessDistanceTraveledMax: number;   // Max points for distance traveled (default 15)
+  fitnessRegressionPenalty: number;     // Max penalty for moving away after 1st pellet (default 20)
 
   // Neural network settings (neuroevolution)
   useNeuralNet: boolean;              // Enable neural network control
@@ -50,6 +52,8 @@ export interface SimulationConfig {
   neuralActivation: ActivationType;   // Activation function
   weightMutationRate: number;         // Probability each weight mutates
   weightMutationMagnitude: number;    // Std dev of weight perturbation
+  neuralDeadZone: number;             // Output threshold below which muscles don't activate (pure mode only)
+  fitnessEfficiencyPenalty: number;   // Penalty per unit of total muscle activation (encourages efficient movement)
 }
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -78,7 +82,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Fitness function defaults
   fitnessPelletPoints: 100,
   fitnessProgressMax: 80,
-  fitnessMovementMax: 25,
+  fitnessNetDisplacementMax: 15,
+  fitnessDistancePerUnit: 3,
+  fitnessDistanceTraveledMax: 15,
   fitnessRegressionPenalty: 20,
 
   // Neural network defaults (disabled by default)
@@ -87,7 +93,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   neuralHiddenSize: 8,
   neuralActivation: 'tanh',
   weightMutationRate: 0.1,
-  weightMutationMagnitude: 0.3
+  weightMutationMagnitude: 0.3,
+  neuralDeadZone: 0.1,           // Outputs with |value| < 0.1 become 0 (pure mode only)
+  fitnessEfficiencyPenalty: 0.5  // Subtract 0.5 * total_activation from fitness
 };
 
 export interface CreatureState {

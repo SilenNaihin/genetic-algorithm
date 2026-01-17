@@ -48,10 +48,11 @@ Creatures are scored using an edge-based, ground-distance system:
 |-----------|--------|-------------|
 | **Progress** | 0-80 | XZ ground distance progress from creature's EDGE toward pellet |
 | **Collection** | +20 | Bonus when pellet is actually collected (requires correct height) |
-| **Movement Bonus** | 0-25 | XZ net displacement over time (ignores falling, discourages flailing) |
+| **Net Displacement** | 0-15 | Rate-based bonus for straight-line distance from start position |
+| **Distance Traveled** | 0-15 | 3 pts per unit of total ground distance covered |
 | **Regression Penalty** | -20 max | Penalty for moving away from pellet (after first pellet) |
 
-**Total per pellet: 100 max** (80 progress + 20 collection) + up to 25 movement bonus
+**Total per pellet: 100 max** (80 progress + 20 collection) + up to 30 movement bonus
 
 **Key mechanics:**
 - All distances measured on XZ plane (ground only, Y/height ignored for progress)
