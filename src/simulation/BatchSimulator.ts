@@ -688,7 +688,9 @@ export function simulateCreature(
       });
 
       // Track fitness at this frame
-      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, currentNetDisplacement, distanceTraveled, simulationTime, totalMuscleActivation));
+      // Normalize muscle activation by frames so far and muscle count to get average activation
+      const avgMuscleActivation = springs.length > 0 ? totalMuscleActivation / ((step + 1) * springs.length) : 0;
+      fitnessOverTime.push(calculateCurrentFitness(centerOfMass, pelletsCollected, currentNetDisplacement, distanceTraveled, simulationTime, avgMuscleActivation));
 
       lastFrameTime = simulationTime;
     }
@@ -752,8 +754,10 @@ export function simulateCreature(
   // - Net displacement bonus: 0-netDisplacementMax points (default 15)
   // - Distance traveled bonus: distancePerUnit pts/unit up to distanceTraveledMax (default 15)
   // - After first pellet: up to -regressionPenalty for moving away (default 20)
-  // - Efficiency penalty: penalizes excessive muscle activation (neural mode)
-  const finalFitness = calculateCurrentFitness(validFinalCOM, pelletsCollected, validNetDisplacementXZ, distanceTraveled, simulationTime, totalMuscleActivation);
+  // - Efficiency penalty: penalizes average muscle activation (neural mode)
+  // Normalize total activation by steps and muscles to get average activation (0-1 range)
+  const avgMuscleActivation = springs.length > 0 ? totalMuscleActivation / (totalSteps * springs.length) : 0;
+  const finalFitness = calculateCurrentFitness(validFinalCOM, pelletsCollected, validNetDisplacementXZ, distanceTraveled, simulationTime, avgMuscleActivation);
 
   return {
     genome,
