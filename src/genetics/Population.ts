@@ -11,6 +11,46 @@ import { mutateGenome, MutationConfig, DEFAULT_MUTATION_CONFIG } from './Mutatio
 import { singlePointCrossover, cloneGenome } from './Crossover';
 import { Creature } from '../core/Creature';
 
+/**
+ * Calculate decayed mutation rate based on generation.
+ *
+ * Industry-standard approach:
+ * - Start rate: 5x the end rate (capped at 50%)
+ * - Warmup period: ~50 generations to reach target rate
+ *
+ * @param endRate - Target mutation rate (from slider)
+ * @param generation - Current generation number
+ * @param decayMode - 'off', 'linear', or 'exponential'
+ * @returns Effective mutation rate for this generation
+ */
+export function calculateDecayedRate(
+  endRate: number,
+  generation: number,
+  decayMode: 'off' | 'linear' | 'exponential'
+): number {
+  if (decayMode === 'off') {
+    return endRate;
+  }
+
+  // Start rate is 5x the end rate, capped at 50%
+  const startRate = Math.min(0.5, endRate * 5);
+
+  // Warmup period: rate reaches target after ~50 generations
+  const warmupGenerations = 50;
+
+  if (decayMode === 'linear') {
+    // Linear decay: rate = start - (start - end) * min(1, gen / warmup)
+    const progress = Math.min(1, generation / warmupGenerations);
+    return startRate - (startRate - endRate) * progress;
+  } else {
+    // Exponential decay: rate = end + (start - end) * exp(-gen / tau)
+    // tau chosen so that after warmupGenerations, we're at ~5% of the way to end
+    // exp(-50/tau) ≈ 0.05 => tau ≈ 16.7
+    const tau = warmupGenerations / 3;
+    return endRate + (startRate - endRate) * Math.exp(-generation / tau);
+  }
+}
+
 export class Population {
   creatures: Creature[] = [];
   generation: number = 0;
@@ -28,7 +68,9 @@ export class Population {
     this.mutationConfig = {
       ...mutationConfig,
       rate: config.mutationRate,
-      magnitude: config.mutationMagnitude
+      magnitude: config.mutationMagnitude,
+      neuralRate: config.weightMutationRate,
+      neuralMagnitude: config.weightMutationMagnitude
     };
   }
 
@@ -107,6 +149,19 @@ export class Population {
     // Calculate selection probabilities based on rank (for creating new creatures)
     const probabilities = rankBasedProbabilities(survivors);
 
+    // Calculate decayed neural mutation rate for this generation
+    const effectiveNeuralRate = calculateDecayedRate(
+      this.config.weightMutationRate,
+      this.generation,
+      this.config.weightMutationDecay
+    );
+
+    // Create mutation config with decayed neural rate
+    const currentMutationConfig: MutationConfig = {
+      ...this.mutationConfig,
+      neuralRate: effectiveNeuralRate
+    };
+
     // Start with all survivors
     const newGenomes: CreatureGenome[] = [...survivorGenomes];
     const targetSize = this.config.populationSize;
@@ -140,7 +195,7 @@ export class Population {
         // Create via mutation of a survivor (clone + mutate)
         const parent = weightedRandomSelect(survivors, probabilities);
         const child = cloneGenome(parent.genome, this.genomeConstraints);
-        const mutatedChild = mutateGenome(child, this.mutationConfig, this.genomeConstraints);
+        const mutatedChild = mutateGenome(child, currentMutationConfig, this.genomeConstraints);
         newGenomes.push(mutatedChild);
       } else {
         // Only crossover enabled but couldn't do it (e.g., not enough survivors)
@@ -181,6 +236,12 @@ export class Population {
     }
     if (config.mutationMagnitude !== undefined) {
       this.mutationConfig.magnitude = config.mutationMagnitude;
+    }
+    if (config.weightMutationRate !== undefined) {
+      this.mutationConfig.neuralRate = config.weightMutationRate;
+    }
+    if (config.weightMutationMagnitude !== undefined) {
+      this.mutationConfig.neuralMagnitude = config.weightMutationMagnitude;
     }
   }
 

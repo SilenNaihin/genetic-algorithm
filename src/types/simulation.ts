@@ -50,8 +50,9 @@ export interface SimulationConfig {
   neuralMode: 'hybrid' | 'pure';      // How NN output is used
   neuralHiddenSize: number;           // Neurons in hidden layer
   neuralActivation: ActivationType;   // Activation function
-  weightMutationRate: number;         // Probability each weight mutates
+  weightMutationRate: number;         // Target/end probability each weight mutates
   weightMutationMagnitude: number;    // Std dev of weight perturbation
+  weightMutationDecay: 'off' | 'linear' | 'exponential';  // Mutation rate decay mode
   neuralDeadZone: number;             // Output threshold below which muscles don't activate (pure mode only)
   fitnessEfficiencyPenalty: number;   // Penalty per unit of total muscle activation (encourages efficient movement)
 }
@@ -87,13 +88,14 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   fitnessDistanceTraveledMax: 15,
   fitnessRegressionPenalty: 20,
 
-  // Neural network defaults (disabled by default)
-  useNeuralNet: false,
+  // Neural network defaults (enabled by default)
+  useNeuralNet: true,
   neuralMode: 'hybrid',
   neuralHiddenSize: 8,
   neuralActivation: 'tanh',
   weightMutationRate: 0.1,
   weightMutationMagnitude: 0.3,
+  weightMutationDecay: 'off',    // No decay by default
   neuralDeadZone: 0.1,           // Outputs with |value| < 0.1 become 0 (pure mode only)
   fitnessEfficiencyPenalty: 0.5  // Subtract 0.5 * total_activation from fitness
 };

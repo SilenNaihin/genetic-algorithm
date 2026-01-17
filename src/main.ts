@@ -376,7 +376,7 @@ class EvolutionApp {
         ">
           <span>Neural Network</span>
           <label style="display: flex; align-items: center; cursor: pointer;">
-            <input type="checkbox" id="use-neural-checkbox" style="
+            <input type="checkbox" id="use-neural-checkbox" checked style="
               width: 18px;
               height: 18px;
               cursor: pointer;
@@ -384,7 +384,7 @@ class EvolutionApp {
             ">
           </label>
         </div>
-        <div id="neural-options" style="padding: 16px 20px; display: none; flex-direction: column;">
+        <div id="neural-options" style="padding: 16px 20px; display: block; flex-direction: column;">
           <div style="display: block; margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
               <span style="display: flex; align-items: center;">
@@ -449,6 +449,29 @@ class EvolutionApp {
               <span style="font-size: 13px; color: var(--text-primary);" id="weight-mut-rate-value">10%</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="weight-mut-rate-slider" min="1" max="50" value="10">
+          </div>
+          <div style="display: block; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Rate Decay</span>
+                <span id="tooltip-rate-decay"></span>
+              </span>
+            </div>
+            <select id="rate-decay-select" style="
+              width: 100%;
+              padding: 8px 12px;
+              background: var(--bg-tertiary);
+              color: var(--text-primary);
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              font-size: 14px;
+              cursor: pointer;
+              display: block;
+            ">
+              <option value="off">Off</option>
+              <option value="linear">Linear</option>
+              <option value="exponential">Exponential</option>
+            </select>
           </div>
           <div style="display: block; margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -640,6 +663,12 @@ class EvolutionApp {
       this.updateSettingsInfoBox();
     });
 
+    const rateDecaySelect = document.getElementById('rate-decay-select') as HTMLSelectElement;
+    rateDecaySelect.addEventListener('change', () => {
+      this.config.weightMutationDecay = rateDecaySelect.value as 'off' | 'linear' | 'exponential';
+      this.updateSettingsInfoBox();
+    });
+
     weightMutMagSlider.addEventListener('input', () => {
       this.config.weightMutationMagnitude = parseFloat(weightMutMagSlider.value);
       document.getElementById('weight-mut-mag-value')!.textContent = weightMutMagSlider.value;
@@ -672,6 +701,9 @@ class EvolutionApp {
     );
     document.getElementById('tooltip-weight-mut-rate')?.appendChild(
       createInfoTooltip(NEURAL_TOOLTIPS.weightMutationRate)
+    );
+    document.getElementById('tooltip-rate-decay')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.rateDecay)
     );
     document.getElementById('tooltip-weight-mut-mag')?.appendChild(
       createInfoTooltip(NEURAL_TOOLTIPS.weightMutationMagnitude)

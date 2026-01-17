@@ -392,7 +392,7 @@ describe('Mutation', () => {
       };
 
       for (let i = 0; i < 50; i++) {
-        const mutated = mutateNode(node, { rate: 1, magnitude: 1, structuralRate: 0 }, DEFAULT_GENOME_CONSTRAINTS);
+        const mutated = mutateNode(node, { rate: 1, magnitude: 1, structuralRate: 0, neuralRate: 0.1, neuralMagnitude: 0.3 }, DEFAULT_GENOME_CONSTRAINTS);
         expect(mutated.size).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.minSize);
         expect(mutated.size).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxSize);
       }
@@ -422,7 +422,7 @@ describe('Mutation', () => {
       };
 
       for (let i = 0; i < 50; i++) {
-        const mutated = mutateMuscle(muscle, { rate: 1, magnitude: 1, structuralRate: 0 }, DEFAULT_GENOME_CONSTRAINTS);
+        const mutated = mutateMuscle(muscle, { rate: 1, magnitude: 1, structuralRate: 0, neuralRate: 0.1, neuralMagnitude: 0.3 }, DEFAULT_GENOME_CONSTRAINTS);
         expect(mutated.frequency).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.minFrequency);
         expect(mutated.frequency).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxFrequency);
       }
@@ -450,7 +450,7 @@ describe('Mutation', () => {
       };
 
       for (let i = 0; i < 50; i++) {
-        const mutated = mutateMuscle(muscle, { rate: 1, magnitude: 1, structuralRate: 0 }, DEFAULT_GENOME_CONSTRAINTS);
+        const mutated = mutateMuscle(muscle, { rate: 1, magnitude: 1, structuralRate: 0, neuralRate: 0.1, neuralMagnitude: 0.3 }, DEFAULT_GENOME_CONSTRAINTS);
         expect(mutated.stiffness).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.minStiffness);
         expect(mutated.stiffness).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxStiffness);
       }

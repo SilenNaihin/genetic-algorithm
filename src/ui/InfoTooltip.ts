@@ -205,7 +205,11 @@ export const NEURAL_TOOLTIPS = {
     position: 'top' as const
   },
   weightMutationRate: {
-    text: 'Percentage of weights that mutate each generation. Higher values explore more but may lose good solutions. Start low (10-20%) for fine-tuning, higher (30-50%) for exploration.',
+    text: 'Target mutation rate (end rate if decay is on). Higher values explore more but may lose good solutions. With decay enabled, rate starts at 5x this value and decreases over 50 generations.',
+    position: 'top' as const
+  },
+  rateDecay: {
+    text: 'Decay mutation rate over generations. Off: constant rate. Linear: steady decrease to target over 50 gens. Exponential: fast initial drop, then gradual approach to target. Helps explore early, fine-tune later.',
     position: 'top' as const
   },
   weightMutationMagnitude: {

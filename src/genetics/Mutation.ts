@@ -12,15 +12,20 @@ import type { NeuralGenomeData } from '../neural/NeuralGenome';
 import { cloneNeuralGenome } from '../neural/NeuralGenome';
 
 export interface MutationConfig {
-  rate: number;           // Probability of mutation per gene
+  rate: number;           // Probability of mutation per gene (body)
   magnitude: number;      // How much values change (0-1 scale)
   structuralRate: number; // Probability of adding/removing nodes/muscles
+  // Neural-specific rates (can differ from body mutation rates)
+  neuralRate: number;     // Probability each neural weight mutates
+  neuralMagnitude: number; // Std dev of neural weight perturbation
 }
 
 export const DEFAULT_MUTATION_CONFIG: MutationConfig = {
   rate: 0.3,
   magnitude: 0.5,
-  structuralRate: 0.1
+  structuralRate: 0.1,
+  neuralRate: 0.1,
+  neuralMagnitude: 0.3
 };
 
 function mutateValue(
@@ -397,12 +402,12 @@ export function mutateGenome(
     }
   }
 
-  // Mutate neural genome if present
+  // Mutate neural genome if present (using neural-specific rates)
   if (genome.neuralGenome) {
     newGenome.neuralGenome = mutateNeuralGenome(
       genome.neuralGenome,
-      config.rate,
-      config.magnitude
+      config.neuralRate,
+      config.neuralMagnitude
     );
   }
 
