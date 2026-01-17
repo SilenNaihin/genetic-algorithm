@@ -2,11 +2,11 @@
  * Integration tests for RunStorage using actual IndexedDB (via fake-indexeddb)
  * These tests verify the real storage implementation, not a mock
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { RunStorage, CompactCreatureResult, recalculateFitnessOverTime } from '../storage/RunStorage';
+import { RunStorage, recalculateFitnessOverTime } from '../storage/RunStorage';
 import { generateRandomGenome } from '../core/Genome';
-import { DEFAULT_CONFIG, type FitnessHistoryEntry, type Vector3, type SimulationConfig } from '../types';
+import { DEFAULT_CONFIG, type FitnessHistoryEntry, type Vector3 } from '../types';
 import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../simulation/BatchSimulator';
 
 // Helper to create a mock simulation result

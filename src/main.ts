@@ -1,3 +1,4 @@
+import './styles/main.css';
 import * as THREE from 'three';
 import { generateRandomGenome } from './core/Genome';
 import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
@@ -10,7 +11,7 @@ import { NeuralVisualizer } from './ui/NeuralVisualizer';
 import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPanel';
 import { createInfoTooltip, NEURAL_TOOLTIPS } from './ui/InfoTooltip';
 import { RunStorage } from './storage/RunStorage';
-import { gatherSensorInputs, SENSOR_NAMES, createNetworkFromGenome } from './neural';
+import { gatherSensorInputsPure, gatherSensorInputsHybrid, SENSOR_NAMES, createNetworkFromGenome, NEURAL_INPUT_SIZE_PURE } from './neural';
 import {
   AppState,
   EvolutionStep,
@@ -1344,6 +1345,36 @@ class EvolutionApp {
           <span style="color: var(--text-muted);">Regression Penalty:</span><span style="color: var(--text-secondary);">${this.config.fitnessRegressionPenalty}</span>
         </div>
       </div>
+      ${this.config.useNeuralNet ? `
+      <div id="neural-dropdown-toggle" style="
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 11px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      ">
+        <svg id="neural-dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+        <span>Neural Config</span>
+      </div>
+      <div id="neural-dropdown-content" style="display: none; margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+        <div style="display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10px;">
+          <span style="color: var(--text-muted);">Mode:</span><span style="color: var(--text-secondary);">${this.config.neuralMode}</span>
+          <span style="color: var(--text-muted);">Hidden Size:</span><span style="color: var(--text-secondary);">${this.config.neuralHiddenSize}</span>
+          <span style="color: var(--text-muted);">Activation:</span><span style="color: var(--text-secondary);">${this.config.neuralActivation}</span>
+          <span style="color: var(--text-muted);">Weight Mut Rate:</span><span style="color: var(--text-secondary);">${Math.round(this.config.weightMutationRate * 100)}%</span>
+          <span style="color: var(--text-muted);">Weight Mut Mag:</span><span style="color: var(--text-secondary);">${this.config.weightMutationMagnitude}</span>
+          <span style="color: var(--text-muted);">Rate Decay:</span><span style="color: var(--text-secondary);">${this.config.weightMutationDecay}</span>
+          <span style="color: var(--text-muted);">Dead Zone:</span><span style="color: var(--text-secondary);">${this.config.neuralDeadZone}</span>
+          <span style="color: var(--text-muted);">Efficiency Penalty:</span><span style="color: var(--text-secondary);">${this.config.fitnessEfficiencyPenalty}</span>
+        </div>
+      </div>
+      ` : ''}
     `;
   }
 
@@ -1356,15 +1387,29 @@ class EvolutionApp {
   }
 
   private setupFitnessDropdown(): void {
-    const toggle = document.getElementById('fitness-dropdown-toggle');
-    const content = document.getElementById('fitness-dropdown-content');
-    const chevron = document.getElementById('fitness-dropdown-chevron');
+    // Fitness dropdown
+    const fitnessToggle = document.getElementById('fitness-dropdown-toggle');
+    const fitnessContent = document.getElementById('fitness-dropdown-content');
+    const fitnessChevron = document.getElementById('fitness-dropdown-chevron');
 
-    toggle?.addEventListener('click', () => {
-      if (content && chevron) {
-        const isHidden = content.style.display === 'none';
-        content.style.display = isHidden ? 'block' : 'none';
-        chevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+    fitnessToggle?.addEventListener('click', () => {
+      if (fitnessContent && fitnessChevron) {
+        const isHidden = fitnessContent.style.display === 'none';
+        fitnessContent.style.display = isHidden ? 'block' : 'none';
+        fitnessChevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+      }
+    });
+
+    // Neural dropdown
+    const neuralToggle = document.getElementById('neural-dropdown-toggle');
+    const neuralContent = document.getElementById('neural-dropdown-content');
+    const neuralChevron = document.getElementById('neural-dropdown-chevron');
+
+    neuralToggle?.addEventListener('click', () => {
+      if (neuralContent && neuralChevron) {
+        const isHidden = neuralContent.style.display === 'none';
+        neuralContent.style.display = isHidden ? 'block' : 'none';
+        neuralChevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
       }
     });
   }
@@ -3495,7 +3540,11 @@ class EvolutionApp {
             }
           }
 
-          const sensorInputs = gatherSensorInputs(pelletDir, velocityDir, normalizedDist, currentTime);
+          // Use appropriate input size based on neural network topology
+          const isPureMode = this.selectedResult.genome.neuralGenome.topology.inputSize === NEURAL_INPUT_SIZE_PURE;
+          const sensorInputs = isPureMode
+            ? gatherSensorInputsPure(pelletDir, velocityDir, normalizedDist)
+            : gatherSensorInputsHybrid(pelletDir, velocityDir, normalizedDist, currentTime);
           this.neuralVisualizer.updateActivations(sensorInputs);
 
           // Update muscle colors based on neural activations (heatmap overlay)

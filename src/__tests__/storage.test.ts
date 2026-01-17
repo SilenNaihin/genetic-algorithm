@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
-import { DEFAULT_CONFIG, type FitnessHistoryEntry, type Vector3, type SimulationConfig } from '../types';
+import { DEFAULT_CONFIG, type FitnessHistoryEntry, type Vector3 } from '../types';
 
 // Legacy mock weights for testing the old fitness recalculation tests
 // The real implementation now uses SimulationConfig with different fields

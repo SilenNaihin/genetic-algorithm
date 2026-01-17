@@ -2,15 +2,15 @@
  * End-to-end integration tests for the evolution pipeline
  * Tests the complete flow: genome generation → simulation → selection → crossover/mutation → next generation
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
 import { Creature } from '../core/Creature';
 import { Population } from '../genetics/Population';
 import { simulatePopulation, simulateCreature } from '../simulation/BatchSimulator';
-import { singlePointCrossover, uniformCrossover, cloneGenome } from '../genetics/Crossover';
+import { singlePointCrossover, cloneGenome } from '../genetics/Crossover';
 import { mutateGenome, DEFAULT_MUTATION_CONFIG } from '../genetics/Mutation';
-import { truncationSelection, getElites, rankBasedProbabilities, weightedRandomSelect } from '../genetics/Selection';
-import { DEFAULT_CONFIG, DEFAULT_GENOME_CONSTRAINTS, type CreatureGenome } from '../types';
+import { truncationSelection, getElites, rankBasedProbabilities } from '../genetics/Selection';
+import { DEFAULT_CONFIG, DEFAULT_GENOME_CONSTRAINTS } from '../types';
 
 // Shorter config for faster tests
 const TEST_CONFIG = {

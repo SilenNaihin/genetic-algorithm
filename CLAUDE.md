@@ -21,10 +21,11 @@ src/
 ├── rendering/        # Three.js visualization
 ├── simulation/       # Headless simulation (BatchSimulator)
 ├── storage/          # IndexedDB persistence (RunStorage)
+├── styles/           # Tailwind CSS (main.css with design tokens)
 ├── types/            # TypeScript interfaces
 ├── ui/               # UI components (GraphPanel, NeuralVisualizer, BrainEvolutionPanel)
 ├── utils/            # Shared utilities (math, id)
-└── main.ts           # Application entry point
+└── main.ts           # Application entry point (~4200 lines, being refactored)
 ```
 
 ## Tech Stack
@@ -33,6 +34,7 @@ src/
 - **3D**: Three.js
 - **Physics**: Cannon-ES
 - **Storage**: IndexedDB
+- **Styling**: Tailwind CSS v4
 - **Testing**: Vitest + happy-dom
 
 ## Conventions
@@ -75,13 +77,15 @@ npm test -- --run  # Run once (no watch)
 
 ## Global Commands
 
-- `/commit` - Atomic git commits
+- `/commit-smart` - Atomic git commits (use after each phase/feature)
+- `/update-claudemd` - Update this file with new learnings
 - `/debug` - Systematic debugging
 - `/setup-repo` - Repository setup
 
 ## Context Tips
 
-- `main.ts` is large (~4000 lines) - contains EvolutionApp class with all UI
+- `prd.json` tracks the frontend refactoring plan - check status before continuing
+- `main.ts` contains EvolutionApp class - being broken into smaller modules
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
 - Fitness: 0-80 progress + 20 collection per pellet + 15 net displacement + 15 distance traveled (all XZ-only)
