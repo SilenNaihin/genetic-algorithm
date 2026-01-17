@@ -386,8 +386,11 @@ class EvolutionApp {
         </div>
         <div id="neural-options" style="padding: 16px 20px; display: none; flex-direction: column;">
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Mode</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Mode</span>
+                <span id="tooltip-mode"></span>
+              </span>
             </div>
             <select id="neural-mode-select" style="
               width: 100%;
@@ -403,18 +406,23 @@ class EvolutionApp {
               <option value="hybrid">Hybrid</option>
               <option value="pure">Pure</option>
             </select>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Hybrid modulates oscillator</div>
           </div>
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Hidden Size</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Hidden Size</span>
+                <span id="tooltip-hidden-size"></span>
+              </span>
               <span style="font-size: 13px; color: var(--text-primary);" id="neural-hidden-value">8</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="neural-hidden-slider" min="4" max="32" step="4" value="8">
           </div>
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Activation</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Activation</span>
+                <span id="tooltip-activation"></span>
+              </span>
             </div>
             <select id="neural-activation-select" style="
               width: 100%;
@@ -653,6 +661,15 @@ class EvolutionApp {
     });
 
     // Initialize info tooltips for neural settings
+    document.getElementById('tooltip-mode')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.mode)
+    );
+    document.getElementById('tooltip-hidden-size')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.hiddenSize)
+    );
+    document.getElementById('tooltip-activation')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.activation)
+    );
     document.getElementById('tooltip-weight-mut-rate')?.appendChild(
       createInfoTooltip(NEURAL_TOOLTIPS.weightMutationRate)
     );
