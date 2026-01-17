@@ -81,6 +81,7 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 - **Neural Network Output Labels**: Output neurons now show muscle IDs (e.g., "1-3") indicating which body nodes the muscle connects, alongside activation values
 
 ### Fixed
+- **Efficiency Penalty Calculation**: Fixed critical bug where efficiency penalty accumulated across all frames and muscles, resulting in ~3000 point penalties that zeroed out all fitness. Now uses average activation (0-1 range) for reasonable ~0.25 point penalty.
 - **Weight Mutation Rate Slider**: Fixed bug where the Weight Mut. Rate slider in the UI wasn't actually being used - neural networks were using body mutation rate instead
 - **Best Creature Persistence**: Fixed bug where "Best Ever" creature wasn't correctly restored when loading a saved run
   - `updateBestCreature` and `updateLongestSurvivor` now properly await IndexedDB writes
