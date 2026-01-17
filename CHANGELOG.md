@@ -30,6 +30,13 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - UI updated with separate sliders for each component
 
 ### Added
+- **Mutation Rate Decay**: Option to decay neural weight mutation rate over generations
+  - **Off**: Constant mutation rate throughout the run
+  - **Linear**: Steady decrease from 5x target rate to target over 50 generations
+  - **Exponential**: Fast initial drop, then gradual approach to target rate
+  - Helps explore solution space early, fine-tune good solutions later
+  - Industry-standard approach for evolutionary optimization
+- **Info Tooltips**: Added (i) icons to all neural network settings explaining each parameter
 - **Brain Evolution Comparison**: New panel to visualize how neural networks evolve over generations
   - **Diff View**: Shows weight changes between Gen 1 average and current generation average
     - Green connections = strengthened weights (positive change)
@@ -74,6 +81,7 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 - **Neural Network Output Labels**: Output neurons now show muscle IDs (e.g., "1-3") indicating which body nodes the muscle connects, alongside activation values
 
 ### Fixed
+- **Weight Mutation Rate Slider**: Fixed bug where the Weight Mut. Rate slider in the UI wasn't actually being used - neural networks were using body mutation rate instead
 - **Best Creature Persistence**: Fixed bug where "Best Ever" creature wasn't correctly restored when loading a saved run
   - `updateBestCreature` and `updateLongestSurvivor` now properly await IndexedDB writes
   - Best creature tracking fields reset when starting new runs
