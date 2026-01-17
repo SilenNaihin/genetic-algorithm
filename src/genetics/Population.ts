@@ -15,7 +15,7 @@ import { Creature } from '../core/Creature';
  * Calculate decayed mutation rate based on generation.
  *
  * Industry-standard approach:
- * - Start rate: 5x the end rate (capped at 50%)
+ * - Start rate: 5x the target rate (capped at 50%)
  * - Warmup period: ~50 generations to reach target rate
  *
  * @param endRate - Target mutation rate (from slider)
@@ -32,7 +32,7 @@ export function calculateDecayedRate(
     return endRate;
   }
 
-  // Start rate is 5x the end rate, capped at 50%
+  // Start at 5x target rate, capped at 50%
   const startRate = Math.min(0.5, endRate * 5);
 
   // Warmup period: rate reaches target after ~50 generations

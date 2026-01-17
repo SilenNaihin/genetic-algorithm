@@ -205,11 +205,11 @@ export const NEURAL_TOOLTIPS = {
     position: 'top' as const
   },
   weightMutationRate: {
-    text: 'Target mutation rate (end rate if decay is on). Higher values explore more but may lose good solutions. With decay enabled, rate starts at 5x this value and decreases over 50 generations.',
+    text: 'Target mutation rate. With decay on, starts at 5× this value (max 50%) and decreases over 50 generations. Example: 10% target → starts at 50%, decays to 10%.',
     position: 'top' as const
   },
   rateDecay: {
-    text: 'Decay mutation rate over generations. Off: constant rate. Linear: steady decrease to target over 50 gens. Exponential: fast initial drop, then gradual approach to target. Helps explore early, fine-tune later.',
+    text: 'Decay from 5× target rate (max 50%) down to target over 50 generations. Linear: steady decrease. Exponential: fast initial drop, gradual finish. Explores early, fine-tunes later.',
     position: 'top' as const
   },
   weightMutationMagnitude: {

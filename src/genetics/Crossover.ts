@@ -10,6 +10,7 @@ import { distance, lerp, lerpVector3, lerpHSL, normalize } from '../utils/math';
 import type { NeuralGenomeData } from '../neural/NeuralGenome';
 import { cloneNeuralGenome, initializeNeuralGenome } from '../neural/NeuralGenome';
 import type { NeuralConfig } from '../neural/NeuralGenome';
+import { DEFAULT_OUTPUT_BIAS } from '../neural/NeuralNetwork';
 
 /**
  * Simple single-point crossover on genome properties
@@ -504,10 +505,10 @@ export function adaptNeuralTopology(
         newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldIdx]);
       }
     } else {
-      // Xavier initialization for new neurons
-      const scale = Math.sqrt(2 / (hiddenSize + newMuscleCount));
+      // Uniform initialization for new neurons (GA-optimized, not Xavier)
+      const weightRange = 0.5;
       for (let h = 0; h < hiddenSize; h++) {
-        newHiddenToOutputWeights.push((Math.random() * 2 - 1) * scale);
+        newHiddenToOutputWeights.push((Math.random() - 0.5) * 2 * weightRange);
       }
     }
   }
@@ -517,10 +518,10 @@ export function adaptNeuralTopology(
     if (o < oldOutputSize) {
       // Copy old bias
       const oldBiasIdx = hiddenSize * oldOutputSize + o;
-      newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldBiasIdx] ?? 0);
+      newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldBiasIdx] ?? DEFAULT_OUTPUT_BIAS);
     } else {
-      // Zero bias for new neurons
-      newHiddenToOutputWeights.push(0);
+      // Negative bias for new neurons (muscles default to "off")
+      newHiddenToOutputWeights.push(DEFAULT_OUTPUT_BIAS);
     }
   }
 
