@@ -8,6 +8,7 @@ import { GraphPanel } from './ui/GraphPanel';
 import { CreatureTypesPanel, CreatureTypeEntry } from './ui/CreatureTypesPanel';
 import { NeuralVisualizer } from './ui/NeuralVisualizer';
 import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPanel';
+import { createInfoTooltip, NEURAL_TOOLTIPS } from './ui/InfoTooltip';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputs, SENSOR_NAMES, createNetworkFromGenome } from './neural';
 import {
@@ -432,34 +433,44 @@ class EvolutionApp {
             </select>
           </div>
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Weight Mut. Rate</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Weight Mut. Rate</span>
+                <span id="tooltip-weight-mut-rate"></span>
+              </span>
               <span style="font-size: 13px; color: var(--text-primary);" id="weight-mut-rate-value">10%</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="weight-mut-rate-slider" min="1" max="50" value="10">
           </div>
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Weight Mut. Mag</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Weight Mut. Mag</span>
+                <span id="tooltip-weight-mut-mag"></span>
+              </span>
               <span style="font-size: 13px; color: var(--text-primary);" id="weight-mut-mag-value">0.3</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="weight-mut-mag-slider" min="0.1" max="1.0" step="0.1" value="0.3">
           </div>
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Dead Zone</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Dead Zone</span>
+                <span id="tooltip-dead-zone"></span>
+              </span>
               <span style="font-size: 13px; color: var(--text-primary);" id="dead-zone-value">0.1</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="dead-zone-slider" min="0" max="0.5" step="0.05" value="0.1">
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Pure mode: outputs below this become 0</div>
           </div>
           <div style="display: block; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="font-size: 13px; color: var(--text-secondary);">Efficiency Penalty</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="display: flex; align-items: center;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Efficiency Penalty</span>
+                <span id="tooltip-efficiency-penalty"></span>
+              </span>
               <span style="font-size: 13px; color: var(--text-primary);" id="efficiency-penalty-value">0.5</span>
             </div>
             <input type="range" style="width: 100%; display: block;" id="efficiency-penalty-slider" min="0" max="2" step="0.1" value="0.5">
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Penalty per unit of muscle activation</div>
           </div>
         </div>
       </div>
@@ -640,6 +651,20 @@ class EvolutionApp {
       document.getElementById('efficiency-penalty-value')!.textContent = efficiencyPenaltySlider.value;
       this.updateSettingsInfoBox();
     });
+
+    // Initialize info tooltips for neural settings
+    document.getElementById('tooltip-weight-mut-rate')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.weightMutationRate)
+    );
+    document.getElementById('tooltip-weight-mut-mag')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.weightMutationMagnitude)
+    );
+    document.getElementById('tooltip-dead-zone')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.deadZone)
+    );
+    document.getElementById('tooltip-efficiency-penalty')?.appendChild(
+      createInfoTooltip(NEURAL_TOOLTIPS.efficiencyPenalty)
+    );
 
     const frequencySlider2 = document.getElementById('frequency-slider') as HTMLInputElement;
     frequencySlider2.addEventListener('change', () => {
