@@ -2,7 +2,8 @@ import './styles/main.css';
 import * as THREE from 'three';
 import { createCreatureMesh, updateMuscleMesh } from './rendering/CreatureMeshFactory';
 import { PreviewRenderer } from './rendering/PreviewRenderer';
-import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
+import { ReplayRenderer } from './rendering/ReplayRenderer';
+import { simulatePopulation, CreatureSimulationResult } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
 import { Creature } from './core/Creature';
 import { DEFAULT_CONFIG, CreatureGenome, FitnessHistoryEntry } from './types';
@@ -56,12 +57,7 @@ class EvolutionApp {
   private previewRenderer: PreviewRenderer | null = null;
 
   // Replay
-  private replayScene: THREE.Scene | null = null;
-  private replayCamera: THREE.PerspectiveCamera | null = null;
-  private replayRenderer: THREE.WebGLRenderer | null = null;
-  private replayCreature: THREE.Group | null = null;
-  private replayPellets: THREE.Mesh[] = [];
-  private replayPelletLines: THREE.Line[] = [];
+  private replayRenderer: ReplayRenderer | null = null;
 
   // Population & simulation
   private population: Population | null = null;
@@ -2567,7 +2563,7 @@ class EvolutionApp {
     }
   }
 
-  private setupReplayScene(): void {
+  private setupReplayRenderer(): void {
     const container = document.getElementById('replay-container')!;
     container.innerHTML = '';
 
@@ -2576,34 +2572,7 @@ class EvolutionApp {
       this.replayRenderer.dispose();
     }
 
-    this.replayScene = new THREE.Scene();
-    this.replayScene.background = new THREE.Color(0x0f0f14);
-
-    this.replayCamera = new THREE.PerspectiveCamera(50, 600 / 400, 0.1, 100);
-    this.replayCamera.position.set(8, 6, 12);
-    this.replayCamera.lookAt(0, 1, 0);
-
-    this.replayRenderer = new THREE.WebGLRenderer({ antialias: true });
-    this.replayRenderer.setSize(600, 400);
-    this.replayRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(this.replayRenderer.domElement);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    this.replayScene.add(ambient);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(5, 10, 5);
-    this.replayScene.add(sun);
-
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(30, 30),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a24, roughness: 0.9 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    this.replayScene.add(ground);
-
-    const grid = new THREE.GridHelper(30, 30, 0x252532, 0x252532);
-    grid.position.y = 0.01;
-    this.replayScene.add(grid);
+    this.replayRenderer = new ReplayRenderer(container);
   }
 
   private showReplay(result: CreatureSimulationResult): void {
@@ -2619,51 +2588,8 @@ class EvolutionApp {
     this.replayStartTime = performance.now();
     this.replaySpeed = 1;
 
-    this.setupReplayScene();
-
-    // Clear previous
-    if (this.replayCreature) this.replayScene!.remove(this.replayCreature);
-    this.replayPellets.forEach(p => this.replayScene!.remove(p));
-    this.replayPelletLines.forEach(l => this.replayScene!.remove(l));
-    this.replayPellets = [];
-    this.replayPelletLines = [];
-
-    this.replayCreature = createCreatureMesh(result.genome);
-    this.replayScene!.add(this.replayCreature);
-
-    const pelletMaterial = new THREE.MeshStandardMaterial({
-      color: 0x10b981,
-      emissive: 0x10b981,
-      emissiveIntensity: 0.3
-    });
-
-    // Material for drop lines (dim green, dashed)
-    const lineMaterial = new THREE.LineDashedMaterial({
-      color: 0x10b981,
-      opacity: 0.3,
-      transparent: true,
-      dashSize: 0.1,
-      gapSize: 0.1
-    });
-
-    for (const pelletData of result.pellets) {
-      const pellet = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), pelletMaterial.clone());
-      pellet.position.set(pelletData.position.x, pelletData.position.y, pelletData.position.z);
-      pellet.userData = { pelletData };
-      this.replayScene!.add(pellet);
-      this.replayPellets.push(pellet);
-
-      // Create drop line from pellet to ground
-      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(pelletData.position.x, pelletData.position.y, pelletData.position.z),
-        new THREE.Vector3(pelletData.position.x, 0.01, pelletData.position.z)
-      ]);
-      const line = new THREE.Line(lineGeometry, lineMaterial.clone());
-      line.computeLineDistances(); // Required for dashed lines
-      line.userData = { pelletData };
-      this.replayScene!.add(line);
-      this.replayPelletLines.push(line);
-    }
+    this.setupReplayRenderer();
+    this.replayRenderer!.loadResult(result);
 
     document.getElementById('replay-stats')!.innerHTML = `
       Nodes: <strong>${result.genome.nodes.length}</strong> |
@@ -3106,14 +3032,14 @@ class EvolutionApp {
   }
 
   private animateReplay = (): void => {
-    if (!this.isReplaying || !this.replayRenderer || !this.replayScene || !this.replayCamera) {
+    if (!this.isReplaying || !this.replayRenderer) {
       this.replayAnimationId = null;
       return;
     }
 
     this.replayAnimationId = requestAnimationFrame(this.animateReplay);
 
-    if (this.selectedResult && this.replayCreature) {
+    if (this.selectedResult) {
       const frames = this.selectedResult.frames;
       const totalFrames = frames.length;
       if (totalFrames === 0) return;
@@ -3145,32 +3071,8 @@ class EvolutionApp {
 
       const frame = frames[this.replayFrame];
       if (frame) {
-        const nodeMeshes = this.replayCreature.userData.nodeMeshes as Map<string, THREE.Mesh>;
-
-        for (const [nodeId, pos] of frame.nodePositions) {
-          const mesh = nodeMeshes.get(nodeId);
-          if (mesh) mesh.position.set(pos.x, pos.y, pos.z);
-        }
-
-        for (const child of this.replayCreature.children) {
-          if (child.userData.nodeA) {
-            const nodeA = nodeMeshes.get(child.userData.nodeA);
-            const nodeB = nodeMeshes.get(child.userData.nodeB);
-            if (nodeA && nodeB) updateMuscleMesh(child as THREE.Mesh, nodeA.position, nodeB.position);
-          }
-        }
-
-        // Show only the active pellet and its drop line at this frame
-        for (let i = 0; i < this.replayPellets.length; i++) {
-          const pellet = this.replayPellets[i];
-          const line = this.replayPelletLines[i];
-          const pelletData = pellet.userData.pelletData as PelletData;
-          const hasSpawned = pelletData.spawnedAtFrame <= this.replayFrame;
-          const isCollected = pelletData.collectedAtFrame !== null && this.replayFrame >= pelletData.collectedAtFrame;
-          const isVisible = hasSpawned && !isCollected;
-          pellet.visible = isVisible;
-          if (line) line.visible = isVisible;
-        }
+        // Render the frame using ReplayRenderer
+        this.replayRenderer.renderFrame(frame, this.replayFrame);
 
         const currentFitness = this.selectedResult.fitnessOverTime[this.replayFrame] || 0;
         const maxFitness = Math.max(...this.selectedResult.fitnessOverTime, 0.1);
@@ -3232,14 +3134,13 @@ class EvolutionApp {
         }
       }
     }
-
-    this.replayRenderer.render(this.replayScene, this.replayCamera);
   };
 
   private updateMuscleHeatmap(sensorInputs: number[]): void {
-    if (!this.replayCreature || !this.selectedResult?.genome.neuralGenome) return;
+    const creature = this.replayRenderer?.getCreature();
+    if (!creature || !this.selectedResult?.genome.neuralGenome) return;
 
-    const muscleMeshes = this.replayCreature.userData.muscleMeshes as THREE.Mesh[] | undefined;
+    const muscleMeshes = creature.userData.muscleMeshes as THREE.Mesh[] | undefined;
     if (!muscleMeshes) return;
 
     // Create network and compute outputs
