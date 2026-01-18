@@ -1,6 +1,5 @@
 import './styles/main.css';
 import * as THREE from 'three';
-import { createCreatureMesh, updateMuscleMesh } from './rendering/CreatureMeshFactory';
 import { PreviewRenderer } from './rendering/PreviewRenderer';
 import { ReplayRenderer } from './rendering/ReplayRenderer';
 import { simulatePopulation, CreatureSimulationResult } from './simulation/BatchSimulator';
@@ -13,6 +12,7 @@ import { NeuralVisualizer } from './ui/NeuralVisualizer';
 import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPanel';
 import { createInfoTooltip, NEURAL_TOOLTIPS } from './ui/InfoTooltip';
 import { TooltipManager, tooltipRow, tooltipTitle } from './ui/TooltipManager';
+import { CreatureCardRenderer, getCreatureName } from './ui/CreatureCardRenderer';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, SENSOR_NAMES, createNetworkFromGenome, NEURAL_INPUT_SIZE_PURE } from './neural';
 import {
@@ -48,10 +48,8 @@ class EvolutionApp {
     }
   }
 
-  // Shared renderer for thumbnail generation
-  private sharedRenderer: THREE.WebGLRenderer | null = null;
-  private sharedScene: THREE.Scene | null = null;
-  private sharedCamera: THREE.PerspectiveCamera | null = null;
+  // Card thumbnail renderer
+  private cardRenderer: CreatureCardRenderer | null = null;
 
   // Preview for menu
   private previewRenderer: PreviewRenderer | null = null;
@@ -130,7 +128,7 @@ class EvolutionApp {
     // Initialize storage first
     await runStorage.init();
 
-    this.setupSharedRenderer();
+    this.setupCardRenderer();
     this.createMenuScreen();
     this.createGridUI();
     this.createTooltip();
@@ -141,24 +139,8 @@ class EvolutionApp {
     this.showMenu();
   }
 
-  private setupSharedRenderer(): void {
-    // Create a single shared renderer for generating thumbnails
-    this.sharedRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    this.sharedRenderer.setSize(160, 160);
-    this.sharedRenderer.setClearColor(0x1e1e2a, 1);
-
-    this.sharedScene = new THREE.Scene();
-    this.sharedScene.background = new THREE.Color(0x1e1e2a);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
-    this.sharedScene.add(ambient);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-    sun.position.set(3, 5, 3);
-    this.sharedScene.add(sun);
-
-    this.sharedCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    this.sharedCamera.position.set(3, 2.5, 3);
-    this.sharedCamera.lookAt(0, 0.3, 0);
+  private setupCardRenderer(): void {
+    this.cardRenderer = new CreatureCardRenderer();
   }
 
   // ============================================
@@ -977,7 +959,7 @@ class EvolutionApp {
 
       ${this.longestSurvivingCreature ? `
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Longest Survivor <span style="color: var(--text-secondary);">(${this.longestSurvivingGenerations} gens, to Gen ${this.longestSurvivingDiedAt})</span>: <span style="color: #a855f7;">${this.getCreatureName(this.longestSurvivingCreature.genome)}</span></div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Longest Survivor <span style="color: var(--text-secondary);">(${this.longestSurvivingGenerations} gens, to Gen ${this.longestSurvivingDiedAt})</span>: <span style="color: #a855f7;">${getCreatureName(this.longestSurvivingCreature.genome)}</span></div>
           <div id="longest-creature-card" style="
             width: 80px;
             height: 80px;
@@ -1379,7 +1361,7 @@ class EvolutionApp {
 
     const result = this.longestSurvivingCreature;
     const genome = result.genome;
-    const creatureName = this.getCreatureName(genome);
+    const creatureName = getCreatureName(genome);
 
     const html = `
       ${tooltipTitle(creatureName, undefined, 'color: #a855f7')}
@@ -1417,77 +1399,9 @@ class EvolutionApp {
     btn.textContent = labels[this.evolutionStep];
   }
 
-  // Render a creature to a 2D canvas using the shared renderer
+  // Render a creature to a 2D canvas using the card renderer
   private renderCreatureToCanvas(result: CreatureSimulationResult, canvas: HTMLCanvasElement): void {
-    if (!this.sharedRenderer || !this.sharedScene || !this.sharedCamera) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear previous creatures from shared scene (keep lights)
-    const toRemove: THREE.Object3D[] = [];
-    this.sharedScene.traverse((obj) => {
-      if (obj.type === 'Group') toRemove.push(obj);
-    });
-    toRemove.forEach(obj => this.sharedScene!.remove(obj));
-
-    // Create and add creature
-    const creature = createCreatureMesh(result.genome);
-    this.sharedScene.add(creature);
-
-    // Calculate bounds and center
-    const box = new THREE.Box3().setFromObject(creature);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-
-    const targetSize = 2;
-    const scaleFactor = maxDim > 0 ? targetSize / maxDim : 1;
-    creature.scale.setScalar(scaleFactor);
-
-    box.setFromObject(creature);
-    box.getCenter(center);
-    creature.position.sub(center);
-    creature.position.y += 0.3;
-
-    // Apply final frame positions if available
-    const finalFrame = result.frames[result.frames.length - 1];
-    if (finalFrame) {
-      const nodeMeshes = creature.userData.nodeMeshes as Map<string, THREE.Mesh>;
-
-      let cx = 0, cy = 0, cz = 0, count = 0;
-      for (const [, pos] of finalFrame.nodePositions) {
-        cx += pos.x; cy += pos.y; cz += pos.z; count++;
-      }
-      if (count > 0) { cx /= count; cy /= count; cz /= count; }
-
-      for (const [nodeId, pos] of finalFrame.nodePositions) {
-        const mesh = nodeMeshes.get(nodeId);
-        if (mesh) {
-          mesh.position.set(
-            (pos.x - cx) * scaleFactor,
-            (pos.y - cy) * scaleFactor + 0.3,
-            (pos.z - cz) * scaleFactor
-          );
-        }
-      }
-      for (const child of creature.children) {
-        if (child.userData.nodeA) {
-          const nodeA = nodeMeshes.get(child.userData.nodeA);
-          const nodeB = nodeMeshes.get(child.userData.nodeB);
-          if (nodeA && nodeB) updateMuscleMesh(child as THREE.Mesh, nodeA.position, nodeB.position);
-        }
-      }
-    }
-
-    // Render
-    this.sharedRenderer.render(this.sharedScene, this.sharedCamera);
-
-    // Copy to 2D canvas
-    ctx.drawImage(this.sharedRenderer.domElement, 0, 0, canvas.width, canvas.height);
-
-    // Clean up
-    this.sharedScene.remove(creature);
+    this.cardRenderer?.renderToCanvas(result, canvas);
   }
 
   private createCreatureCards(): void {
@@ -1512,34 +1426,6 @@ class EvolutionApp {
       this.creatureCards.push(card);
       this.gridContainer.appendChild(card.element);
     }
-  }
-
-  // Generate a short unique name from genome characteristics
-  private getCreatureName(genome: CreatureGenome): string {
-    // Extract unique number from ID (format: creature_timestamp_counter)
-    const idParts = genome.id.split('_');
-    const counter = parseInt(idParts[idParts.length - 1]) || 0;
-
-    // First letter: based on color hue (26 letters for color spectrum)
-    const hueLetters = 'ROYGBVPMCSTAWDELFHIJKNQUXZ';
-    const hueLetter = hueLetters[Math.floor(genome.color.h * 26) % 26];
-
-    // Second letter: based on body structure (nodes + muscles combo)
-    const structLetters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const structIndex = (genome.nodes.length * 3 + genome.muscles.length) % structLetters.length;
-    const structLetter = structLetters[structIndex];
-
-    // Number: unique counter (mod 1000 to keep it short)
-    const num = counter % 1000;
-
-    // Base name like "RB42"
-    const baseName = `${hueLetter}${structLetter}${num}`;
-
-    // Add survival streak suffix if creature has survived generations
-    if (genome.survivalStreak > 0) {
-      return `${baseName}★${genome.survivalStreak}`;
-    }
-    return baseName;
   }
 
   private createSingleCard(
@@ -1582,7 +1468,7 @@ class EvolutionApp {
     const fitnessValue = hasFitness ? result.finalFitness : 0;
     const fitnessText = hasFitness ? fitnessValue.toFixed(0) : '...';
 
-    const creatureName = this.getCreatureName(result.genome);
+    const creatureName = getCreatureName(result.genome);
     const rankLabel = document.createElement('span');
     rankLabel.className = 'creature-card-rank';
     // Show "DQ" prefix for disqualified creatures
@@ -1680,7 +1566,7 @@ class EvolutionApp {
     if (!result || !this.tooltipManager) return;
 
     const genome = result.genome;
-    const creatureName = this.getCreatureName(genome);
+    const creatureName = getCreatureName(genome);
     const avgStiffness = genome.muscles.length > 0
       ? genome.muscles.reduce((sum, m) => sum + m.stiffness, 0) / genome.muscles.length
       : 0;
@@ -3641,7 +3527,7 @@ class EvolutionApp {
       this.longestSurvivingCreature = longestSurvivor;
       this.longestSurvivingGenerations = longestSurvivor.genome.survivalStreak;
       this.longestSurvivingDiedAt = this.generation;
-      console.log(`New longest surviving creature! ${this.getCreatureName(longestSurvivor.genome)} survived ${longestSurvivor.genome.survivalStreak} consecutive generations`);
+      console.log(`New longest surviving creature! ${getCreatureName(longestSurvivor.genome)} survived ${longestSurvivor.genome.survivalStreak} consecutive generations`);
       await runStorage.updateLongestSurvivor(longestSurvivor, longestSurvivor.genome.survivalStreak, this.generation);
     }
 
