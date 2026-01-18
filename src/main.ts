@@ -1,7 +1,7 @@
 import './styles/main.css';
 import * as THREE from 'three';
 import { createCreatureMesh, updateMuscleMesh } from './rendering/CreatureMeshFactory';
-import { generateRandomGenome } from './core/Genome';
+import { PreviewRenderer } from './rendering/PreviewRenderer';
 import { simulatePopulation, CreatureSimulationResult, PelletData } from './simulation/BatchSimulator';
 import { Population } from './genetics/Population';
 import { Creature } from './core/Creature';
@@ -32,8 +32,20 @@ const runStorage = new RunStorage();
 
 class EvolutionApp {
   private container: HTMLElement;
-  private state: AppState = 'menu';
+  private _state: AppState = 'menu';
   private evolutionStep: EvolutionStep = 'idle';
+
+  private get state(): AppState {
+    return this._state;
+  }
+
+  private set state(value: AppState) {
+    this._state = value;
+    // Stop preview animation when leaving menu
+    if (value !== 'menu') {
+      this.previewRenderer?.stopAnimation();
+    }
+  }
 
   // Shared renderer for thumbnail generation
   private sharedRenderer: THREE.WebGLRenderer | null = null;
@@ -41,12 +53,7 @@ class EvolutionApp {
   private sharedCamera: THREE.PerspectiveCamera | null = null;
 
   // Preview for menu
-  private previewScene: THREE.Scene | null = null;
-  private previewCamera: THREE.PerspectiveCamera | null = null;
-  private previewRenderer: THREE.WebGLRenderer | null = null;
-  private previewCreature: THREE.Group | null = null;
-  private previewGenome: CreatureGenome | null = null;
-  private previewTime: number = 0;
+  private previewRenderer: PreviewRenderer | null = null;
 
   // Replay
   private replayScene: THREE.Scene | null = null;
@@ -549,7 +556,7 @@ class EvolutionApp {
     maxNodesSlider.addEventListener('input', () => {
       this.config.maxNodes = parseInt(maxNodesSlider.value);
       document.getElementById('maxnodes-value')!.textContent = maxNodesSlider.value;
-      this.regeneratePreviewCreature();
+      this.previewRenderer?.regenerateCreature();
       this.updateSettingsInfoBox();
     });
 
@@ -557,7 +564,7 @@ class EvolutionApp {
     maxMusclesSlider.addEventListener('input', () => {
       this.config.maxMuscles = parseInt(maxMusclesSlider.value);
       document.getElementById('maxmuscles-value')!.textContent = maxMusclesSlider.value;
-      this.regeneratePreviewCreature();
+      this.previewRenderer?.regenerateCreature();
       this.updateSettingsInfoBox();
     });
 
@@ -721,7 +728,7 @@ class EvolutionApp {
     const frequencySlider2 = document.getElementById('frequency-slider') as HTMLInputElement;
     frequencySlider2.addEventListener('change', () => {
       // Regenerate on frequency change to show max frequency effect
-      this.regeneratePreviewCreature();
+      this.previewRenderer?.regenerateCreature();
     });
 
     // New fitness sliders
@@ -753,148 +760,14 @@ class EvolutionApp {
 
   private setupPreview(): void {
     const container = document.getElementById('preview-container')!;
-
-    this.previewScene = new THREE.Scene();
-    this.previewScene.background = new THREE.Color(0x0f0f14);
-
-    this.previewCamera = new THREE.PerspectiveCamera(50, 400 / 300, 0.1, 100);
-    this.previewCamera.position.set(4, 3, 6);
-    this.previewCamera.lookAt(0, 1, 0);
-
-    this.previewRenderer = new THREE.WebGLRenderer({ antialias: true });
-    this.previewRenderer.setSize(400, 300);
-    this.previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(this.previewRenderer.domElement);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    this.previewScene.add(ambient);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(5, 10, 5);
-    this.previewScene.add(sun);
-
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(20, 20),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a24, roughness: 0.9 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    this.previewScene.add(ground);
-
-    const grid = new THREE.GridHelper(20, 20, 0x252532, 0x252532);
-    grid.position.y = 0.01;
-    this.previewScene.add(grid);
-
-    // Pellets
-    const pelletMaterial = new THREE.MeshStandardMaterial({
-      color: 0x10b981,
-      emissive: 0x10b981,
-      emissiveIntensity: 0.3
-    });
-    for (let i = 0; i < 3; i++) {
-      const pellet = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), pelletMaterial);
-      pellet.position.set((Math.random() - 0.5) * 6, 0.25, (Math.random() - 0.5) * 6);
-      this.previewScene.add(pellet);
-    }
-
-    this.regeneratePreviewCreature();
-
-    this.animatePreview();
-  }
-
-  private regeneratePreviewCreature(): void {
-    if (!this.previewScene) return;
-
-    // Remove old creature
-    if (this.previewCreature) {
-      this.previewScene.remove(this.previewCreature);
-    }
-
-    // Generate creature at MAX complexity so user can see what the limits look like
-    // Node count is limited by muscle count (need N-1 muscles to connect N nodes)
-    const effectiveMaxNodes = Math.min(this.config.maxNodes, this.config.maxMuscles + 1);
-    const constraints = {
-      minNodes: effectiveMaxNodes,  // Force max nodes (within muscle limit)
-      maxNodes: effectiveMaxNodes,
-      minMuscles: 1,
+    this.previewRenderer = new PreviewRenderer(container, () => ({
+      maxNodes: this.config.maxNodes,
       maxMuscles: this.config.maxMuscles,
-      minSize: 0.2,
-      maxSize: 0.8,
-      minStiffness: 50,
-      maxStiffness: 500,
-      minFrequency: 0.5,
-      maxFrequency: this.config.maxAllowedFrequency,
-      maxAmplitude: 0.4,
-      spawnRadius: 2.0
-    };
-
-    this.previewGenome = generateRandomGenome(constraints);
-    this.previewCreature = createCreatureMesh(this.previewGenome);
-    this.previewScene.add(this.previewCreature);
+      maxAllowedFrequency: this.config.maxAllowedFrequency,
+      gravity: this.config.gravity
+    }));
+    this.previewRenderer.startAnimation();
   }
-
-  private animatePreview = (): void => {
-    if (this.state !== 'menu' || !this.previewRenderer || !this.previewScene || !this.previewCamera) return;
-
-    requestAnimationFrame(this.animatePreview);
-    this.previewTime += 0.016;
-
-    if (this.previewCreature && this.previewGenome) {
-      const nodeMeshes = this.previewCreature.userData.nodeMeshes as Map<string, THREE.Mesh>;
-
-      // Gravity effect: stronger gravity (more negative) = more sag
-      // Base gravity is -9.8, range is -5 to -30
-      // Normalize: -9.8 = 0 sag, -30 = max sag
-      const gravityStrength = Math.abs(this.config.gravity);
-      const gravitySag = Math.max(0, (gravityStrength - 9.8) / 20) * 0.5; // 0 to 0.5 sag
-
-      for (const node of this.previewGenome.nodes) {
-        const mesh = nodeMeshes.get(node.id);
-        if (!mesh) continue;
-
-        let x = node.position.x, y = node.position.y, z = node.position.z;
-
-        for (const muscle of this.previewGenome.muscles) {
-          if (muscle.nodeA !== node.id && muscle.nodeB !== node.id) continue;
-
-          const freq = muscle.frequency * this.previewGenome.globalFrequencyMultiplier;
-          const contraction = Math.sin(this.previewTime * freq * Math.PI * 2 + muscle.phase);
-          const amount = contraction * muscle.amplitude * 0.3;
-
-          const otherNodeId = muscle.nodeA === node.id ? muscle.nodeB : muscle.nodeA;
-          const otherNode = this.previewGenome.nodes.find(n => n.id === otherNodeId);
-          if (!otherNode) continue;
-
-          const dx = node.position.x - otherNode.position.x;
-          const dy = node.position.y - otherNode.position.y;
-          const dz = node.position.z - otherNode.position.z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-          if (dist > 0.01) {
-            x += (dx / dist) * amount;
-            y += (dy / dist) * amount;
-            z += (dz / dist) * amount;
-          }
-        }
-
-        // Apply gravity sag - nodes higher up sag more
-        const heightFactor = Math.max(0, node.position.y - 0.5);
-        const nodeSag = gravitySag * heightFactor;
-
-        mesh.position.set(x, Math.max(node.size * 0.5, y - nodeSag), z);
-      }
-
-      for (const child of this.previewCreature.children) {
-        if (child.userData.nodeA) {
-          const nodeA = nodeMeshes.get(child.userData.nodeA);
-          const nodeB = nodeMeshes.get(child.userData.nodeB);
-          if (nodeA && nodeB) {
-            updateMuscleMesh(child as THREE.Mesh, nodeA.position, nodeB.position);
-          }
-        }
-      }
-    }
-
-    this.previewRenderer.render(this.previewScene, this.previewCamera);
-  };
 
   private showMenu(): void {
     this.state = 'menu';
@@ -902,7 +775,7 @@ class EvolutionApp {
     if (this.gridUI) this.gridUI.style.display = 'none';
     if (this.graphPanel) this.graphPanel.hide();
     if (this.creatureTypesPanel) this.creatureTypesPanel.hide();
-    this.animatePreview();
+    this.previewRenderer?.startAnimation();
   }
 
   // ============================================
