@@ -14,6 +14,7 @@ import { createInfoTooltip, NEURAL_TOOLTIPS } from './ui/InfoTooltip';
 import { TooltipManager, tooltipRow, tooltipTitle } from './ui/TooltipManager';
 import { CreatureCardRenderer, getCreatureName } from './ui/CreatureCardRenderer';
 import { getTargetGeneration, updateControlsForHistoryMode, validateJumpTarget } from './ui/GenerationNavigator';
+import { getStepIndicatorHTML, getSettingsInfoHTML, setupSettingsDropdowns } from './ui/StatsRenderer';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, SENSOR_NAMES, createNetworkFromGenome, NEURAL_INPUT_SIZE_PURE } from './neural';
 import {
@@ -774,7 +775,7 @@ class EvolutionApp {
     // Step indicator
     this.stepIndicator = document.createElement('div');
     this.stepIndicator.className = 'step-indicator glass';
-    this.stepIndicator.innerHTML = this.getStepIndicatorHTML();
+    this.stepIndicator.innerHTML = getStepIndicatorHTML(this.evolutionStep, this.generation);
     this.gridUI.appendChild(this.stepIndicator);
 
     // Settings info box (top right)
@@ -790,11 +791,11 @@ class EvolutionApp {
       color: var(--text-muted);
       border-radius: 8px;
     `;
-    settingsBox.innerHTML = this.getSettingsInfoHTML();
+    settingsBox.innerHTML = getSettingsInfoHTML(this.config);
     this.gridUI.appendChild(settingsBox);
 
     // Setup fitness dropdown click handler after DOM is ready
-    setTimeout(() => this.setupFitnessDropdown(), 0);
+    setTimeout(() => setupSettingsDropdowns(), 0);
 
     // Grid container for creature cards - use absolute positioning for animations
     this.gridContainer = document.createElement('div');
@@ -1035,139 +1036,12 @@ class EvolutionApp {
     `;
   }
 
-  private getStepIndicatorHTML(): string {
-    const steps = [
-      { key: 'mutate', label: 'Mutate', num: 1 },
-      { key: 'simulate', label: 'Simulate', num: 2 },
-      { key: 'sort', label: 'Sort', num: 3 }
-    ];
-
-    const currentIndex = steps.findIndex(s => s.key === this.evolutionStep);
-
-    return steps.map((step, i) => {
-      const isActive = step.key === this.evolutionStep;
-      const isDone = currentIndex > i || (this.evolutionStep === 'idle' && this.generation > 0);
-      const circleClass = isActive ? 'active' : (isDone ? 'done' : '');
-      const labelClass = isActive ? 'active' : (isDone ? 'done' : '');
-
-      const connector = i < steps.length - 1
-        ? `<div class="step-connector ${isDone || (currentIndex > i) ? 'done' : ''}"></div>`
-        : '';
-
-      return `
-        <div class="step-item">
-          <div class="step-circle ${circleClass}">${isDone && !isActive ? '✓' : step.num}</div>
-          <span class="step-label ${labelClass}">${step.label}</span>
-        </div>
-        ${connector}
-      `;
-    }).join('');
-  }
-
-  private getSettingsInfoHTML(): string {
-    return `
-      <div style="color: var(--text-secondary); font-weight: 600; margin-bottom: 8px;">Settings</div>
-      <div style="display: grid; grid-template-columns: auto auto; gap: 4px 12px;">
-        <span>Gravity:</span><span style="color: var(--text-primary);">${this.config.gravity}</span>
-        <span>Mutation:</span><span style="color: var(--text-primary);">${Math.round(this.config.mutationRate * 100)}%</span>
-        <span>Max Freq:</span><span style="color: var(--text-primary);">${this.config.maxAllowedFrequency} Hz</span>
-        <span>Duration:</span><span style="color: var(--text-primary);">${this.config.simulationDuration}s</span>
-        <span>Max Nodes:</span><span style="color: var(--text-primary);">${this.config.maxNodes}</span>
-        <span>Max Muscles:</span><span style="color: var(--text-primary);">${this.config.maxMuscles}</span>
-      </div>
-      <div id="fitness-dropdown-toggle" style="
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        cursor: pointer;
-        color: var(--text-muted);
-        font-size: 11px;
-        margin-top: 10px;
-        padding-top: 8px;
-        border-top: 1px solid var(--border);
-      ">
-        <svg id="fitness-dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-        <span>Fitness Config</span>
-      </div>
-      <div id="fitness-dropdown-content" style="display: none; margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-        <div style="display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10px;">
-          <span style="color: var(--text-muted);">Pellet Points:</span><span style="color: var(--text-secondary);">${this.config.fitnessPelletPoints}</span>
-          <span style="color: var(--text-muted);">Progress Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessProgressMax}</span>
-          <span style="color: var(--text-muted);">Net Disp Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessNetDisplacementMax}</span>
-          <span style="color: var(--text-muted);">Dist/Unit:</span><span style="color: var(--text-secondary);">${this.config.fitnessDistancePerUnit}</span>
-          <span style="color: var(--text-muted);">Dist Max:</span><span style="color: var(--text-secondary);">${this.config.fitnessDistanceTraveledMax}</span>
-          <span style="color: var(--text-muted);">Regression Penalty:</span><span style="color: var(--text-secondary);">${this.config.fitnessRegressionPenalty}</span>
-        </div>
-      </div>
-      ${this.config.useNeuralNet ? `
-      <div id="neural-dropdown-toggle" style="
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        cursor: pointer;
-        color: var(--text-muted);
-        font-size: 11px;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid var(--border);
-      ">
-        <svg id="neural-dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-        <span>Neural Config</span>
-      </div>
-      <div id="neural-dropdown-content" style="display: none; margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-        <div style="display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10px;">
-          <span style="color: var(--text-muted);">Mode:</span><span style="color: var(--text-secondary);">${this.config.neuralMode}</span>
-          <span style="color: var(--text-muted);">Hidden Size:</span><span style="color: var(--text-secondary);">${this.config.neuralHiddenSize}</span>
-          <span style="color: var(--text-muted);">Activation:</span><span style="color: var(--text-secondary);">${this.config.neuralActivation}</span>
-          <span style="color: var(--text-muted);">Weight Mut Rate:</span><span style="color: var(--text-secondary);">${Math.round(this.config.weightMutationRate * 100)}%</span>
-          <span style="color: var(--text-muted);">Weight Mut Mag:</span><span style="color: var(--text-secondary);">${this.config.weightMutationMagnitude}</span>
-          <span style="color: var(--text-muted);">Rate Decay:</span><span style="color: var(--text-secondary);">${this.config.weightMutationDecay}</span>
-          <span style="color: var(--text-muted);">Dead Zone:</span><span style="color: var(--text-secondary);">${this.config.neuralDeadZone}</span>
-          <span style="color: var(--text-muted);">Efficiency Penalty:</span><span style="color: var(--text-secondary);">${this.config.fitnessEfficiencyPenalty}</span>
-        </div>
-      </div>
-      ` : ''}
-    `;
-  }
-
   private updateSettingsInfoBox(): void {
     const settingsBox = document.getElementById('settings-info-box');
     if (settingsBox) {
-      settingsBox.innerHTML = this.getSettingsInfoHTML();
-      this.setupFitnessDropdown();
+      settingsBox.innerHTML = getSettingsInfoHTML(this.config);
+      setupSettingsDropdowns();
     }
-  }
-
-  private setupFitnessDropdown(): void {
-    // Fitness dropdown
-    const fitnessToggle = document.getElementById('fitness-dropdown-toggle');
-    const fitnessContent = document.getElementById('fitness-dropdown-content');
-    const fitnessChevron = document.getElementById('fitness-dropdown-chevron');
-
-    fitnessToggle?.addEventListener('click', () => {
-      if (fitnessContent && fitnessChevron) {
-        const isHidden = fitnessContent.style.display === 'none';
-        fitnessContent.style.display = isHidden ? 'block' : 'none';
-        fitnessChevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
-      }
-    });
-
-    // Neural dropdown
-    const neuralToggle = document.getElementById('neural-dropdown-toggle');
-    const neuralContent = document.getElementById('neural-dropdown-content');
-    const neuralChevron = document.getElementById('neural-dropdown-chevron');
-
-    neuralToggle?.addEventListener('click', () => {
-      if (neuralContent && neuralChevron) {
-        const isHidden = neuralContent.style.display === 'none';
-        neuralContent.style.display = isHidden ? 'block' : 'none';
-        neuralChevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
-      }
-    });
   }
 
   private updateStats(): void {
@@ -1269,7 +1143,7 @@ class EvolutionApp {
         }
       }
     }
-    if (this.stepIndicator) this.stepIndicator.innerHTML = this.getStepIndicatorHTML();
+    if (this.stepIndicator) this.stepIndicator.innerHTML = getStepIndicatorHTML(this.evolutionStep, this.generation);
   }
 
   /**
