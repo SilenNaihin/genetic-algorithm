@@ -117,29 +117,81 @@
     },
     {
       "id": 17,
-      "name": "Convert modules to React components",
-      "description": "Convert extracted modules to React functional components, integrate state management",
-      "test_focus": "Each component as converted - same functionality as vanilla version",
-      "subphases": [
-        "MenuScreen component",
-        "CreatureGrid component",
-        "StatsPanel component",
-        "ControlPanel component",
-        "ReplayModal component",
-        "LoadRunsModal component"
-      ]
+      "name": "Setup Zustand store + folder structure",
+      "description": "Install Zustand, create app/stores/evolutionStore.ts with state shape, create folder structure (components/common, menu, grid, modals), create app/types/ui.ts",
+      "test_focus": "npm run build passes, no runtime errors"
     },
     {
       "id": 18,
-      "name": "State management + hooks",
-      "description": "Extract app state to React context/hooks, wire up components",
-      "test_focus": "State flows correctly between components, no stale state issues"
+      "name": "Create services layer",
+      "description": "Create src/services/SimulationService.ts and StorageService.ts as thin wrappers around domain logic for future backend migration",
+      "test_focus": "npm run build passes, services export correctly"
     },
     {
       "id": 19,
-      "name": "Final React cleanup",
-      "description": "Remove old vanilla JS code, final testing",
-      "test_focus": "Full app regression test - every feature works"
+      "name": "Common components + Three.js hooks",
+      "description": "Create app/components/common/ (Button, Modal, ProgressBar), create app/hooks/useThreeRenderer.ts for Three.js lifecycle management",
+      "test_focus": "Components render without errors"
+    },
+    {
+      "id": 20,
+      "name": "MenuScreen component",
+      "description": "Create MenuScreen with PreviewCanvas, ParamSliders, config panels. Wire to Zustand store. Convert CSS to Tailwind.",
+      "test_focus": "Menu renders, sliders update config, preview creature animates, Start button works"
+    },
+    {
+      "id": 21,
+      "name": "GridView shell + ControlPanel",
+      "description": "Create GridView container, ControlPanel with Step/Auto/Graph/Reset buttons. Wire to Zustand actions.",
+      "test_focus": "Grid view renders, buttons trigger actions (may not fully work yet)"
+    },
+    {
+      "id": 22,
+      "name": "CreatureCard + CreatureGrid",
+      "description": "Create CreatureCard with canvas thumbnail (using CreatureCardRenderer), CreatureGrid to display 100 cards. Handle click for replay.",
+      "test_focus": "Cards render with creature thumbnails, clicking opens replay"
+    },
+    {
+      "id": 23,
+      "name": "StatsPanel",
+      "description": "Create StatsPanel with generation info, step indicator, settings display, generation navigation arrows.",
+      "test_focus": "Stats display correctly, navigation arrows work, step indicator highlights"
+    },
+    {
+      "id": 24,
+      "name": "ReplayModal",
+      "description": "Create ReplayModal with 3D replay canvas (using ReplayRenderer), play/pause, speed controls, timeline scrubbing.",
+      "test_focus": "Replay plays correctly, controls work, modal closes properly"
+    },
+    {
+      "id": 25,
+      "name": "LoadRunsModal",
+      "description": "Create LoadRunsModal to display saved runs, load/delete functionality. Wire to StorageService.",
+      "test_focus": "Modal shows saved runs, can load a run, can delete a run"
+    },
+    {
+      "id": 26,
+      "name": "Wire simulation logic",
+      "description": "Connect Zustand actions to SimulationService. Implement startSimulation, executeNextStep, autoRun in store actions.",
+      "test_focus": "Full evolution cycle works: mutate -> simulate -> sort, auto-run works"
+    },
+    {
+      "id": 27,
+      "name": "Graph panels integration",
+      "description": "Integrate existing GraphPanel and CreatureTypesPanel classes with React, or convert to React components.",
+      "test_focus": "Fitness graph shows, creature types chart shows, toggle works"
+    },
+    {
+      "id": 28,
+      "name": "Remove vanilla code",
+      "description": "Delete main.ts EvolutionApp class, remove unused vanilla code from src/ui/, update page.tsx to render React app directly",
+      "test_focus": "App works entirely through React, no vanilla bootstrap"
+    },
+    {
+      "id": 29,
+      "name": "Final cleanup + visual parity check",
+      "description": "Remove unused CSS, verify Tailwind visual parity, add error boundaries around Three.js, final testing",
+      "test_focus": "Full app regression - every feature works, visuals match original"
     }
   ],
   "notes": [
