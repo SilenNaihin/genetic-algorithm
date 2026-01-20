@@ -20,7 +20,19 @@ Only after user says "ok", "approved", "looks good", "next", "continue", etc:
 1. Commit the changes (no Co-Authored-By line)
 2. Then start the next phase
 
+## Handling Complex Extractions
+
+If an extraction is too complex (600+ lines, deep coupling):
+1. **Don't force it** - some things are better handled in React migration
+2. **Update `react-migration.md`** with:
+   - Why it was deferred
+   - Component hierarchy / interconnections
+   - What the React approach will be
+3. **Mark phase as "deferred" in prd.json** and move to next phase
+4. Tell the user what was deferred and why
+
 ## Notes
 
 - Tailwind v4 doesn't detect classes in JS strings - defer full conversion to React phase
 - Keep CSS in main.css for now, just extract the JS logic
+- `react-migration.md` tracks deferred work and component planning for phases 16-19
