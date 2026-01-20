@@ -13,6 +13,7 @@ import { BrainEvolutionPanel, BrainEvolutionData } from './ui/BrainEvolutionPane
 import { createInfoTooltip, NEURAL_TOOLTIPS } from './ui/InfoTooltip';
 import { TooltipManager, tooltipRow, tooltipTitle } from './ui/TooltipManager';
 import { CreatureCardRenderer, getCreatureName } from './ui/CreatureCardRenderer';
+import { getTargetGeneration, updateControlsForHistoryMode, validateJumpTarget } from './ui/GenerationNavigator';
 import { RunStorage } from './storage/RunStorage';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, SENSOR_NAMES, createNetworkFromGenome, NEURAL_INPUT_SIZE_PURE } from './neural';
 import {
@@ -2195,33 +2196,20 @@ class EvolutionApp {
     const currentRunId = runStorage.getCurrentRunId();
     if (!currentRunId) return;
 
-    // Determine which generation we're currently viewing
-    const currentViewGen = this.viewingGeneration !== null ? this.viewingGeneration : this.generation;
+    const result = getTargetGeneration(direction, {
+      current: this.generation,
+      max: this.maxGeneration,
+      viewing: this.viewingGeneration
+    });
 
-    let targetGen: number;
-    if (direction === 'prev') {
-      targetGen = currentViewGen - 1;
-      if (targetGen < 0) return;
-    } else {
-      targetGen = currentViewGen + 1;
-      // If going beyond saved generations
-      if (targetGen > this.maxGeneration) {
-        if (targetGen === this.generation) {
-          // Go to the current live generation (exit history mode)
-          await this.goToCurrentGeneration();
-          return;
-        }
-        return;
-      }
-    }
+    if (!result) return;
 
-    // If navigating to the current live generation, exit history mode instead of loading from storage
-    if (targetGen === this.generation) {
+    if (result.shouldGoToLive) {
       await this.goToCurrentGeneration();
       return;
     }
 
-    await this.loadGenerationView(targetGen);
+    await this.loadGenerationView(result.target);
   }
 
   private async promptJumpToGeneration(): Promise<void> {
@@ -2231,8 +2219,9 @@ class EvolutionApp {
     if (input === null) return;
 
     const targetGen = parseInt(input, 10);
-    if (isNaN(targetGen) || targetGen < 0 || targetGen > this.generation) {
-      alert(`Please enter a number between 0 and ${this.generation}`);
+    const error = validateJumpTarget(targetGen, this.generation);
+    if (error) {
+      alert(error);
       return;
     }
 
@@ -2248,7 +2237,7 @@ class EvolutionApp {
   private async goToCurrentGeneration(): Promise<void> {
     // Exit history mode and return to the current live generation
     this.viewingGeneration = null;
-    this.updateControlsForHistoryMode(false);
+    updateControlsForHistoryMode(false, () => this.updateNextButton());
 
     // Try to load current generation results from storage if they exist
     const currentRunId = runStorage.getCurrentRunId();
@@ -2348,7 +2337,7 @@ class EvolutionApp {
       }
 
       this.evolutionStep = 'sort';
-      this.updateControlsForHistoryMode(false);
+      updateControlsForHistoryMode(false, () => this.updateNextButton());
       this.updateStats();
 
       console.log(`Forked run to new run: ${newRunId}, starting at generation ${this.generation}`);
@@ -2414,38 +2403,11 @@ class EvolutionApp {
       // Show history mode UI
       this.createCreatureCardsFromResults(results);
       this.updateStats();
-      this.updateControlsForHistoryMode(true);
+      updateControlsForHistoryMode(true);
 
     } catch (error) {
       console.error('Error loading generation:', error);
       alert('Error loading generation data');
-    }
-  }
-
-  private updateControlsForHistoryMode(isHistoryMode: boolean): void {
-    const nextStepBtn = document.getElementById('next-step-btn') as HTMLButtonElement;
-    const run1xBtn = document.getElementById('run-1x-btn') as HTMLButtonElement;
-    const run10xBtn = document.getElementById('run-10x-btn') as HTMLButtonElement;
-    const run100xBtn = document.getElementById('run-100x-btn') as HTMLButtonElement;
-
-    if (isHistoryMode) {
-      // Disable evolution controls when viewing history
-      if (nextStepBtn) {
-        nextStepBtn.disabled = true;
-        nextStepBtn.textContent = 'Viewing History';
-      }
-      if (run1xBtn) run1xBtn.disabled = true;
-      if (run10xBtn) run10xBtn.disabled = true;
-      if (run100xBtn) run100xBtn.disabled = true;
-    } else {
-      // Re-enable controls
-      if (nextStepBtn) {
-        nextStepBtn.disabled = false;
-        this.updateNextButton();
-      }
-      if (run1xBtn) run1xBtn.disabled = false;
-      if (run10xBtn) run10xBtn.disabled = false;
-      if (run100xBtn) run100xBtn.disabled = false;
     }
   }
 
