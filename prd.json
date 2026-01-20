@@ -111,7 +111,8 @@
     {
       "id": 16,
       "name": "Setup React + Next.js",
-      "description": "Install React, setup Vite for React, create App.tsx shell component",
+      "status": "completed",
+      "description": "Installed Next.js 16 with Turbopack, created app/ directory with layout.tsx and page.tsx, vanilla app bootstrapped via dynamic import",
       "test_focus": "App loads without errors"
     },
     {

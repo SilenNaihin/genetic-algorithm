@@ -4,9 +4,9 @@
   "description": "3D Evolutionary Algorithm Simulation",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "dev": "next dev --turbopack --port 3001",
+    "build": "next build",
+    "start": "next start",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
@@ -33,12 +33,16 @@
   "dependencies": {
     "cannon-es": "^0.20.0",
     "chart.js": "^4.5.1",
+    "next": "^16.1.4",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "three": "^0.182.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
     "@types/three": "^0.182.0",
     "@vitest/ui": "^4.0.17",
     "autoprefixer": "^10.4.23",
