@@ -20,6 +20,48 @@ Track complex extractions and interconnections that will be handled during React
 - `config` object - passed down, changes trigger `updateSettingsInfoBox()`
 - Slider values update config and regenerate preview creature
 
+### SimulationController (Phase 12 - Skipped)
+**Why deferred:** ~500 lines spanning 7 methods with deep DOM coupling:
+- `startSimulation()` - initializes run, creates population
+- `executeNextStep()` - evolution step state machine
+- `runMutateStep()` - 166 lines of card animation (opacity, transform, spawn effects)
+- `runSimulationStep()` - progress bar updates, thumbnail re-rendering
+- `runSortStep()` - position animations for sorted cards
+- `recordFitnessHistory()` - updates graph panels
+- `autoRun()` - orchestrates multi-generation runs
+
+**React approach:**
+- Evolution state in context: `evolutionStep`, `isAutoRunning`, `generation`
+- Card animations via React Transition Group or Framer Motion
+- Progress tracked in state, rendered declaratively
+- Simulation logic stays in `BatchSimulator`, orchestrated by `useEvolution` hook
+
+**Key instance vars accessed:**
+- `this.population`, `this.simulationResults`, `this.creatureCards`
+- `this.graphPanel`, `this.creatureTypesPanel`
+- `this.progressContainer`, `this.gridContainer`
+
+### LoadRunsModal (Phase 13 - Skipped)
+**Why deferred:** ~370 lines with `loadRun()` setting 15+ instance variables:
+- Modal HTML + event handlers (160 lines) - extractable but pointless pre-React
+- `loadRun()` (190 lines) - directly sets config, generation, simulationResults, creates Population/Creature objects
+
+**React approach:** `<LoadRunsModal />` component with:
+- Props: `isOpen`, `onClose`, `onLoadRun`
+- Uses `useQuery` or similar for fetching runs
+- `loadRun` becomes dispatch to global state/context
+- Run cards rendered via map, not innerHTML
+
+**State restored by loadRun:**
+- `config`, `generation`, `maxGeneration`, `viewingGeneration`
+- `simulationResults`, `fitnessHistory`, `creatureTypeHistory`
+- `bestCreatureEver`, `longestSurvivingCreature`
+- `population` (recreated from results)
+
+### ControlPanel (Phase 14 - Skipped)
+**Why deferred:** Only ~35 lines (PRD overestimated). Just button HTML + event bindings.
+Not worth extracting standalone - becomes trivial `<ControlPanel />` in React.
+
 ## Component Hierarchy (Planned)
 
 ```

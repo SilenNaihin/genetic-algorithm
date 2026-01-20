@@ -80,32 +80,33 @@
     {
       "id": 12,
       "name": "Extract SimulationController",
-      "description": "Extract simulation/evolution logic (startSimulation, executeNextStep, autoRun) to src/simulation/SimulationController.ts",
-      "test_focus": "Evolution cycle - mutate/simulate/sort steps execute correctly, auto-run works, progress bar updates",
-      "tailwind": "Convert .progress-container styles to Tailwind utilities",
-      "estimated_lines": "~400 lines"
+      "status": "deferred",
+      "description": "~500 lines with deep DOM coupling for card animations - defer to React migration",
+      "deferred_reason": "7 methods (startSimulation, executeNextStep, runMutateStep, etc.) with heavy card animation DOM manipulation",
+      "see_also": "react-migration.md"
     },
     {
       "id": 13,
       "name": "Extract LoadRunsModal",
-      "description": "Extract load runs modal creation and logic to src/ui/LoadRunsModal.ts",
-      "test_focus": "Load Runs button - modal opens, shows saved runs, can load/delete runs",
-      "tailwind": "Convert .modal-overlay styles to Tailwind utilities",
-      "estimated_lines": "~200 lines"
+      "status": "deferred",
+      "description": "~370 lines with loadRun() setting 15+ instance variables - defer to React migration",
+      "deferred_reason": "loadRun() directly sets config, generation, population, simulationResults - better as React state dispatch",
+      "see_also": "react-migration.md"
     },
     {
       "id": 14,
       "name": "Extract ControlPanel",
-      "description": "Extract bottom control panel to src/ui/ControlPanel.ts",
-      "test_focus": "Bottom control bar - all buttons work (Step, Auto, Menu, Save, Load, graphs, neural viz)",
-      "tailwind": "Convert .control-panel, .btn styles to Tailwind utilities",
-      "estimated_lines": "~150 lines"
+      "status": "deferred",
+      "description": "Only ~35 lines actual (PRD overestimated) - not worth standalone extraction",
+      "deferred_reason": "Too small to extract meaningfully, becomes trivial React component",
+      "see_also": "react-migration.md"
     },
     {
       "id": 15,
       "name": "Final modular cleanup",
-      "description": "Review main.ts, ensure it's under 500 lines, remove unused CSS from main.css",
-      "test_focus": "Full app test - all features still work end-to-end"
+      "status": "deferred",
+      "description": "Cannot reach <500 line target without React - deferring to post-migration cleanup",
+      "deferred_reason": "main.ts still 3500+ lines; remaining code is tightly coupled to app state"
     },
     {
       "id": 16,
