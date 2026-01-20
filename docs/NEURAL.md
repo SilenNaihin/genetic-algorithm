@@ -6,10 +6,13 @@
 3. [Architecture](#architecture)
 4. [Control Modes](#control-modes)
 5. [Evolution Operators](#evolution-operators)
-6. [Configuration](#configuration)
-7. [Visualization](#visualization)
-8. [Future: NEAT](#future-neat)
-9. [References](#references)
+6. [GA Optimization Techniques](#ga-optimization-techniques)
+7. [Diversity Maintenance](#diversity-maintenance)
+8. [Selection Methods](#selection-methods)
+9. [Configuration](#configuration)
+10. [Visualization](#visualization)
+11. [Future: NEAT](#future-neat)
+12. [References](#references)
 
 ---
 
@@ -221,6 +224,328 @@ def crossover_weights_blend(parent1, parent2):
 
 ---
 
+## GA Optimization Techniques
+
+Genetic algorithms for neural networks require different strategies than gradient-based training. Here are key techniques that improve evolution efficiency.
+
+### Output Bias (Negative Initialization)
+
+In pure neural mode, random weights often cause all muscles to fire constantly, wasting energy and producing chaotic movement.
+
+**Solution**: Initialize output layer biases to a negative value (e.g., -1.5):
+
+```typescript
+// Output neurons default "off" until inputs push them positive
+outputBias = -1.5;
+
+// Effective muscle activation threshold:
+// tanh(weighted_sum + bias) > 0
+// weighted_sum must exceed 1.5 to activate muscle
+```
+
+**Why it works:**
+- Muscles start relaxed (biologically plausible)
+- Creature must "earn" muscle activation through meaningful input patterns
+- Reduces energy waste from constant firing
+- Creates selective pressure for efficient movement
+
+### Uniform Weight Initialization
+
+Traditional deep learning uses **Gaussian** initialization (Xavier/He). For GA evolution, **uniform** distribution works better:
+
+```typescript
+// Gaussian: most weights near 0, few large
+weight = randomGaussian() * 0.5;  // ❌ Clusters near zero
+
+// Uniform: even spread across range
+weight = randomUniform(-0.5, 0.5);  // ✅ Better exploration
+```
+
+**Why uniform beats Gaussian for GA:**
+| Aspect | Gaussian | Uniform |
+|--------|----------|---------|
+| Initial diversity | Low (clustered) | High (spread) |
+| Mutation coverage | Biased toward small weights | Even coverage |
+| Edge exploration | Rare | Equally likely |
+
+Gaussian initialization is designed for gradient flow. Since we don't use gradients, we prefer uniform coverage of the weight space.
+
+### Dead Zone Problem
+
+When using `tanh` activation with negative output biases, a **dead zone** emerges:
+
+```
+Output = tanh(weighted_sum - 1.5)
+
+If weighted_sum < 0.5:
+  Output ≈ tanh(-1.0) ≈ -0.76  (muscle fully relaxed)
+
+Problem: Small weight changes don't affect output!
+```
+
+**The Issue:**
+- Mutations in the dead zone produce identical fitness
+- No selection pressure to improve
+- GA "blindly wanders" until lucky mutation escapes
+
+**Mitigations:**
+1. **Smaller negative bias** (e.g., -0.5 instead of -1.5)
+2. **Leaky activation** that preserves small differences
+3. **Fitness shaping** to reward near-activation attempts
+
+### Mutation Decay
+
+Large mutations help early exploration; small mutations enable fine-tuning later.
+
+**Linear Decay:**
+```typescript
+const mutationMag = initialMag * (1 - generation / maxGenerations);
+// Gen 0: mag = 0.5
+// Gen 50: mag = 0.25 (if maxGen = 100)
+// Gen 100: mag = 0
+```
+
+**Exponential Decay (recommended):**
+```typescript
+const mutationMag = initialMag * Math.pow(decayRate, generation);
+// decayRate = 0.99
+// Gen 0: mag = 0.5
+// Gen 50: mag = 0.303
+// Gen 100: mag = 0.183
+```
+
+**Typical ranges:**
+| Parameter | Early (gen 0-20) | Mid (gen 20-80) | Late (gen 80+) |
+|-----------|------------------|-----------------|----------------|
+| Mutation magnitude | 0.3 - 0.5 | 0.15 - 0.3 | 0.05 - 0.15 |
+| Mutation rate | 0.2 - 0.3 | 0.1 - 0.2 | 0.05 - 0.1 |
+
+---
+
+## Diversity Maintenance
+
+### Why Diversity Matters
+
+**Premature convergence** occurs when the population clusters around a local optimum, losing the genetic variety needed to discover better solutions.
+
+```
+Generation 10:  ●  ●  ●  ●  ●  (diverse population)
+                  ↓ selection pressure
+Generation 50:  ●●●●●           (converged - stuck!)
+                     Local optimum  →  Global optimum
+                     (stuck here)       (unreachable)
+```
+
+Without diversity, evolution becomes a random walk around a single point rather than exploration of the fitness landscape.
+
+### Fitness Sharing
+
+**Fitness sharing** reduces fitness for creatures similar to others, encouraging the population to spread out.
+
+**Formula:**
+```typescript
+// Sharing function: how much to penalize similarity
+function share(distance: number, threshold: number): number {
+  if (distance >= threshold) return 0;
+  return 1 - (distance / threshold);
+}
+
+// Shared fitness calculation
+function sharedFitness(creature: Creature, population: Creature[]): number {
+  const rawFitness = creature.fitness;
+
+  // Sum of similarity to all others
+  const nicheCount = population.reduce((sum, other) => {
+    const dist = genomeDistance(creature, other);
+    return sum + share(dist, sharingThreshold);
+  }, 0);
+
+  return rawFitness / nicheCount;
+}
+```
+
+**Intuition:** If 10 creatures occupy the same niche, they share that niche's resources (fitness), each getting 1/10th credit. This creates pressure to find unique solutions.
+
+**Parameters:**
+- `sharingThreshold`: Distance below which creatures compete (typically 3-5 for normalized genomes)
+- Higher threshold = more sharing = more diversity pressure
+
+### Speciation (NEAT-Style)
+
+Rather than continuous sharing, **speciation** groups similar creatures into discrete species:
+
+```typescript
+interface Species {
+  id: number;
+  representative: Genome;  // Comparison point
+  members: Creature[];
+}
+
+function assignSpecies(creature: Creature, species: Species[]): Species {
+  for (const sp of species) {
+    if (genomeDistance(creature.genome, sp.representative) < threshold) {
+      return sp;  // Join existing species
+    }
+  }
+  return createNewSpecies(creature);  // Found new species
+}
+```
+
+**Species protection:**
+- Each species guaranteed at least one offspring (prevents extinction of novel approaches)
+- Selection happens within species first
+- Fitness adjusted by species size
+
+**Distance metric:**
+```typescript
+function genomeDistance(g1: Genome, g2: Genome): number {
+  const c1 = 1.0;  // Excess gene coefficient
+  const c2 = 1.0;  // Disjoint gene coefficient
+  const c3 = 0.4;  // Weight difference coefficient
+
+  const excess = countExcessGenes(g1, g2);
+  const disjoint = countDisjointGenes(g1, g2);
+  const avgWeightDiff = averageWeightDifference(g1, g2);
+
+  return c1 * excess + c2 * disjoint + c3 * avgWeightDiff;
+}
+```
+
+### Novelty Search (Alternative)
+
+Instead of optimizing fitness directly, **novelty search** rewards creatures for being *different* from what's been seen before:
+
+```typescript
+function noveltyScore(creature: Creature, archive: Creature[]): number {
+  // k-nearest neighbors in behavior space
+  const k = 15;
+  const neighbors = findKNearest(creature.behavior, archive, k);
+
+  // Average distance to neighbors = novelty
+  return neighbors.reduce((sum, n) => sum + behaviorDistance(creature, n), 0) / k;
+}
+```
+
+**When to use:**
+- Deceptive fitness landscapes (local optima everywhere)
+- Open-ended evolution experiments
+- When you don't know what "good" looks like
+
+**Trade-off:** May find interesting behaviors that don't solve the task.
+
+---
+
+## Selection Methods
+
+Different selection methods balance **exploitation** (favoring best) vs **exploration** (maintaining diversity).
+
+### Truncation Selection (Current)
+
+Select the top X% of the population as parents:
+
+```typescript
+function truncationSelection(population: Creature[], survivalRate: number): Creature[] {
+  const sorted = [...population].sort((a, b) => b.fitness - a.fitness);
+  const cutoff = Math.floor(population.length * survivalRate);
+  return sorted.slice(0, cutoff);
+}
+
+// Usage: top 20% survive
+const parents = truncationSelection(population, 0.2);
+```
+
+| Pros | Cons |
+|------|------|
+| Simple to implement | High selection pressure |
+| Fast convergence | Can lose diversity quickly |
+| Guaranteed best survive | Harsh on near-winners |
+
+**Best for:** Problems where you want fast convergence and have good initial diversity.
+
+### Tournament Selection
+
+Randomly pick K creatures, best wins:
+
+```typescript
+function tournamentSelection(
+  population: Creature[],
+  tournamentSize: number
+): Creature {
+  // Pick random contestants
+  const contestants: Creature[] = [];
+  for (let i = 0; i < tournamentSize; i++) {
+    const idx = Math.floor(Math.random() * population.length);
+    contestants.push(population[idx]);
+  }
+
+  // Best wins
+  return contestants.reduce((best, c) =>
+    c.fitness > best.fitness ? c : best
+  );
+}
+
+// To select N parents:
+const parents = Array(numParents).fill(null).map(() =>
+  tournamentSelection(population, tournamentSize)
+);
+```
+
+**Tournament size controls pressure:**
+| Size | Selection Pressure | Notes |
+|------|-------------------|-------|
+| 2 | Low | Good diversity, slow convergence |
+| 5 | Medium | Balanced (recommended) |
+| 10+ | High | Fast convergence, low diversity |
+
+**Advantages:**
+- Adjustable pressure via tournament size
+- Works with negative fitness values
+- Easy to parallelize
+
+### Rank-Based Selection
+
+Probability proportional to rank, not raw fitness:
+
+```typescript
+function rankBasedSelection(population: Creature[]): Creature {
+  const sorted = [...population].sort((a, b) => b.fitness - a.fitness);
+  const n = sorted.length;
+
+  // Linear ranking: P(rank r) = (2 - s) / n + 2r(s - 1) / (n(n-1))
+  // where s = selection pressure (1.0 to 2.0)
+  const s = 1.5;
+
+  const probabilities = sorted.map((_, rank) => {
+    const r = n - rank - 1;  // Invert so rank 0 = best
+    return (2 - s) / n + (2 * r * (s - 1)) / (n * (n - 1));
+  });
+
+  // Roulette wheel selection
+  const total = probabilities.reduce((a, b) => a + b, 0);
+  let random = Math.random() * total;
+
+  for (let i = 0; i < n; i++) {
+    random -= probabilities[i];
+    if (random <= 0) return sorted[i];
+  }
+  return sorted[n - 1];
+}
+```
+
+**Why use ranks instead of raw fitness?**
+- **Immune to fitness scaling:** If best = 1000, second = 100, third = 99, raw fitness gives best almost all selections. Ranks treat second and third fairly.
+- **Handles negative fitness**
+- **Consistent selection pressure** regardless of fitness distribution
+
+**Comparison:**
+| Method | Diversity | Convergence | Implementation |
+|--------|-----------|-------------|----------------|
+| Truncation | Low | Fast | Trivial |
+| Tournament | Tunable | Tunable | Simple |
+| Rank-Based | High | Slow | Moderate |
+
+---
+
 ## Configuration
 
 ### Menu Options
@@ -233,17 +558,38 @@ def crossover_weights_blend(parent1, parent2):
 | `activation` | enum | 'tanh' | 'tanh', 'relu', or 'sigmoid' |
 | `mutationMagnitude` | number | 0.3 | Weight perturbation std dev |
 | `weightMutationRate` | number | 0.1 | Probability each weight mutates |
+| `outputBias` | number | -1.5 | Initial bias for output neurons (negative = muscles default off) |
+| `weightMutationDecay` | number | 0.99 | Exponential decay rate for mutation magnitude per generation |
+| `fitnessSharing` | boolean | false | Enable fitness sharing for diversity maintenance |
+| `sharingThreshold` | number | 3.0 | Genome distance below which creatures share fitness |
+| `selectionMethod` | enum | 'truncation' | 'truncation', 'tournament', or 'rank' |
+| `tournamentSize` | number | 5 | Number of contestants per tournament (if tournament selection) |
 
 ### TypeScript Interface
 
 ```typescript
 interface NeuralConfig {
+  // Core settings
   useNeuralNet: boolean;
   neuralMode: 'hybrid' | 'pure';
   hiddenSize: number;
   activation: 'tanh' | 'relu' | 'sigmoid';
+
+  // Mutation
   mutationMagnitude: number;
   weightMutationRate: number;
+  weightMutationDecay: number;
+
+  // Initialization
+  outputBias: number;
+
+  // Diversity
+  fitnessSharing: boolean;
+  sharingThreshold: number;
+
+  // Selection
+  selectionMethod: 'truncation' | 'tournament' | 'rank';
+  tournamentSize: number;
 }
 ```
 
@@ -366,20 +712,37 @@ See `docs/NEAT_IMPLEMENTATION.md` (future) for details.
    - https://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf
    - The foundational paper for topology-evolving neural networks
 
-2. **Weight Agnostic Neural Networks (2019)** - Gaier & Ha
+2. **SBX Crossover (1995)** - Deb & Agrawal
+   - "Simulated Binary Crossover for Continuous Search Space"
+   - Introduced self-adaptive crossover for real-coded GAs
+   - Key technique for evolving continuous weight vectors
+
+3. **Fitness Sharing (1987)** - Goldberg & Richardson
+   - "Genetic Algorithms with Sharing for Multimodal Function Optimization"
+   - Foundational work on diversity maintenance in GAs
+   - Introduced niche-based selection pressure
+
+4. **Weight Agnostic Neural Networks (2019)** - Gaier & Ha
    - https://arxiv.org/abs/1906.04358
    - Shows topology alone can encode behavior
 
-3. **Deep Neuroevolution (2017)** - Uber AI
+5. **Deep Neuroevolution (2017)** - Uber AI
    - https://arxiv.org/abs/1712.06567
    - Scales genetic algorithms to deep networks
+
+6. **Novelty Search (2011)** - Lehman & Stanley
+   - "Abandoning Objectives: Evolution Through the Search for Novelty Alone"
+   - https://eplex.cs.ucf.edu/papers/lehman_ecj11.pdf
+   - Alternative to fitness-based selection
 
 ### Books
 
 - "Neuroevolution" by Kenneth O. Stanley (2019)
 - "Introduction to Evolutionary Computing" by Eiben & Smith
+- "Genetic Algorithms in Search, Optimization, and Machine Learning" by Goldberg (1989)
 
 ### Code References
 
 - NEAT-Python: https://github.com/CodeReclwordholder/NEAT-Python
 - PyTorch-NEAT: https://github.com/uber-research/PyTorch-NEAT
+- SharpNEAT: https://github.com/colgreen/sharpneat (C# implementation with good docs)

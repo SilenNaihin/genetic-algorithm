@@ -1,0 +1,249 @@
+{
+  "name": "Genetics System Overhaul",
+  "version": "1.0",
+  "goal": "Implement comprehensive neuroevolution improvements to enable effective neural architecture search (NAS)",
+  "end_state": "All GA parameters configurable via UI, API-first architecture ready for headless NAS with GPU acceleration",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Output Bias Parameter",
+      "status": "pending",
+      "description": "Replace dead zone with configurable output bias in neural settings",
+      "tasks": [
+        "Add outputBias to SimulationConfig (range -2 to 0, default -0.5)",
+        "Replace dead zone slider with output bias slider in neural panel",
+        "Update NeuralNetwork.initialize() to use config.outputBias instead of hardcoded -1.5",
+        "Update tooltip to explain output bias effect on muscle activation",
+        "Remove dead zone code path from BatchSimulator"
+      ],
+      "files": ["src/types/simulation.ts", "src/neural/NeuralNetwork.ts", "src/main.ts", "src/simulation/BatchSimulator.ts"],
+      "test_focus": "Creatures should be more active with bias closer to 0"
+    },
+    {
+      "id": 2,
+      "name": "Mutation Decay Improvements",
+      "status": "pending",
+      "description": "Add configurable decay start, end, and duration parameters",
+      "tasks": [
+        "Add to SimulationConfig: mutationDecayStart (default 0.5), mutationDecayEnd (default 0.1), mutationDecayGenerations (default 100)",
+        "Update calculateDecayedRate() to use these parameters",
+        "Add UI controls in neural panel for all three parameters",
+        "Update Neural Config display box to show current effective rate"
+      ],
+      "files": ["src/types/simulation.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "test_focus": "Verify mutation rate changes correctly over generations"
+    },
+    {
+      "id": 3,
+      "name": "Selection Methods",
+      "status": "pending",
+      "description": "Add tournament selection as alternative to truncation",
+      "tasks": [
+        "Add selectionMethod: 'truncation' | 'tournament' to SimulationConfig",
+        "Add tournamentSize parameter (default 3)",
+        "Implement tournamentSelection() in Selection.ts",
+        "Update Population.evolve() to use selected method",
+        "Add UI dropdown for selection method"
+      ],
+      "files": ["src/types/simulation.ts", "src/genetics/Selection.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "test_focus": "Tournament should maintain more diversity than truncation"
+    },
+    {
+      "id": 4,
+      "name": "Adaptive Mutation",
+      "status": "pending",
+      "description": "Auto-increase mutation when fitness stagnates",
+      "tasks": [
+        "Add useAdaptiveMutation: boolean to SimulationConfig",
+        "Add stagnationThreshold (default 10 generations)",
+        "Add adaptiveMutationBoost (default 2x)",
+        "Track best fitness history in Population",
+        "Implement stagnation detection and rate boost logic",
+        "Add UI toggle and parameter controls"
+      ],
+      "files": ["src/types/simulation.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "test_focus": "Mutation rate should increase after N generations without improvement"
+    },
+    {
+      "id": 5,
+      "name": "Crossover Improvements",
+      "status": "pending",
+      "description": "Add SBX crossover option for neural weights",
+      "tasks": [
+        "Add neuralCrossoverMethod: 'interpolation' | 'uniform' | 'sbx' to SimulationConfig",
+        "Implement SBX crossover (Simulated Binary Crossover) with eta parameter",
+        "Add eta parameter slider (default 2.0, range 0.5-5.0)",
+        "Add UI dropdown for crossover method"
+      ],
+      "files": ["src/types/simulation.ts", "src/genetics/Crossover.ts", "src/main.ts"],
+      "test_focus": "SBX should produce offspring 'between' parents more smoothly"
+    },
+    {
+      "id": 6,
+      "name": "Fitness Sharing",
+      "status": "pending",
+      "description": "Implement fitness sharing for diversity maintenance",
+      "tasks": [
+        "Add useFitnessSharing: boolean to SimulationConfig",
+        "Add sharingRadius parameter (default 0.5)",
+        "Implement genomeDistance() for neural genomes",
+        "Implement applyFitnessSharing() function",
+        "Integrate into selection process",
+        "Add UI toggle and radius slider"
+      ],
+      "files": ["src/types/simulation.ts", "src/genetics/Selection.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "test_focus": "Population should maintain more phenotypic diversity"
+    },
+    {
+      "id": 7,
+      "name": "Time Bonus",
+      "status": "pending",
+      "description": "Add time bonus for faster pellet collection",
+      "tasks": [
+        "Add fitnessTimeBonus parameter (default 20)",
+        "Add fitnessTimeBonusScale (seconds for full bonus, default 5)",
+        "Calculate time bonus: bonus * (1 - timeToCollect/scale)",
+        "Update fitness calculation in BatchSimulator",
+        "Add UI controls"
+      ],
+      "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/main.ts"],
+      "test_focus": "Faster collectors should score higher"
+    },
+    {
+      "id": 8,
+      "name": "Proprioception Inputs",
+      "status": "pending",
+      "description": "Add muscle strain as neural network input",
+      "tasks": [
+        "Add useProprioception: boolean to SimulationConfig",
+        "Calculate muscle strain inputs during simulation",
+        "Update gatherSensorInputs to include strain when enabled",
+        "Update NEURAL_INPUT_SIZE dynamically based on muscle count",
+        "Handle topology adaptation when proprioception toggled",
+        "Add UI toggle"
+      ],
+      "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/neural/NeuralGenome.ts", "src/main.ts"],
+      "test_focus": "With proprioception, creatures should develop smoother gaits"
+    },
+    {
+      "id": 9,
+      "name": "Efficiency Penalty Ramp",
+      "status": "pending",
+      "description": "Make efficiency penalty ramp up over generations",
+      "tasks": [
+        "Add efficiencyPenaltyStartGen (default 50)",
+        "Add efficiencyPenaltyRampGens (default 50)",
+        "Calculate effective penalty based on generation",
+        "Update fitness calculation",
+        "Add UI controls for start gen and ramp duration"
+      ],
+      "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/main.ts"],
+      "test_focus": "Early generations should explore freely, later generations penalized for inefficiency"
+    },
+    {
+      "id": 10,
+      "name": "Speciation (Basic)",
+      "status": "pending",
+      "description": "Implement basic speciation for diversity protection",
+      "tasks": [
+        "Define Species interface",
+        "Add useSpeciation: boolean to SimulationConfig",
+        "Add compatibilityThreshold parameter",
+        "Implement species assignment based on genome distance",
+        "Implement within-species selection",
+        "Add species stagnation tracking and culling",
+        "Visualize species count in stats panel"
+      ],
+      "files": ["src/types/simulation.ts", "src/genetics/Speciation.ts (new)", "src/genetics/Population.ts", "src/main.ts"],
+      "test_focus": "Multiple species should coexist with different strategies"
+    },
+    {
+      "id": 11,
+      "name": "NEAT Foundation",
+      "status": "pending",
+      "description": "Implement NEAT gene representation and structural mutations",
+      "see_also": "docs/NEAT_FUTURE.md",
+      "tasks": [
+        "Define ConnectionGene and NodeGene interfaces",
+        "Implement global innovation counter",
+        "Implement NEATGenome creation with minimal topology",
+        "Implement NEATNetwork.fromGenome() with topological sort",
+        "Implement mutateAddConnection()",
+        "Implement mutateAddNode()",
+        "Add NEAT crossover by gene alignment"
+      ],
+      "files": ["src/neural/NEATGenome.ts (new)", "src/neural/NEATNetwork.ts (new)", "src/genetics/NEATMutation.ts (new)", "src/genetics/NEATCrossover.ts (new)"],
+      "test_focus": "NEAT networks should grow topology over generations"
+    },
+    {
+      "id": 12,
+      "name": "UI Panel Expansion",
+      "status": "pending",
+      "description": "Expand neural settings panel to accommodate new parameters",
+      "tasks": [
+        "Reorganize neural panel into collapsible sections",
+        "Section 1: Network (mode, hidden size, activation, output bias)",
+        "Section 2: Mutation (rate decay start/end/gens, adaptive toggle)",
+        "Section 3: Selection (method, tournament size, fitness sharing)",
+        "Section 4: Advanced (proprioception, efficiency ramp, speciation)",
+        "Make panel scrollable or use tabs"
+      ],
+      "files": ["src/main.ts", "src/styles/main.css"],
+      "test_focus": "All parameters accessible and well-organized"
+    },
+    {
+      "id": 13,
+      "name": "API-First Architecture",
+      "status": "pending",
+      "description": "Prepare for headless NAS by exposing all parameters via API",
+      "depends_on": "Backend API migration (separate chat)",
+      "tasks": [
+        "Define SimulationRequest and SimulationResult API types",
+        "Create runSimulation() function that takes full config",
+        "Return structured results (fitness, generations, best genome)",
+        "Enable batch execution for parameter sweeps",
+        "Add progress callbacks for long runs"
+      ],
+      "files": ["src/api/types.ts (new)", "src/api/simulation.ts (new)"],
+      "test_focus": "Headless runs should complete and return results"
+    },
+    {
+      "id": 14,
+      "name": "GPU Acceleration Research",
+      "status": "pending",
+      "description": "Investigate GPU acceleration for NAS",
+      "tasks": [
+        "Research WebGPU for neural network forward pass",
+        "Benchmark current CPU performance (creatures/second)",
+        "Prototype GPU-accelerated batch evaluation",
+        "Determine if physics (Cannon-ES) is the bottleneck vs NN"
+      ],
+      "notes": "Physics is likely CPU-bound; GPU helps most with parallel NN evaluation for many creatures"
+    }
+  ],
+  "documentation": {
+    "files": [
+      {"path": "CHANGELOG.md", "purpose": "Version history"},
+      {"path": "CLAUDE.md", "purpose": "AI assistant context"},
+      {"path": "docs/NEURAL.md", "purpose": "Neural network architecture and evolution"},
+      {"path": "docs/GENOME.md", "purpose": "Genome structure and encoding"},
+      {"path": "docs/NEAT_FUTURE.md", "purpose": "NEAT implementation plan (already exists)"},
+      {"path": "docs/optimized-runs.md", "purpose": "Parameter tuning results"}
+    ],
+    "update_after_each_phase": true
+  },
+  "references": {
+    "neat_paper": "https://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf",
+    "sbx_crossover": "Deb & Agrawal (1995) - Simulated Binary Crossover",
+    "tournament_selection": "Miller & Goldberg (1995) - Tournament Selection",
+    "fitness_sharing": "Goldberg & Richardson (1987) - Genetic Algorithms with Sharing",
+    "novelty_search": "Lehman & Stanley (2011) - Abandoning Objectives"
+  },
+  "guidelines": [
+    "One phase at a time - test before moving on",
+    "Update documentation after each phase",
+    "Add tests for new genetics functions",
+    "Keep UI changes minimal until Phase 12",
+    "Maintain backward compatibility with existing saved runs"
+  ]
+}

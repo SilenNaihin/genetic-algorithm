@@ -15,7 +15,7 @@ Browser-based genetic algorithm simulator where soft-bodied creatures evolve to 
 src/
 ├── __tests__/        # Vitest tests
 ├── core/             # Domain models (Creature, Genome, Pellet)
-├── genetics/         # Evolution (Selection, Crossover, Mutation, Population)
+├── genetics/         # Evolution (Selection, Crossover, Mutation, Population, Speciation)
 ├── neural/           # Neural network for neuroevolution
 ├── physics/          # Cannon-ES physics (BodyFactory, PhysicsWorld)
 ├── rendering/        # Three.js visualization
@@ -37,12 +37,22 @@ src/
 - **Styling**: Tailwind CSS v4
 - **Testing**: Vitest + happy-dom
 
+## Genetics System
+
+- **Selection**: Truncation (default), Tournament (coming soon)
+- **Mutation**: Body (node positions, muscle params), Neural weights, Structural (add/remove nodes/muscles)
+- **Crossover**: Interpolation (body), Uniform (neural weights)
+- **Key files**: `src/genetics/Selection.ts`, `Population.ts`, `Mutation.ts`, `Crossover.ts`
+- See `genetics-prd.json` for implementation roadmap
+
 ## Conventions
 
 - Use shared utilities from `utils/math.ts` and `utils/id.ts`
 - Creature results are compacted for storage (frames as number arrays)
 - Tests go in `src/__tests__/*.test.ts`
 - Interface tests preferred over unit tests
+- Neural genome topology adapts when muscle count changes (`adaptNeuralTopology`)
+- Output biases default negative (-1.5) for GA optimization
 
 ## What NOT to Do
 
@@ -85,6 +95,7 @@ npm test -- --run  # Run once (no watch)
 ## Context Tips
 
 - `prd.json` tracks the frontend refactoring plan - check status before continuing
+- `genetics-prd.json` tracks the genetics system overhaul - check status before implementing GA features
 - `main.ts` contains EvolutionApp class - being broken into smaller modules
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)

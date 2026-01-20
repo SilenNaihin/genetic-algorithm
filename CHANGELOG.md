@@ -4,6 +4,23 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Added
+- **Neural Config Display Panel**: Expandable dropdown in top-right settings box showing current neural network configuration
+- **Mutation Rate Decay Options**: Choose between linear, exponential, or off (constant) decay modes with configurable start/end rates
+- **Separate Neural Mutation Rates**: Weight mutation now has dedicated neural-specific rates (`neuralRate`, `neuralMagnitude`) independent of body mutation
+- **Info Tooltips**: Added (i) icons for all neural network settings (mode, hidden size, activation, decay) explaining each parameter
+
+### Changed
+- **Neural Network Enabled by Default**: `useNeuralNet` now defaults to `true` for new runs
+- **Output Bias Constant**: Output biases now use `DEFAULT_OUTPUT_BIAS` constant (-1.5) for consistency
+- **Normalized Efficiency Penalty**: Efficiency penalty now uses normalized average muscle activation (0-1 range) instead of accumulated totals
+
+### Fixed
+- **Replay Neural Mode Mismatch**: Fixed crash when replaying creatures where neural network mode (pure/hybrid) didn't match expected input size
+- **Efficiency Penalty Zero Fitness**: Fixed efficiency penalty accumulating total activation instead of averaging, which was zeroing out all fitness
+- **adaptNeuralTopology Xavier Init**: Fixed using Xavier initialization instead of uniform for GA-optimized neural networks
+- **adaptNeuralTopology Bias**: Fixed using 0 bias instead of `DEFAULT_OUTPUT_BIAS` for newly added neurons
+
 ### Changed
 - **Neural Network Optimization for Genetic Algorithms**:
   - **Negative output biases** (-1.5 default): Muscles default to "off" state, must evolve to activate
