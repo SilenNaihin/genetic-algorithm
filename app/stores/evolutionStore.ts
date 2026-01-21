@@ -19,6 +19,18 @@ export interface CreatureTypeHistoryEntry {
 }
 
 /**
+ * Card animation state for smooth position/visual transitions
+ */
+export interface CardAnimationState {
+  isDead: boolean;     // Card is marked for culling (shows red border)
+  isFadingOut: boolean; // Card is fading out (phase 2 of death animation)
+  isMutated: boolean;  // Card is newly spawned (shows amber)
+  isSpawning: boolean; // Card is spawning from parent position
+  spawnFromX: number | null; // Start X position for spawn animation
+  spawnFromY: number | null; // Start Y position for spawn animation
+}
+
+/**
  * Evolution store state shape
  */
 interface EvolutionState {
@@ -53,8 +65,23 @@ interface EvolutionState {
   loadModalOpen: boolean;
   graphsVisible: boolean;
 
+  // Simulation progress
+  simulationProgress: { completed: number; total: number } | null;
+
   // Run metadata
   runName: string;
+
+  // Card animation states (genome.id -> animation state)
+  cardAnimationStates: Map<string, CardAnimationState>;
+
+  // Sort animation trigger (set by runSortStep, cleared when animation completes)
+  sortAnimationTriggered: boolean;
+
+  // Brain evolution modal
+  brainEvolutionModalOpen: boolean;
+
+  // Generation jump modal
+  generationJumpModalOpen: boolean;
 }
 
 /**
@@ -79,6 +106,13 @@ interface EvolutionActions {
   setLoadModalOpen: (open: boolean) => void;
   setGraphsVisible: (visible: boolean) => void;
   setRunName: (name: string) => void;
+  setSimulationProgress: (progress: { completed: number; total: number } | null) => void;
+  setCardAnimationStates: (states: Map<string, CardAnimationState>) => void;
+  updateCardAnimationState: (id: string, state: Partial<CardAnimationState>) => void;
+  clearCardAnimationStates: () => void;
+  setSortAnimationTriggered: (triggered: boolean) => void;
+  setBrainEvolutionModalOpen: (open: boolean) => void;
+  setGenerationJumpModalOpen: (open: boolean) => void;
 
   // Complex actions (will be implemented in later phases)
   // These are placeholders that will call services
@@ -106,8 +140,13 @@ const initialState: EvolutionState = {
   selectedCreatureId: null,
   replayResult: null,
   loadModalOpen: false,
-  graphsVisible: false,
+  graphsVisible: true,
+  simulationProgress: null,
   runName: '',
+  cardAnimationStates: new Map(),
+  sortAnimationTriggered: false,
+  brainEvolutionModalOpen: false,
+  generationJumpModalOpen: false,
 };
 
 /**
@@ -157,6 +196,22 @@ export const useEvolutionStore = create<EvolutionStore>()(
       setLoadModalOpen: (loadModalOpen) => set({ loadModalOpen }, false, 'setLoadModalOpen'),
       setGraphsVisible: (graphsVisible) => set({ graphsVisible }, false, 'setGraphsVisible'),
       setRunName: (runName) => set({ runName }, false, 'setRunName'),
+      setSimulationProgress: (simulationProgress) => set({ simulationProgress }, false, 'setSimulationProgress'),
+      setCardAnimationStates: (cardAnimationStates) => set({ cardAnimationStates }, false, 'setCardAnimationStates'),
+      updateCardAnimationState: (id, state) => set(
+        (s) => {
+          const newStates = new Map(s.cardAnimationStates);
+          const existing = newStates.get(id) || { isDead: false, isFadingOut: false, isMutated: false, isSpawning: false, spawnFromX: null, spawnFromY: null };
+          newStates.set(id, { ...existing, ...state });
+          return { cardAnimationStates: newStates };
+        },
+        false,
+        'updateCardAnimationState'
+      ),
+      clearCardAnimationStates: () => set({ cardAnimationStates: new Map() }, false, 'clearCardAnimationStates'),
+      setSortAnimationTriggered: (sortAnimationTriggered) => set({ sortAnimationTriggered }, false, 'setSortAnimationTriggered'),
+      setBrainEvolutionModalOpen: (brainEvolutionModalOpen) => set({ brainEvolutionModalOpen }, false, 'setBrainEvolutionModalOpen'),
+      setGenerationJumpModalOpen: (generationJumpModalOpen) => set({ generationJumpModalOpen }, false, 'setGenerationJumpModalOpen'),
 
       // Reset to initial state
       reset: () => set(initialState, false, 'reset'),
@@ -175,3 +230,4 @@ export const useGeneration = () => useEvolutionStore((s) => s.generation);
 export const useConfig = () => useEvolutionStore((s) => s.config);
 export const useSimulationResults = () => useEvolutionStore((s) => s.simulationResults);
 export const useIsAutoRunning = () => useEvolutionStore((s) => s.isAutoRunning);
+export const useCardAnimationStates = () => useEvolutionStore((s) => s.cardAnimationStates);
