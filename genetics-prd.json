@@ -1,8 +1,8 @@
 {
   "name": "Genetics System Overhaul",
-  "version": "1.0",
+  "version": "1.1",
   "goal": "Implement comprehensive neuroevolution improvements to enable effective neural architecture search (NAS)",
-  "end_state": "All GA parameters configurable via UI, API-first architecture ready for headless NAS with GPU acceleration",
+  "end_state": "All GA parameters configurable via UI, API-first architecture ready for headless NAS, human-in-the-loop mid-run tweaking, and NEAT topology evolution",
   "phases": [
     {
       "id": 1,
@@ -113,17 +113,20 @@
       "id": 8,
       "name": "Proprioception Inputs",
       "status": "pending",
-      "description": "Add muscle strain as neural network input",
+      "description": "Add body-sensing inputs to neural network (muscle strain, node velocities, ground contact)",
       "tasks": [
         "Add useProprioception: boolean to SimulationConfig",
-        "Calculate muscle strain inputs during simulation",
-        "Update gatherSensorInputs to include strain when enabled",
-        "Update NEURAL_INPUT_SIZE dynamically based on muscle count",
+        "Add proprioceptionInputs: 'strain' | 'velocity' | 'ground' | 'all' to SimulationConfig",
+        "Calculate muscle strain inputs: (currentLength - restLength) / restLength per muscle",
+        "Calculate node velocity inputs: normalized velocity vector per node",
+        "Calculate ground contact inputs: 1 if nodeY < threshold, 0 otherwise per node",
+        "Update gatherSensorInputs to include selected proprioception inputs",
+        "Update NEURAL_INPUT_SIZE dynamically: base + (M strains) + (N*3 velocities) + (N contacts)",
         "Handle topology adaptation when proprioception toggled",
-        "Add UI toggle"
+        "Add UI toggle and input type selector"
       ],
       "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/neural/NeuralGenome.ts", "src/main.ts"],
-      "test_focus": "With proprioception, creatures should develop smoother gaits"
+      "test_focus": "With proprioception, creatures should develop smoother gaits and better balance"
     },
     {
       "id": 9,
@@ -131,10 +134,10 @@
       "status": "pending",
       "description": "Make efficiency penalty ramp up over generations",
       "tasks": [
-        "Add efficiencyPenaltyStartGen (default 50)",
-        "Add efficiencyPenaltyRampGens (default 50)",
-        "Calculate effective penalty based on generation",
-        "Update fitness calculation",
+        "Add efficiencyPenaltyStartGen (default 100)",
+        "Add efficiencyPenaltyRampGens (default 100)",
+        "Calculate effective penalty: 0 before startGen, linear ramp to full over rampGens",
+        "Update fitness calculation in BatchSimulator",
         "Add UI controls for start gen and ramp duration"
       ],
       "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/main.ts"],
@@ -159,24 +162,6 @@
     },
     {
       "id": 11,
-      "name": "NEAT Foundation",
-      "status": "pending",
-      "description": "Implement NEAT gene representation and structural mutations",
-      "see_also": "docs/NEAT_FUTURE.md",
-      "tasks": [
-        "Define ConnectionGene and NodeGene interfaces",
-        "Implement global innovation counter",
-        "Implement NEATGenome creation with minimal topology",
-        "Implement NEATNetwork.fromGenome() with topological sort",
-        "Implement mutateAddConnection()",
-        "Implement mutateAddNode()",
-        "Add NEAT crossover by gene alignment"
-      ],
-      "files": ["src/neural/NEATGenome.ts (new)", "src/neural/NEATNetwork.ts (new)", "src/genetics/NEATMutation.ts (new)", "src/genetics/NEATCrossover.ts (new)"],
-      "test_focus": "NEAT networks should grow topology over generations"
-    },
-    {
-      "id": 12,
       "name": "UI Panel Expansion",
       "status": "pending",
       "description": "Expand neural settings panel to accommodate new parameters",
@@ -185,14 +170,15 @@
         "Section 1: Network (mode, hidden size, activation, output bias)",
         "Section 2: Mutation (rate decay start/end/gens, adaptive toggle)",
         "Section 3: Selection (method, tournament size, fitness sharing)",
-        "Section 4: Advanced (proprioception, efficiency ramp, speciation)",
+        "Section 4: Fitness (time bonus, efficiency ramp)",
+        "Section 5: Advanced (proprioception, speciation)",
         "Make panel scrollable or use tabs"
       ],
       "files": ["src/main.ts", "src/styles/main.css"],
       "test_focus": "All parameters accessible and well-organized"
     },
     {
-      "id": 13,
+      "id": 12,
       "name": "API-First Architecture",
       "status": "pending",
       "description": "Prepare for headless NAS by exposing all parameters via API",
@@ -208,19 +194,84 @@
       "test_focus": "Headless runs should complete and return results"
     },
     {
-      "id": 14,
-      "name": "GPU Acceleration Research",
+      "id": 13,
+      "name": "Neural Architecture Search (NAS)",
       "status": "pending",
-      "description": "Investigate GPU acceleration for NAS",
+      "description": "Automated parameter optimization via grid search and Bayesian optimization",
+      "depends_on": "Phase 12 (API-First)",
       "tasks": [
-        "Research WebGPU for neural network forward pass",
-        "Benchmark current CPU performance (creatures/second)",
-        "Prototype GPU-accelerated batch evaluation",
-        "Determine if physics (Cannon-ES) is the bottleneck vs NN"
+        "Define NASConfig with parameter ranges to search",
+        "Implement grid search over discrete parameter combinations",
+        "Implement random search with configurable budget",
+        "Add Bayesian optimization using surrogate model (optional)",
+        "Track and visualize NAS progress (best params, convergence)",
+        "Export best configuration found",
+        "Add NAS control panel in UI"
       ],
-      "notes": "Physics is likely CPU-bound; GPU helps most with parallel NN evaluation for many creatures"
+      "files": ["src/nas/types.ts (new)", "src/nas/GridSearch.ts (new)", "src/nas/RandomSearch.ts (new)", "src/nas/NASRunner.ts (new)"],
+      "test_focus": "NAS should find better parameters than defaults"
+    },
+    {
+      "id": 14,
+      "name": "Human-in-the-Loop Parameter Tweaking",
+      "status": "pending",
+      "description": "Allow mid-run parameter changes to guide evolution manually",
+      "depends_on": "Phase 12 (API-First)",
+      "tasks": [
+        "Identify tweakable parameters: mutation rate, crossover rate, selection pressure, fitness weights",
+        "Identify non-tweakable parameters: network topology, input size (require restart)",
+        "Create ParameterChangeEvent with generation, parameter, oldValue, newValue",
+        "Store parameter change history with run data",
+        "Add 'Parameter History' timeline visualization",
+        "Add mid-run parameter edit UI (sliders that apply immediately)",
+        "Implement smooth parameter transitions (optional: ramp over N generations)",
+        "Add 'revert to generation X config' functionality"
+      ],
+      "files": ["src/types/simulation.ts", "src/storage/RunStorage.ts", "src/main.ts", "src/ui/ParameterTimeline.ts (new)"],
+      "test_focus": "Parameter changes should take effect immediately and be tracked in history",
+      "notes": "This enables 'playing god' - watching evolution and nudging parameters when stuck. Storage complexity: each run stores array of ParameterChangeEvents."
+    },
+    {
+      "id": 15,
+      "name": "NEAT Foundation",
+      "status": "pending",
+      "description": "Implement NEAT gene representation and structural mutations",
+      "see_also": "docs/NEAT_FUTURE.md",
+      "tasks": [
+        "Define ConnectionGene and NodeGene interfaces",
+        "Implement global innovation counter",
+        "Implement NEATGenome creation with minimal topology",
+        "Implement NEATNetwork.fromGenome() with topological sort",
+        "Implement mutateAddConnection()",
+        "Implement mutateAddNode()",
+        "Add NEAT crossover by gene alignment",
+        "Integrate with speciation (Phase 10)"
+      ],
+      "files": ["src/neural/NEATGenome.ts (new)", "src/neural/NEATNetwork.ts (new)", "src/genetics/NEATMutation.ts (new)", "src/genetics/NEATCrossover.ts (new)"],
+      "test_focus": "NEAT networks should grow topology over generations"
     }
   ],
+  "mid_run_tweakable_params": {
+    "description": "Parameters that can be changed during a run without restart",
+    "tweakable": [
+      "mutationRate",
+      "mutationMagnitude",
+      "crossoverRate",
+      "selectionMethod",
+      "tournamentSize",
+      "cullPercentage",
+      "fitnessWeights (pellet, progress, displacement, distance)",
+      "efficiencyPenalty",
+      "adaptiveMutationBoost",
+      "sharingRadius"
+    ],
+    "not_tweakable": [
+      "neuralMode (pure/hybrid) - changes input size",
+      "hiddenSize - changes network topology",
+      "proprioception toggle - changes input size",
+      "populationSize - would require creating/culling creatures"
+    ]
+  },
   "documentation": {
     "files": [
       {"path": "CHANGELOG.md", "purpose": "Version history"},
@@ -237,13 +288,15 @@
     "sbx_crossover": "Deb & Agrawal (1995) - Simulated Binary Crossover",
     "tournament_selection": "Miller & Goldberg (1995) - Tournament Selection",
     "fitness_sharing": "Goldberg & Richardson (1987) - Genetic Algorithms with Sharing",
-    "novelty_search": "Lehman & Stanley (2011) - Abandoning Objectives"
+    "novelty_search": "Lehman & Stanley (2011) - Abandoning Objectives",
+    "bayesian_optimization": "Snoek et al. (2012) - Practical Bayesian Optimization"
   },
   "guidelines": [
     "One phase at a time - test before moving on",
     "Update documentation after each phase",
     "Add tests for new genetics functions",
-    "Keep UI changes minimal until Phase 12",
-    "Maintain backward compatibility with existing saved runs"
+    "Keep UI changes minimal until Phase 11",
+    "Maintain backward compatibility with existing saved runs",
+    "GPU acceleration handled in separate chat"
   ]
 }
