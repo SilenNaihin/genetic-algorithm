@@ -118,60 +118,70 @@
     {
       "id": 17,
       "name": "Setup Zustand store + folder structure",
+      "status": "completed",
       "description": "Install Zustand, create app/stores/evolutionStore.ts with state shape, create folder structure (components/common, menu, grid, modals), create app/types/ui.ts",
       "test_focus": "npm run build passes, no runtime errors"
     },
     {
       "id": 18,
       "name": "Create services layer",
+      "status": "completed",
       "description": "Create src/services/SimulationService.ts and StorageService.ts as thin wrappers around domain logic for future backend migration",
       "test_focus": "npm run build passes, services export correctly"
     },
     {
       "id": 19,
       "name": "Common components + Three.js hooks",
+      "status": "completed",
       "description": "Create app/components/common/ (Button, Modal, ProgressBar), create app/hooks/useThreeRenderer.ts for Three.js lifecycle management",
       "test_focus": "Components render without errors"
     },
     {
       "id": 20,
       "name": "MenuScreen component",
+      "status": "completed",
       "description": "Create MenuScreen with PreviewCanvas, ParamSliders, config panels. Wire to Zustand store. Convert CSS to Tailwind.",
       "test_focus": "Menu renders, sliders update config, preview creature animates, Start button works"
     },
     {
       "id": 21,
       "name": "GridView shell + ControlPanel",
+      "status": "completed",
       "description": "Create GridView container, ControlPanel with Step/Auto/Graph/Reset buttons. Wire to Zustand actions.",
       "test_focus": "Grid view renders, buttons trigger actions (may not fully work yet)"
     },
     {
       "id": 22,
       "name": "CreatureCard + CreatureGrid",
+      "status": "completed",
       "description": "Create CreatureCard with canvas thumbnail (using CreatureCardRenderer), CreatureGrid to display 100 cards. Handle click for replay.",
       "test_focus": "Cards render with creature thumbnails, clicking opens replay"
     },
     {
       "id": 23,
       "name": "StatsPanel",
+      "status": "completed",
       "description": "Create StatsPanel with generation info, step indicator, settings display, generation navigation arrows.",
       "test_focus": "Stats display correctly, navigation arrows work, step indicator highlights"
     },
     {
       "id": 24,
       "name": "ReplayModal",
+      "status": "completed",
       "description": "Create ReplayModal with 3D replay canvas (using ReplayRenderer), play/pause, speed controls, timeline scrubbing.",
       "test_focus": "Replay plays correctly, controls work, modal closes properly"
     },
     {
       "id": 25,
       "name": "LoadRunsModal",
+      "status": "completed",
       "description": "Create LoadRunsModal to display saved runs, load/delete functionality. Wire to StorageService.",
       "test_focus": "Modal shows saved runs, can load a run, can delete a run"
     },
     {
       "id": 26,
       "name": "Wire simulation logic",
+      "status": "completed",
       "description": "Connect Zustand actions to SimulationService. Implement startSimulation, executeNextStep, autoRun in store actions.",
       "test_focus": "Full evolution cycle works: mutate -> simulate -> sort, auto-run works"
     },
@@ -183,15 +193,21 @@
     },
     {
       "id": 28,
+      "name": "Setup routing structure",
+      "description": "Create /run/[runId] dynamic route for viewing saved runs. Menu stays at /, active runs redirect to /run/[id].",
+      "test_focus": "Starting a run navigates to /run/[id], loading a saved run navigates to /run/[id]"
+    },
+    {
+      "id": 29,
       "name": "Remove vanilla code",
       "description": "Delete main.ts EvolutionApp class, remove unused vanilla code from src/ui/, update page.tsx to render React app directly",
       "test_focus": "App works entirely through React, no vanilla bootstrap"
     },
     {
-      "id": 29,
-      "name": "Final cleanup + visual parity check",
-      "description": "Remove unused CSS, verify Tailwind visual parity, add error boundaries around Three.js, final testing",
-      "test_focus": "Full app regression - every feature works, visuals match original"
+      "id": 30,
+      "name": "Final consolidation + visual parity check",
+      "description": "User compares React app to vanilla (still runnable via main.ts), reports visual/behavioral differences, fix until parity achieved",
+      "test_focus": "Full app regression - every feature works, visuals match original exactly"
     }
   ],
   "notes": [
@@ -202,6 +218,8 @@
     "Target: All files < 500 lines",
     "Tailwind: Convert CSS classes to utility classes as we extract",
     "React: Final migration after modularization is complete",
-    "Deferred extractions tracked in react-migration.md"
+    "Deferred extractions tracked in react-migration.md",
+    "IMPORTANT: Keep vanilla app (main.ts) working until Phase 30 consolidation - do NOT delete or break it",
+    "Routing: Menu at /, active runs at /run/[runId]"
   ]
 }
