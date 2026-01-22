@@ -12,41 +12,80 @@ import { singlePointCrossover, cloneGenome } from './Crossover';
 import { Creature } from '../core/Creature';
 
 /**
+ * Decay configuration for mutation rate scheduling.
+ */
+export interface DecayConfig {
+  decayMode: 'off' | 'linear' | 'exponential';
+  startRate: number;        // Initial mutation rate (default 0.5)
+  endRate: number;          // Final mutation rate (default 0.1)
+  decayGenerations: number; // Generations over which decay occurs (default 100)
+}
+
+/**
  * Calculate decayed mutation rate based on generation.
  *
- * Industry-standard approach:
- * - Start rate: 5x the target rate (capped at 50%)
- * - Warmup period: ~50 generations to reach target rate
+ * When decay is enabled, mutation rate transitions from startRate to endRate
+ * over decayGenerations using either linear or exponential interpolation.
  *
- * @param endRate - Target mutation rate (from slider)
  * @param generation - Current generation number
- * @param decayMode - 'off', 'linear', or 'exponential'
+ * @param config - Decay configuration (or use legacy overload)
  * @returns Effective mutation rate for this generation
  */
+export function calculateDecayedRate(
+  generation: number,
+  config: DecayConfig
+): number;
 export function calculateDecayedRate(
   endRate: number,
   generation: number,
   decayMode: 'off' | 'linear' | 'exponential'
+): number;
+export function calculateDecayedRate(
+  arg1: number,
+  arg2: DecayConfig | number,
+  arg3?: 'off' | 'linear' | 'exponential'
 ): number {
-  if (decayMode === 'off') {
-    return endRate;
+  // Handle legacy 3-argument signature for backwards compatibility
+  if (typeof arg2 === 'number') {
+    const endRate = arg1;
+    const generation = arg2;
+    const decayMode = arg3!;
+
+    if (decayMode === 'off') {
+      return endRate;
+    }
+
+    // Legacy behavior: start at 5x target rate, capped at 50%, decay over 50 generations
+    const startRate = Math.min(0.5, endRate * 5);
+    const warmupGenerations = 50;
+
+    if (decayMode === 'linear') {
+      const progress = Math.min(1, generation / warmupGenerations);
+      return startRate - (startRate - endRate) * progress;
+    } else {
+      const tau = warmupGenerations / 3;
+      return endRate + (startRate - endRate) * Math.exp(-generation / tau);
+    }
   }
 
-  // Start at 5x target rate, capped at 50%
-  const startRate = Math.min(0.5, endRate * 5);
+  // New config-based signature
+  const generation = arg1;
+  const config = arg2 as DecayConfig;
 
-  // Warmup period: rate reaches target after ~50 generations
-  const warmupGenerations = 50;
+  if (config.decayMode === 'off') {
+    return config.endRate;
+  }
+
+  const { startRate, endRate, decayGenerations, decayMode } = config;
 
   if (decayMode === 'linear') {
-    // Linear decay: rate = start - (start - end) * min(1, gen / warmup)
-    const progress = Math.min(1, generation / warmupGenerations);
+    // Linear decay: rate = start - (start - end) * min(1, gen / decayGenerations)
+    const progress = Math.min(1, generation / decayGenerations);
     return startRate - (startRate - endRate) * progress;
   } else {
     // Exponential decay: rate = end + (start - end) * exp(-gen / tau)
-    // tau chosen so that after warmupGenerations, we're at ~5% of the way to end
-    // exp(-50/tau) ≈ 0.05 => tau ≈ 16.7
-    const tau = warmupGenerations / 3;
+    // tau chosen so rate is ~95% decayed after decayGenerations
+    const tau = decayGenerations / 3;
     return endRate + (startRate - endRate) * Math.exp(-generation / tau);
   }
 }

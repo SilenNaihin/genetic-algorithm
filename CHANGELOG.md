@@ -4,6 +4,13 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Changed
+- **Output Bias replaces Dead Zone**: Replaced runtime dead zone filtering with configurable output bias
+  - Output bias (-2 to 0, default -0.5) is baked into neural network weights
+  - More negative = muscles harder to activate initially, must evolve to overcome
+  - Evolves with population, no runtime filtering needed
+  - Removed dead zone code path from BatchSimulator
+
 ### Added
 - **Neural Config Display Panel**: Expandable dropdown in top-right settings box showing current neural network configuration
 - **Mutation Rate Decay Options**: Choose between linear, exponential, or off (constant) decay modes with configurable start/end rates

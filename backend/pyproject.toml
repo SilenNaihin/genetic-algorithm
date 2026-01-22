@@ -14,6 +14,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "numpy>=1.26.0",
     "websockets>=13.0",
+    "torch>=2.0.0",
 ]
 
 [project.optional-dependencies]

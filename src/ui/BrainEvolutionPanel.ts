@@ -40,42 +40,16 @@ export class BrainEvolutionPanel {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
     // Create panel container
+    // Note: When used in React Modal, the modal wrapper handles positioning
+    // This panel just provides the visualization content
     this.panel = document.createElement('div');
     this.panel.className = 'brain-evolution-panel';
     this.panel.style.cssText = `
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--bg-secondary, #1a1a24);
-      border: 1px solid var(--border-color, #333);
-      border-radius: 12px;
-      padding: 16px;
-      z-index: 1000;
-      display: none;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      background: transparent;
+      padding: 0;
     `;
 
-    // Create header
-    const header = document.createElement('div');
-    header.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    `;
-    header.innerHTML = `
-      <h3 style="margin: 0; color: #fff; font-size: 14px;">Brain Evolution</h3>
-      <button id="close-brain-evolution" style="
-        background: none;
-        border: none;
-        color: #888;
-        cursor: pointer;
-        font-size: 18px;
-        padding: 4px 8px;
-      ">&times;</button>
-    `;
-    this.panel.appendChild(header);
+    // Header removed - React Modal provides the header
 
     // Create diff visualization section
     const diffSection = document.createElement('div');
@@ -128,9 +102,6 @@ export class BrainEvolutionPanel {
     this.panel.appendChild(legend);
 
     container.appendChild(this.panel);
-
-    // Set up close button
-    this.panel.querySelector('#close-brain-evolution')?.addEventListener('click', () => this.hide());
   }
 
   /**
@@ -169,19 +140,17 @@ export class BrainEvolutionPanel {
   }
 
   /**
-   * Show the panel
+   * Show the panel (renders content - visibility controlled by React Modal)
    */
   show(): void {
-    this.panel.style.display = 'block';
     this.isVisible = true;
     this.render();
   }
 
   /**
-   * Hide the panel
+   * Hide the panel (no-op when used with React Modal)
    */
   hide(): void {
-    this.panel.style.display = 'none';
     this.isVisible = false;
   }
 

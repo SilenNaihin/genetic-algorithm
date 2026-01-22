@@ -17,7 +17,7 @@
 import { ActivationType, getActivation } from './activations';
 
 /** Default negative bias for output neurons (makes muscles default to "off") */
-export const DEFAULT_OUTPUT_BIAS = -1.5;
+export const DEFAULT_OUTPUT_BIAS = -0.5;
 
 export interface NeuralNetworkConfig {
   inputSize: number;    // Number of sensor inputs (7 for pure mode, 8 for hybrid)

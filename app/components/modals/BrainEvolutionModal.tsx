@@ -121,7 +121,7 @@ export function BrainEvolutionModal() {
       };
 
       panelRef.current?.setData(data);
-      panelRef.current?.show();
+      // Don't call show() - the React Modal handles visibility
       setLoading(false);
     } catch (err) {
       console.error('Error loading brain comparison data:', err);

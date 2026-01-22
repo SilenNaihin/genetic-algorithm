@@ -338,10 +338,6 @@ export function ReplayModal() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatNumber = (n: number) => n.toFixed(2);
-  const formatVector = (v: { x: number; y: number; z: number }) =>
-    `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
-
   if (!replayResult) return null;
 
   const genome = replayResult.genome;
@@ -355,10 +351,10 @@ export function ReplayModal() {
   const currentTime = replayResult.frames[currentFrame]?.time || 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1600px">
-      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1100px">
+      <div style={{ display: 'flex', gap: '16px' }}>
         {/* Left: Replay viewer */}
-        <div style={{ flex: '0 0 480px' }}>
+        <div style={{ flex: '0 0 500px' }}>
           <div
             ref={containerRef}
             style={{
@@ -450,7 +446,7 @@ export function ReplayModal() {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-              Nodes: <strong>{genome.nodes.length}</strong> | Muscles:{' '}
+              Gen {genome.generation} | Nodes: <strong>{genome.nodes.length}</strong> | Muscles:{' '}
               <strong>{genome.muscles.length}</strong> | Pellets:{' '}
               <strong>
                 {replayResult.pelletsCollected}/{replayResult.pellets.length}
@@ -467,157 +463,73 @@ export function ReplayModal() {
           </div>
         </div>
 
-        {/* Middle: Genome viewer */}
-        <div
-          style={{
-            flex: '0 0 280px',
-            maxHeight: '500px',
-            overflowY: 'auto',
-            background: 'var(--bg-tertiary)',
-            borderRadius: '12px',
-            padding: '16px',
-            fontSize: '12px',
-            fontFamily: 'monospace',
-          }}
-        >
-          {/* Info section */}
-          <div style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
-            <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: '8px', fontSize: '13px' }}>
-              CREATURE INFO
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>ID:</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{genome.id}</span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Generation:</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{genome.generation}</span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Survival Streak:</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{genome.survivalStreak}</span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Parents:</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>
-                {genome.parentIds.length > 0 ? genome.parentIds.length : 'None (Gen 0)'}
-              </span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Global Freq Mult:</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{formatNumber(genome.globalFrequencyMultiplier)}</span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Distance Traveled:</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{replayResult.distanceTraveled.toFixed(2)}</span>
-            </div>
-            {replayResult.disqualified && (
-              <div style={{ marginTop: '8px', color: 'var(--danger)' }}>
-                Disqualified: {replayResult.disqualified}
-              </div>
-            )}
-          </div>
-
-          {/* Nodes section */}
-          <div style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
-            <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: '8px', fontSize: '13px' }}>
-              NODES ({genome.nodes.length})
-            </div>
-            {genome.nodes.map((node, i) => (
+        {/* Right: Neural Network + Family Tree side by side */}
+        <div style={{ flex: '1 1 auto', display: 'flex', gap: '16px', minWidth: 0 }}>
+          {/* Neural Network panel (only shown for neural creatures) */}
+          {hasNeuralGenome && (
+            <div
+              style={{
+                flex: '0 0 280px',
+                maxHeight: '480px',
+                background: 'var(--bg-tertiary)',
+                borderRadius: '12px',
+                padding: '16px',
+              }}
+            >
               <div
-                key={node.id}
                 style={{
-                  marginBottom: '8px',
-                  padding: '8px',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: '6px',
+                  color: 'var(--accent)',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  marginBottom: '12px',
+                  borderBottom: '1px solid var(--border-light)',
+                  paddingBottom: '4px',
                 }}
               >
-                <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>
-                  Node {i + 1}
+                NEURAL NETWORK
+              </div>
+              <div ref={neuralVizContainerRef} style={{ marginBottom: '12px' }} />
+              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Mode:</span> {config.neuralMode || 'hybrid'}
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Size:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{formatNumber(node.size)}</span>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Topology:</span>{' '}
+                  {genome.neuralGenome!.topology.inputSize} → {genome.neuralGenome!.topology.hiddenSize} →{' '}
+                  {genome.neuralGenome!.topology.outputSize}
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Friction:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{formatNumber(node.friction)}</span>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Activation:</span> {genome.neuralGenome!.activation}
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Position:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{formatVector(node.position)}</span>
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Weights:</span> {genome.neuralGenome!.weights.length}
+                </div>
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '4px' }}>SENSOR INPUTS</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '9px' }}>
+                    {SENSOR_NAMES.map((name, i) => (
+                      <div
+                        key={name}
+                        style={{
+                          color: i < 3 ? 'var(--accent)' : i < 6 ? 'var(--success)' : 'var(--text-secondary)',
+                        }}
+                      >
+                        {name}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Muscles section */}
-          <div>
-            <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: '8px', fontSize: '13px' }}>
-              MUSCLES ({genome.muscles.length})
             </div>
-            {genome.muscles.map((muscle, i) => {
-              const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
-              const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
+          )}
 
-              return (
-                <div
-                  key={i}
-                  style={{
-                    marginBottom: '12px',
-                    padding: '8px',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '6px',
-                  }}
-                >
-                  <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>
-                    Muscle {i + 1} (Node {nodeAIndex} ↔ Node {nodeBIndex})
-                  </div>
-
-                  <div style={{ marginBottom: '4px' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '2px' }}>PHYSICAL</div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Rest Length:</span>{' '}
-                      <span style={{ color: 'var(--text-primary)' }}>{formatNumber(muscle.restLength)}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Stiffness:</span>{' '}
-                      <span style={{ color: 'var(--text-primary)' }}>{formatNumber(muscle.stiffness)}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Damping:</span>{' '}
-                      <span style={{ color: 'var(--text-primary)' }}>{formatNumber(muscle.damping)}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '4px' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '2px' }}>OSCILLATION</div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Frequency:</span>{' '}
-                      <span style={{ color: 'var(--text-primary)' }}>{formatNumber(muscle.frequency)} Hz</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Amplitude:</span>{' '}
-                      <span style={{ color: 'var(--text-primary)' }}>{formatNumber(muscle.amplitude)}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Phase:</span>{' '}
-                      <span style={{ color: 'var(--text-primary)' }}>{formatNumber(muscle.phase)} rad</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Neural Network panel (only shown for neural creatures) */}
-        {hasNeuralGenome && (
+          {/* Family Tree panel */}
           <div
             style={{
-              flex: '0 0 280px',
-              maxHeight: '500px',
+              flex: '1 1 280px',
+              minWidth: '250px',
+              maxHeight: '480px',
+              overflow: 'auto',
               background: 'var(--bg-tertiary)',
               borderRadius: '12px',
               padding: '16px',
@@ -625,104 +537,46 @@ export function ReplayModal() {
           >
             <div
               style={{
-                color: 'var(--accent)',
-                fontWeight: 600,
-                fontSize: '13px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 marginBottom: '12px',
                 borderBottom: '1px solid var(--border-light)',
                 paddingBottom: '4px',
               }}
             >
-              NEURAL NETWORK
+              <div style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '13px' }}>FAMILY TREE</div>
+              <select
+                value={lineageMode}
+                onChange={(e) => setLineageMode(e.target.value as 'both' | 'crossover' | 'clone')}
+                style={{
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="both">Both</option>
+                <option value="crossover">Crossover only</option>
+                <option value="clone">Clone only</option>
+              </select>
             </div>
-            <div ref={neuralVizContainerRef} style={{ marginBottom: '12px' }} />
-            <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
-              <div style={{ marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Mode:</span> {config.neuralMode || 'hybrid'}
-              </div>
-              <div style={{ marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Topology:</span>{' '}
-                {genome.neuralGenome!.topology.inputSize} → {genome.neuralGenome!.topology.hiddenSize} →{' '}
-                {genome.neuralGenome!.topology.outputSize}
-              </div>
-              <div style={{ marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Activation:</span> {genome.neuralGenome!.activation}
-              </div>
-              <div style={{ marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Weights:</span> {genome.neuralGenome!.weights.length}
-              </div>
-              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '4px' }}>SENSOR INPUTS</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '9px' }}>
-                  {SENSOR_NAMES.map((name, i) => (
-                    <div
-                      key={name}
-                      style={{
-                        color: i < 3 ? 'var(--accent)' : i < 6 ? 'var(--success)' : 'var(--text-secondary)',
-                      }}
-                    >
-                      {name}
-                    </div>
-                  ))}
+            <div style={{ minHeight: '100px', minWidth: 'max-content' }}>
+              {familyTreeLoading ? (
+                <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                  Loading ancestry...
                 </div>
-              </div>
+              ) : familyTree ? (
+                <FamilyTreeDisplay tree={familyTree} lineageMode={lineageMode} />
+              ) : (
+                <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                  Select a creature to view ancestry
+                </div>
+              )}
             </div>
-          </div>
-        )}
-
-        {/* Family Tree panel */}
-        <div
-          style={{
-            flex: '1 1 300px',
-            minWidth: '280px',
-            maxHeight: '500px',
-            overflow: 'auto',
-            background: 'var(--bg-tertiary)',
-            borderRadius: '12px',
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '12px',
-              borderBottom: '1px solid var(--border-light)',
-              paddingBottom: '4px',
-            }}
-          >
-            <div style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '13px' }}>FAMILY TREE</div>
-            <select
-              value={lineageMode}
-              onChange={(e) => setLineageMode(e.target.value as 'both' | 'crossover' | 'clone')}
-              style={{
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '2px 6px',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="both">Both</option>
-              <option value="crossover">Crossover only</option>
-              <option value="clone">Clone only</option>
-            </select>
-          </div>
-          <div style={{ minHeight: '100px', minWidth: 'max-content' }}>
-            {familyTreeLoading ? (
-              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-                Loading ancestry...
-              </div>
-            ) : familyTree ? (
-              <FamilyTreeDisplay tree={familyTree} lineageMode={lineageMode} />
-            ) : (
-              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-                Select a creature to view ancestry
-              </div>
-            )}
           </div>
         </div>
       </div>

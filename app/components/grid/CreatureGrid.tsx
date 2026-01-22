@@ -31,6 +31,9 @@ export function CreatureGrid() {
   const [isSorted, setIsSorted] = useState(true);
   const prevStepRef = useRef(evolutionStep);
 
+  // Track renderer ready state to force re-render when ready
+  const [rendererReady, setRendererReady] = useState(false);
+
   // Handle step transitions for sorting
   useEffect(() => {
     const prevStep = prevStepRef.current;
@@ -71,9 +74,11 @@ export function CreatureGrid() {
   // Initialize renderer on mount
   useEffect(() => {
     rendererRef.current = new CreatureCardRenderer();
+    setRendererReady(true);
     return () => {
       rendererRef.current?.dispose();
       rendererRef.current = null;
+      setRendererReady(false);
     };
   }, []);
 
@@ -145,7 +150,8 @@ export function CreatureGrid() {
     hideTooltip();
   };
 
-  if (displayResults.length === 0) {
+  // Don't render until we have results and renderer is ready
+  if (displayResults.length === 0 || !rendererReady) {
     return null;
   }
 

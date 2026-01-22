@@ -189,6 +189,23 @@ export function NeuralPanel() {
             />
           </div>
 
+          {/* Dead Zone - only shown in Pure mode */}
+          {config.neuralMode === 'pure' && (
+            <div style={{ marginBottom: '16px' }}>
+              <ParamSlider
+                name="Dead Zone"
+                value={config.neuralDeadZone}
+                displayValue={String(config.neuralDeadZone)}
+                min={0}
+                max={0.5}
+                step={0.05}
+                onChange={(v) => setConfig({ neuralDeadZone: v })}
+                tooltip="Outputs with absolute value below this threshold become 0. Higher values make muscles harder to activate, encouraging sparse activation patterns."
+                width="100%"
+              />
+            </div>
+          )}
+
           {/* Efficiency Penalty */}
           <div style={{ marginBottom: '16px' }}>
             <ParamSlider

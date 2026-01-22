@@ -7,7 +7,7 @@
     {
       "id": 1,
       "name": "Output Bias Parameter",
-      "status": "pending",
+      "status": "complete",
       "description": "Replace dead zone with configurable output bias in neural settings",
       "tasks": [
         "Add outputBias to SimulationConfig (range -2 to 0, default -0.5)",
@@ -16,13 +16,18 @@
         "Update tooltip to explain output bias effect on muscle activation",
         "Remove dead zone code path from BatchSimulator"
       ],
-      "files": ["src/types/simulation.ts", "src/neural/NeuralNetwork.ts", "src/main.ts", "src/simulation/BatchSimulator.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/neural/NeuralNetwork.ts",
+        "src/main.ts",
+        "src/simulation/BatchSimulator.ts"
+      ],
       "test_focus": "Creatures should be more active with bias closer to 0"
     },
     {
       "id": 2,
       "name": "Mutation Decay Improvements",
-      "status": "pending",
+      "status": "complete",
       "description": "Add configurable decay start, end, and duration parameters",
       "tasks": [
         "Add to SimulationConfig: mutationDecayStart (default 0.5), mutationDecayEnd (default 0.1), mutationDecayGenerations (default 100)",
@@ -30,7 +35,11 @@
         "Add UI controls in neural panel for all three parameters",
         "Update Neural Config display box to show current effective rate"
       ],
-      "files": ["src/types/simulation.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/genetics/Population.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Verify mutation rate changes correctly over generations"
     },
     {
@@ -45,7 +54,12 @@
         "Update Population.evolve() to use selected method",
         "Add UI dropdown for selection method"
       ],
-      "files": ["src/types/simulation.ts", "src/genetics/Selection.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/genetics/Selection.ts",
+        "src/genetics/Population.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Tournament should maintain more diversity than truncation"
     },
     {
@@ -61,7 +75,11 @@
         "Implement stagnation detection and rate boost logic",
         "Add UI toggle and parameter controls"
       ],
-      "files": ["src/types/simulation.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/genetics/Population.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Mutation rate should increase after N generations without improvement"
     },
     {
@@ -75,7 +93,11 @@
         "Add eta parameter slider (default 2.0, range 0.5-5.0)",
         "Add UI dropdown for crossover method"
       ],
-      "files": ["src/types/simulation.ts", "src/genetics/Crossover.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/genetics/Crossover.ts",
+        "src/main.ts"
+      ],
       "test_focus": "SBX should produce offspring 'between' parents more smoothly"
     },
     {
@@ -91,7 +113,12 @@
         "Integrate into selection process",
         "Add UI toggle and radius slider"
       ],
-      "files": ["src/types/simulation.ts", "src/genetics/Selection.ts", "src/genetics/Population.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/genetics/Selection.ts",
+        "src/genetics/Population.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Population should maintain more phenotypic diversity"
     },
     {
@@ -106,7 +133,11 @@
         "Update fitness calculation in BatchSimulator",
         "Add UI controls"
       ],
-      "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/simulation/BatchSimulator.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Faster collectors should score higher"
     },
     {
@@ -125,7 +156,12 @@
         "Handle topology adaptation when proprioception toggled",
         "Add UI toggle and input type selector"
       ],
-      "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/neural/NeuralGenome.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/simulation/BatchSimulator.ts",
+        "src/neural/NeuralGenome.ts",
+        "src/main.ts"
+      ],
       "test_focus": "With proprioception, creatures should develop smoother gaits and better balance"
     },
     {
@@ -140,7 +176,11 @@
         "Update fitness calculation in BatchSimulator",
         "Add UI controls for start gen and ramp duration"
       ],
-      "files": ["src/types/simulation.ts", "src/simulation/BatchSimulator.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/simulation/BatchSimulator.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Early generations should explore freely, later generations penalized for inefficiency"
     },
     {
@@ -157,7 +197,12 @@
         "Add species stagnation tracking and culling",
         "Visualize species count in stats panel"
       ],
-      "files": ["src/types/simulation.ts", "src/genetics/Speciation.ts (new)", "src/genetics/Population.ts", "src/main.ts"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/genetics/Speciation.ts (new)",
+        "src/genetics/Population.ts",
+        "src/main.ts"
+      ],
       "test_focus": "Multiple species should coexist with different strategies"
     },
     {
@@ -174,7 +219,10 @@
         "Section 5: Advanced (proprioception, speciation)",
         "Make panel scrollable or use tabs"
       ],
-      "files": ["src/main.ts", "src/styles/main.css"],
+      "files": [
+        "src/main.ts",
+        "src/styles/main.css"
+      ],
       "test_focus": "All parameters accessible and well-organized"
     },
     {
@@ -190,7 +238,10 @@
         "Enable batch execution for parameter sweeps",
         "Add progress callbacks for long runs"
       ],
-      "files": ["src/api/types.ts (new)", "src/api/simulation.ts (new)"],
+      "files": [
+        "src/api/types.ts (new)",
+        "src/api/simulation.ts (new)"
+      ],
       "test_focus": "Headless runs should complete and return results"
     },
     {
@@ -208,7 +259,12 @@
         "Export best configuration found",
         "Add NAS control panel in UI"
       ],
-      "files": ["src/nas/types.ts (new)", "src/nas/GridSearch.ts (new)", "src/nas/RandomSearch.ts (new)", "src/nas/NASRunner.ts (new)"],
+      "files": [
+        "src/nas/types.ts (new)",
+        "src/nas/GridSearch.ts (new)",
+        "src/nas/RandomSearch.ts (new)",
+        "src/nas/NASRunner.ts (new)"
+      ],
       "test_focus": "NAS should find better parameters than defaults"
     },
     {
@@ -227,7 +283,12 @@
         "Implement smooth parameter transitions (optional: ramp over N generations)",
         "Add 'revert to generation X config' functionality"
       ],
-      "files": ["src/types/simulation.ts", "src/storage/RunStorage.ts", "src/main.ts", "src/ui/ParameterTimeline.ts (new)"],
+      "files": [
+        "src/types/simulation.ts",
+        "src/storage/RunStorage.ts",
+        "src/main.ts",
+        "src/ui/ParameterTimeline.ts (new)"
+      ],
       "test_focus": "Parameter changes should take effect immediately and be tracked in history",
       "notes": "This enables 'playing god' - watching evolution and nudging parameters when stuck. Storage complexity: each run stores array of ParameterChangeEvents."
     },
@@ -247,7 +308,12 @@
         "Add NEAT crossover by gene alignment",
         "Integrate with speciation (Phase 10)"
       ],
-      "files": ["src/neural/NEATGenome.ts (new)", "src/neural/NEATNetwork.ts (new)", "src/genetics/NEATMutation.ts (new)", "src/genetics/NEATCrossover.ts (new)"],
+      "files": [
+        "src/neural/NEATGenome.ts (new)",
+        "src/neural/NEATNetwork.ts (new)",
+        "src/genetics/NEATMutation.ts (new)",
+        "src/genetics/NEATCrossover.ts (new)"
+      ],
       "test_focus": "NEAT networks should grow topology over generations"
     }
   ],
@@ -274,12 +340,30 @@
   },
   "documentation": {
     "files": [
-      {"path": "CHANGELOG.md", "purpose": "Version history"},
-      {"path": "CLAUDE.md", "purpose": "AI assistant context"},
-      {"path": "docs/NEURAL.md", "purpose": "Neural network architecture and evolution"},
-      {"path": "docs/GENOME.md", "purpose": "Genome structure and encoding"},
-      {"path": "docs/NEAT_FUTURE.md", "purpose": "NEAT implementation plan (already exists)"},
-      {"path": "docs/optimized-runs.md", "purpose": "Parameter tuning results"}
+      {
+        "path": "CHANGELOG.md",
+        "purpose": "Version history"
+      },
+      {
+        "path": "CLAUDE.md",
+        "purpose": "AI assistant context"
+      },
+      {
+        "path": "docs/NEURAL.md",
+        "purpose": "Neural network architecture and evolution"
+      },
+      {
+        "path": "docs/GENOME.md",
+        "purpose": "Genome structure and encoding"
+      },
+      {
+        "path": "docs/NEAT_FUTURE.md",
+        "purpose": "NEAT implementation plan (already exists)"
+      },
+      {
+        "path": "docs/optimized-runs.md",
+        "purpose": "Parameter tuning results"
+      }
     ],
     "update_after_each_phase": true
   },

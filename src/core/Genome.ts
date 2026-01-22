@@ -176,7 +176,8 @@ export function generateRandomGenome(
         hiddenSize: simulationConfig?.neuralHiddenSize || 8,
         activation: simulationConfig?.neuralActivation || 'tanh',
         weightMutationRate: simulationConfig?.weightMutationRate || 0.1,
-        weightMutationMagnitude: simulationConfig?.weightMutationMagnitude || 0.3
+        weightMutationMagnitude: simulationConfig?.weightMutationMagnitude || 0.3,
+        outputBias: simulationConfig?.neuralOutputBias ?? -0.5
       })
     : undefined;
 

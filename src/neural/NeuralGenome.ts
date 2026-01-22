@@ -36,6 +36,7 @@ export interface NeuralConfig {
   activation: ActivationType;      // Activation function
   weightMutationRate: number;      // Probability each weight mutates
   weightMutationMagnitude: number; // Std dev of weight perturbation
+  outputBias: number;              // Initial output neuron bias (-2 to 0)
 }
 
 /**
@@ -47,7 +48,8 @@ export const DEFAULT_NEURAL_CONFIG: NeuralConfig = {
   hiddenSize: 8,
   activation: 'tanh',
   weightMutationRate: 0.1,
-  weightMutationMagnitude: 0.3
+  weightMutationMagnitude: 0.3,
+  outputBias: -0.5
 };
 
 /**
