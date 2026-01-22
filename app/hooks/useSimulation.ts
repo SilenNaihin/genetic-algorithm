@@ -107,6 +107,32 @@ export function useSimulation() {
   );
 
   /**
+   * Update longest survivor tracking (creature with highest survivalStreak)
+   */
+  const updateLongestSurvivor = useCallback(
+    (results: CreatureSimulationResult[], gen: number) => {
+      const validResults = results.filter(
+        (r) => !isNaN(r.finalFitness) && isFinite(r.finalFitness)
+      );
+      if (validResults.length === 0) return;
+
+      // Find creature with highest survivalStreak
+      const longestSurvivor = validResults.reduce((longest, r) =>
+        (r.genome.survivalStreak || 0) > (longest.genome.survivalStreak || 0) ? r : longest
+      , validResults[0]);
+
+      const streak = longestSurvivor.genome.survivalStreak || 0;
+      const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
+
+      if (streak > 0 && streak > currentLongestGens) {
+        setLongestSurvivor(longestSurvivor, streak, gen);
+        StorageService.updateLongestSurvivor(longestSurvivor, streak, gen);
+      }
+    },
+    [setLongestSurvivor]
+  );
+
+  /**
    * Start a new evolution simulation
    */
   const startSimulation = useCallback(async () => {
@@ -196,27 +222,18 @@ export function useSimulation() {
     const currentResults = useEvolutionStore.getState().simulationResults;
     const currentGen = useEvolutionStore.getState().generation;
 
-    // Sort current results by fitness to find bottom 50%
+    // Sort current results by fitness to find bottom cullPercentage%
+    const currentConfig = useEvolutionStore.getState().config;
     const sortedResults = [...currentResults].sort((a, b) => {
       const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
       const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
       return bFit - aFit;
     });
 
-    const cutoff = Math.floor(sortedResults.length * 0.5);
-    const survivors = sortedResults.slice(0, cutoff);
-    const deadCreatures = sortedResults.slice(cutoff);
-
-    // Track longest survivor among creatures that are dying
-    const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
-    for (const dead of deadCreatures) {
-      const streak = dead.genome.survivalStreak || 0;
-      if (streak > 0 && streak > currentLongestGens) {
-        // This creature beat the record before dying
-        setLongestSurvivor(dead, streak, currentGen);
-        StorageService.updateLongestSurvivor(dead, streak, currentGen);
-      }
-    }
+    // cullPercentage is the fraction killed, so survivors = 1 - cullPercentage
+    const survivorCount = Math.floor(sortedResults.length * (1 - currentConfig.cullPercentage));
+    const survivors = sortedResults.slice(0, survivorCount);
+    const deadCreatures = sortedResults.slice(survivorCount);
 
     // Grid position helper
     const GRID_COLS = 10;
@@ -401,9 +418,10 @@ export function useSimulation() {
     await recordFitnessHistory(results, currentGen, history);
     await recordCreatureTypeHistory(results, currentGen);
     updateBestCreature(results, currentGen);
+    updateLongestSurvivor(results, currentGen);
 
     setEvolutionStep('idle');
-  }, [setEvolutionStep, clearCardAnimationStates, setSortAnimationTriggered, recordFitnessHistory, recordCreatureTypeHistory, updateBestCreature]);
+  }, [setEvolutionStep, clearCardAnimationStates, setSortAnimationTriggered, recordFitnessHistory, recordCreatureTypeHistory, updateBestCreature, updateLongestSurvivor]);
 
   /**
    * Execute one step in the evolution cycle.
