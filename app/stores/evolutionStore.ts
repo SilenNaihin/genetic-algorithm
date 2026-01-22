@@ -82,6 +82,9 @@ interface EvolutionState {
 
   // Generation jump modal
   generationJumpModalOpen: boolean;
+
+  // Error notification
+  notification: { message: string; type: 'error' | 'info' } | null;
 }
 
 /**
@@ -113,6 +116,8 @@ interface EvolutionActions {
   setSortAnimationTriggered: (triggered: boolean) => void;
   setBrainEvolutionModalOpen: (open: boolean) => void;
   setGenerationJumpModalOpen: (open: boolean) => void;
+  setNotification: (notification: { message: string; type: 'error' | 'info' } | null) => void;
+  showError: (message: string) => void;
 
   // Complex actions (will be implemented in later phases)
   // These are placeholders that will call services
@@ -147,6 +152,7 @@ const initialState: EvolutionState = {
   sortAnimationTriggered: false,
   brainEvolutionModalOpen: false,
   generationJumpModalOpen: false,
+  notification: null,
 };
 
 /**
@@ -212,6 +218,8 @@ export const useEvolutionStore = create<EvolutionStore>()(
       setSortAnimationTriggered: (sortAnimationTriggered) => set({ sortAnimationTriggered }, false, 'setSortAnimationTriggered'),
       setBrainEvolutionModalOpen: (brainEvolutionModalOpen) => set({ brainEvolutionModalOpen }, false, 'setBrainEvolutionModalOpen'),
       setGenerationJumpModalOpen: (generationJumpModalOpen) => set({ generationJumpModalOpen }, false, 'setGenerationJumpModalOpen'),
+      setNotification: (notification) => set({ notification }, false, 'setNotification'),
+      showError: (message) => set({ notification: { message, type: 'error' } }, false, 'showError'),
 
       // Reset to initial state
       reset: () => set(initialState, false, 'reset'),

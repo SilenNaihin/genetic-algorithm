@@ -141,13 +141,6 @@ export function StatsPanel() {
           className="gen-nav-btn"
           onClick={handlePrevGen}
           disabled={!canGoPrev}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: canGoPrev ? 'pointer' : 'default',
-            opacity: canGoPrev ? 1 : 0.3,
-            padding: '4px',
-          }}
         >
           <svg
             width="12"
@@ -193,13 +186,6 @@ export function StatsPanel() {
           className="gen-nav-btn"
           onClick={handleNextGen}
           disabled={!canGoNext}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: canGoNext ? 'pointer' : 'default',
-            opacity: canGoNext ? 1 : 0.3,
-            padding: '4px',
-          }}
         >
           <svg
             width="12"

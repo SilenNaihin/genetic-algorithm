@@ -3,6 +3,7 @@
 import { useAppState } from '../stores/evolutionStore';
 import { MenuScreen } from '../components/menu';
 import { GridView } from '../components/grid';
+import { Notification } from '../components/ui/Notification';
 
 /**
  * Main React app entry point.
@@ -11,9 +12,10 @@ import { GridView } from '../components/grid';
 export default function MenuPage() {
   const appState = useAppState();
 
-  if (appState === 'grid') {
-    return <GridView />;
-  }
-
-  return <MenuScreen />;
+  return (
+    <>
+      {appState === 'grid' ? <GridView /> : <MenuScreen />}
+      <Notification />
+    </>
+  );
 }

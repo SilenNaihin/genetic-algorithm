@@ -7,6 +7,9 @@ import * as StorageService from '../../src/services/StorageService';
 import * as SimState from '../lib/simulationState';
 import type { CreatureSimulationResult } from '../../src/simulation/BatchSimulator';
 
+// Get showError from store for non-hook context
+const showError = (message: string) => useEvolutionStore.getState().showError(message);
+
 // Animation timing constants (matches vanilla app)
 const MARK_DEAD_DELAY = 600;
 const FADE_OUT_DELAY = 400;
@@ -47,7 +50,7 @@ export function useSimulation() {
    * Record fitness history for current generation
    */
   const recordFitnessHistory = useCallback(
-    (results: CreatureSimulationResult[], gen: number, history: typeof fitnessHistory) => {
+    async (results: CreatureSimulationResult[], gen: number, history: typeof fitnessHistory) => {
       const stats = SimulationService.calculateFitnessStats(results);
       if (stats.validCount === 0) return history;
 
@@ -60,7 +63,7 @@ export function useSimulation() {
 
       const newHistory = [...history, newEntry];
       setFitnessHistory(newHistory);
-      StorageService.updateFitnessHistory(newHistory);
+      await StorageService.updateFitnessHistory(newHistory);
       return newHistory;
     },
     [setFitnessHistory]
@@ -70,7 +73,7 @@ export function useSimulation() {
    * Record creature type history (node count distribution)
    */
   const recordCreatureTypeHistory = useCallback(
-    (results: CreatureSimulationResult[], gen: number) => {
+    async (results: CreatureSimulationResult[], gen: number) => {
       const nodeCountDistribution = new Map<number, number>();
       for (const result of results) {
         const nodeCount = result.genome.nodes.length;
@@ -81,7 +84,7 @@ export function useSimulation() {
       const currentHistory = useEvolutionStore.getState().creatureTypeHistory;
       const newHistory = [...currentHistory, newEntry];
       setCreatureTypeHistory(newHistory);
-      StorageService.updateCreatureTypeHistory(newHistory);
+      await StorageService.updateCreatureTypeHistory(newHistory);
     },
     [setCreatureTypeHistory]
   );
@@ -160,6 +163,7 @@ export function useSimulation() {
       return results;
     } catch (error) {
       console.error('Failed to start simulation:', error);
+      showError('Failed to start simulation. Please try again.');
       throw error;
     }
   }, [
@@ -393,9 +397,9 @@ export function useSimulation() {
       setSortAnimationTriggered(false);
     }
 
-    // Record history
-    recordFitnessHistory(results, currentGen, history);
-    recordCreatureTypeHistory(results, currentGen);
+    // Record history - must be sequential to avoid race condition on IndexedDB writes
+    await recordFitnessHistory(results, currentGen, history);
+    await recordCreatureTypeHistory(results, currentGen);
     updateBestCreature(results, currentGen);
 
     setEvolutionStep('idle');
@@ -484,20 +488,20 @@ export function useSimulation() {
         await StorageService.initStorage();
         const run = await StorageService.getRun(runId);
         if (!run) {
-          console.error('Run not found');
+          showError('Run not found');
           return;
         }
 
         const maxGen = run.generationCount - 1;
         if (maxGen < 0) {
-          console.error('No saved generations');
+          showError('No saved generations in this run');
           return;
         }
 
         // Load the most recent generation
         const results = await StorageService.loadGeneration(runId, maxGen, run.config);
         if (!results) {
-          console.error('Could not load generation data');
+          showError('Could not load generation data');
           return;
         }
 
@@ -550,6 +554,7 @@ export function useSimulation() {
         }
       } catch (error) {
         console.error('Error loading run:', error);
+        showError('Failed to load run');
       }
     },
     [setBestCreature, setLongestSurvivor]
@@ -670,6 +675,7 @@ export function useSimulation() {
       console.log(`Forked run to new run: ${newRunId}, starting at generation ${viewingGen}`);
     } catch (error) {
       console.error('Failed to fork run:', error);
+      showError('Failed to fork run');
     }
   }, [clearCardAnimationStates]);
 
