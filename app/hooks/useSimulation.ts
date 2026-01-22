@@ -421,8 +421,11 @@ export function useSimulation() {
       await runMutateStep();
       // runMutateStep sets evolutionStep to 'simulate' when done
     } else if (currentStep === 'simulate') {
-      // Run simulation, then immediately sort
+      // Run simulation
       await runSimulateStep();
+      // runSimulateStep sets evolutionStep to 'sort' when done
+    } else if (currentStep === 'sort') {
+      // Run sort step
       await runSortStep();
       // runSortStep sets evolutionStep to 'idle' when done
     }
