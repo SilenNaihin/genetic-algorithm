@@ -111,7 +111,8 @@ export function singlePointCrossover(
         hiddenSize: neuralGenome.topology.hiddenSize,
         activation: neuralGenome.activation,
         weightMutationRate: 0.1,
-        weightMutationMagnitude: 0.3
+        weightMutationMagnitude: 0.3,
+        outputBias: DEFAULT_OUTPUT_BIAS
       });
     }
   } else if (parent1.neuralGenome) {
@@ -123,7 +124,8 @@ export function singlePointCrossover(
         hiddenSize: neuralGenome.topology.hiddenSize,
         activation: neuralGenome.activation,
         weightMutationRate: 0.1,
-        weightMutationMagnitude: 0.3
+        weightMutationMagnitude: 0.3,
+        outputBias: DEFAULT_OUTPUT_BIAS
       });
     }
   }
@@ -241,7 +243,8 @@ export function uniformCrossover(
         hiddenSize: neuralGenome.topology.hiddenSize,
         activation: neuralGenome.activation,
         weightMutationRate: 0.1,
-        weightMutationMagnitude: 0.3
+        weightMutationMagnitude: 0.3,
+        outputBias: DEFAULT_OUTPUT_BIAS
       });
     }
   } else if (parent1.neuralGenome) {
@@ -253,7 +256,8 @@ export function uniformCrossover(
         hiddenSize: neuralGenome.topology.hiddenSize,
         activation: neuralGenome.activation,
         weightMutationRate: 0.1,
-        weightMutationMagnitude: 0.3
+        weightMutationMagnitude: 0.3,
+        outputBias: DEFAULT_OUTPUT_BIAS
       });
     }
   }
@@ -474,10 +478,13 @@ export function crossoverOrInitNeuralGenome(
 export function adaptNeuralTopology(
   genome: NeuralGenomeData,
   newMuscleCount: number,
-  _config: NeuralConfig
+  config: NeuralConfig
 ): NeuralGenomeData {
   const { inputSize, hiddenSize } = genome.topology;
   const oldOutputSize = genome.topology.outputSize;
+
+  // Use config's output bias for new neurons, fall back to default
+  const outputBias = config.outputBias ?? DEFAULT_OUTPUT_BIAS;
 
   // Calculate weight boundaries
   const inputToHiddenCount = inputSize * hiddenSize + hiddenSize;  // weights + bias
@@ -518,10 +525,10 @@ export function adaptNeuralTopology(
     if (o < oldOutputSize) {
       // Copy old bias
       const oldBiasIdx = hiddenSize * oldOutputSize + o;
-      newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldBiasIdx] ?? DEFAULT_OUTPUT_BIAS);
+      newHiddenToOutputWeights.push(oldHiddenToOutputWeights[oldBiasIdx] ?? outputBias);
     } else {
       // Negative bias for new neurons (muscles default to "off")
-      newHiddenToOutputWeights.push(DEFAULT_OUTPUT_BIAS);
+      newHiddenToOutputWeights.push(outputBias);
     }
   }
 

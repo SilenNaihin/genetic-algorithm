@@ -279,6 +279,7 @@ export function simulateCreature(
   let neuralNetwork: NeuralNetwork | null = null;
   const useNeural = config.useNeuralNet && genome.controllerType === 'neural' && genome.neuralGenome;
   const neuralMode = config.neuralMode || 'hybrid';
+  const deadZone = config.neuralDeadZone ?? 0.1;
 
   if (useNeural && genome.neuralGenome) {
     neuralNetwork = createNetworkFromGenome(genome.neuralGenome);
@@ -364,9 +365,6 @@ export function simulateCreature(
   const regressionPenalty = config.fitnessRegressionPenalty ?? 20;
   const efficiencyPenalty = config.fitnessEfficiencyPenalty ?? 0.5;
   const TARGET_DISPLACEMENT_RATE = 1.0;  // Units/second for full bonus (net displacement)
-
-  // Neural network settings
-  const deadZone = config.neuralDeadZone ?? 0.1;
 
   const calculateCurrentFitness = (
     centerOfMass: Vector3,

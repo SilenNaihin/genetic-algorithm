@@ -4,7 +4,7 @@ Browser-based genetic algorithm simulator where soft-bodied creatures evolve to 
 
 ## Quick Reference
 
-- Dev: `npm run dev`
+- Dev: `npm run dev` (port 3001)
 - Test: `npm test`
 - Build: `npm run build`
 - Type check: `tsc --noEmit`
@@ -12,30 +12,50 @@ Browser-based genetic algorithm simulator where soft-bodied creatures evolve to 
 ## Directory Structure
 
 ```
-src/
-├── __tests__/        # Vitest tests
-├── core/             # Domain models (Creature, Genome, Pellet)
-├── genetics/         # Evolution (Selection, Crossover, Mutation, Population, Speciation)
-├── neural/           # Neural network for neuroevolution
-├── physics/          # Cannon-ES physics (BodyFactory, PhysicsWorld)
-├── rendering/        # Three.js visualization
-├── simulation/       # Headless simulation (BatchSimulator)
-├── storage/          # IndexedDB persistence (RunStorage)
-├── styles/           # Tailwind CSS (main.css with design tokens)
-├── types/            # TypeScript interfaces
-├── ui/               # UI components (GraphPanel, NeuralVisualizer, BrainEvolutionPanel)
-├── utils/            # Shared utilities (math, id)
-└── main.ts           # Application entry point (~4200 lines, being refactored)
+app/                    # Next.js React application
+├── components/         # React components
+│   ├── common/         # Shared UI components (Button)
+│   ├── grid/           # Grid view components (CreatureGrid, ControlPanel, StatsPanel)
+│   ├── menu/           # Menu screen components (MenuScreen, ParamSlider, NeuralPanel)
+│   ├── modals/         # Modal dialogs (ReplayModal, LoadRunsModal, BrainEvolutionModal)
+│   └── ui/             # UI utilities (InfoTooltip, Notification)
+├── hooks/              # React hooks (useSimulation)
+├── stores/             # Zustand state management (evolutionStore)
+├── menu/               # /menu route
+├── run/[runId]/        # /run/[runId] dynamic route
+└── page.tsx            # Root page (redirects to /menu)
+
+src/                    # Core simulation modules (shared)
+├── __tests__/          # Vitest tests
+├── core/               # Domain models (Creature, Genome, Pellet)
+├── genetics/           # Evolution (Selection, Crossover, Mutation, Population)
+├── neural/             # Neural network for neuroevolution
+├── physics/            # Cannon-ES physics (BodyFactory, PhysicsWorld)
+├── rendering/          # Three.js visualization (PreviewRenderer, ReplayRenderer)
+├── services/           # Service layer (SimulationService, StorageService)
+├── simulation/         # Headless simulation (BatchSimulator)
+├── storage/            # IndexedDB persistence (RunStorage)
+├── styles/             # Tailwind CSS (main.css with design tokens)
+├── types/              # TypeScript interfaces
+├── ui/                 # Shared UI components (GraphPanel, NeuralVisualizer, BrainEvolutionPanel)
+└── utils/              # Shared utilities (math, id)
 ```
 
 ## Tech Stack
 
-- **Build**: Vite + TypeScript
+- **Framework**: Next.js 16 + React 19
+- **State**: Zustand
 - **3D**: Three.js
 - **Physics**: Cannon-ES
 - **Storage**: IndexedDB
 - **Styling**: Tailwind CSS v4
 - **Testing**: Vitest + happy-dom
+
+## Routes
+
+- `/` - Redirects to /menu
+- `/menu` - Configuration screen with 3D preview
+- `/run/[runId]` - Evolution simulation view for a specific run
 
 ## Genetics System
 
@@ -52,7 +72,7 @@ src/
 - Tests go in `src/__tests__/*.test.ts`
 - Interface tests preferred over unit tests
 - Neural genome topology adapts when muscle count changes (`adaptNeuralTopology`)
-- Output biases default negative (-1.5) for GA optimization
+- Output biases default negative (-0.5) for GA optimization
 
 ## What NOT to Do
 
@@ -94,15 +114,13 @@ npm test -- --run  # Run once (no watch)
 
 ## Context Tips
 
-- `prd.json` tracks the frontend refactoring plan - check status before continuing
 - `genetics-prd.json` tracks the genetics system overhaul - check status before implementing GA features
-- `main.ts` contains EvolutionApp class - being broken into smaller modules
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
-- Fitness: 0-80 progress + 20 collection per pellet + 15 net displacement + 15 distance traveled (all XZ-only)
+- Fitness: 0-80 progress + 100 collection per pellet + 15 net displacement + 15 distance traveled (all XZ-only)
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
   - Pure mode: 7 inputs (no time phase), NN has full control
   - Hybrid mode: 8 inputs (with time phase), NN modulates base oscillation
-  - GA-optimized: negative output biases (-1.5), uniform weights, dead zone threshold
+  - GA-optimized: negative output biases (-0.5), uniform weights, dead zone threshold
   - Efficiency penalty discourages excessive muscle activation
   - BrainEvolutionPanel visualizes weight changes across generations
