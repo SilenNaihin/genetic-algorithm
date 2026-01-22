@@ -1,42 +1,52 @@
 # Fitness Function Update Checklist
 
-When making changes to the fitness function, ensure all these locations are updated:
+Use this checklist when modifying the fitness function to ensure all related components are updated.
 
-## Core Implementation
-- **src/simulation/BatchSimulator.ts** - Main fitness calculation in `calculateCurrentFitness()`
-  - Config values are read at the start of `simulateCreature()`
-  - Fitness breakdown: pelletPoints per pellet + progressMax toward pellet + movementMax for displacement - regressionPenalty
+## Files to Update
 
-## Type Definitions
-- **src/types/simulation.ts** - `SimulationConfig` interface
-  - `fitnessPelletPoints`: Points per pellet collected (default 100)
-  - `fitnessProgressMax`: Max progress bonus toward pellet (default 80)
-  - `fitnessMovementMax`: Max bonus for net displacement (default 25)
-  - `fitnessRegressionPenalty`: Penalty for moving away after 1st pellet (default 20)
-  - Also update `DEFAULT_CONFIG` with any new defaults
+1. **src/simulation/BatchSimulator.ts**
+   - `calculateCurrentFitness()` function (~line 371)
+   - Track any new metrics during simulation loop
+   - Update final fitness calculation
 
-## Storage/Replay
-- **src/storage/RunStorage.ts** - `recalculateFitnessOverTime()` for replay visualization
-  - Must match the logic in BatchSimulator for consistent replay
+2. **src/types/simulation.ts**
+   - Add new config parameters (e.g., `fitnessNewBonus: number`)
+   - Add defaults to `DEFAULT_CONFIG`
 
-## UI
-- **src/main.ts** - Menu UI updates:
-  - Fitness panel HTML (around line 313)
-  - `setupFitnessSlider()` method
-  - `resetFitnessDefaults()` method
-  - `getSettingsInfoHTML()` for the settings info dropdown
+3. **src/main.ts**
+   - Add UI controls in fitness settings panel
+   - Update `getSettingsInfoHTML()` for the config display
+   - Add tooltips if needed
 
-## Current Fitness Model
+4. **src/ui/InfoTooltip.ts**
+   - Add tooltip text for new fitness parameters
+
+## Fitness Components Reference
+
+Current fitness formula:
 ```
-Fitness = (pelletsCollected * pelletPoints)
-        + (progressTowardPellet * progressMax)
-        + (netDisplacementRate * movementMax)
-        - (regressionRatio * regressionPenalty)  // Only after 1st pellet
+fitness = pellets * pelletPoints              // 100 per pellet
+        + progress * progressMax              // 0-80 toward current pellet
+        + displacementRatio * netDisplacementMax  // 0-15 net distance from start
+        + distanceBonus                       // 0-15 total distance traveled
+        - regressionPenalty                   // 0-20 for moving away after collection
+        - muscleActivation * efficiencyPenalty  // Penalize excessive activation
 ```
 
-Where:
-- `progressTowardPellet`: 0-1 based on XZ distance from creature's edge to pellet
-- `netDisplacementRate`: XZ displacement rate (units/sec), capped at 1.0
-- `regressionRatio`: How far the creature moved away from its closest approach
+## Checklist
 
-The minimum fitness is clamped to 0.
+- [ ] Added config parameter with default
+- [ ] Updated `calculateCurrentFitness()` function
+- [ ] Added tracking during simulation if needed
+- [ ] Added UI slider/input in fitness panel
+- [ ] Updated Neural Config display if relevant
+- [ ] Added tooltip explaining the parameter
+- [ ] Updated CLAUDE.md fitness formula if changed
+- [ ] Added CHANGELOG entry
+- [ ] Tested manually that new parameter affects fitness
+
+## Testing
+
+1. Run with new parameter at default - should match previous behavior
+2. Run with extreme values - verify expected effect
+3. Check fitness-over-time graph shows reasonable progression
