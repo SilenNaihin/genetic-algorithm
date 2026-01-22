@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAppState } from './stores/evolutionStore';
+import { MenuScreen } from './components/menu';
+import { GridView } from './components/grid';
+import { Notification } from './components/ui/Notification';
 
 /**
- * Evolution Lab - Root Page
- * Redirects to the menu screen.
+ * Evolution Lab - Main Page
+ * Renders MenuScreen or GridView based on appState.
  */
-export default function RootPage() {
-  const router = useRouter();
+export default function HomePage() {
+  const appState = useAppState();
 
-  useEffect(() => {
-    router.replace('/menu');
-  }, [router]);
-
-  return null;
+  return (
+    <>
+      {appState === 'grid' ? <GridView /> : <MenuScreen />}
+      <Notification />
+    </>
+  );
 }

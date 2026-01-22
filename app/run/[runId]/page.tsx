@@ -46,10 +46,10 @@ export default function RunPage() {
     load();
   }, [runId, loadRun, showError]);
 
-  // If we're on the menu state, redirect to /menu
+  // If we're on the menu state, redirect to /
   useEffect(() => {
     if (!loading && appState === 'menu') {
-      router.push('/menu');
+      router.push('/');
     }
   }, [loading, appState, router]);
 
@@ -87,7 +87,7 @@ export default function RunPage() {
       >
         <div style={{ color: 'var(--danger)', fontSize: '18px' }}>{error}</div>
         <button
-          onClick={() => router.push('/menu')}
+          onClick={() => router.push('/')}
           style={{
             padding: '8px 16px',
             background: 'var(--accent)',
