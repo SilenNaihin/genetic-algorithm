@@ -26,11 +26,18 @@ export function ControlPanel() {
   // Check if simulation is actively running
   const isSimulationRunning = simulationProgress !== null;
 
+  const sortAnimationTriggered = useEvolutionStore((s) => s.sortAnimationTriggered);
+
   // Determine button text based on evolution step (matches vanilla)
   const getStepButtonText = () => {
     // Special case: actively simulating
     if (isSimulationRunning) {
       return 'Simulating...';
+    }
+
+    // Special case: sort animation in progress
+    if (sortAnimationTriggered) {
+      return 'Sorting...';
     }
 
     switch (evolutionStep) {
@@ -47,8 +54,8 @@ export function ControlPanel() {
     }
   };
 
-  // Button disabled during mutate animation, active simulation, auto-run, or viewing history
-  const isStepDisabled = evolutionStep === 'mutate' || isSimulationRunning || isAutoRunning || isViewingHistory;
+  // Button disabled during mutate animation, sort animation in progress, active simulation, auto-run, or viewing history
+  const isStepDisabled = evolutionStep === 'mutate' || sortAnimationTriggered || isSimulationRunning || isAutoRunning || isViewingHistory;
   const isAutoRunDisabled = isAutoRunning || isViewingHistory;
 
   const handleStep = async () => {
