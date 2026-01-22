@@ -126,7 +126,7 @@ export function useSimulation() {
 
       // Initialize storage and create new run
       await StorageService.initStorage();
-      await StorageService.createRun(currentConfig);
+      const runId = await StorageService.createRun(currentConfig);
 
       // Create initial population
       const population = SimulationService.createInitialPopulation(currentConfig);
@@ -160,7 +160,7 @@ export function useSimulation() {
       // Reset to idle state after initial simulation
       setEvolutionStep('idle');
 
-      return results;
+      return { results, runId };
     } catch (error) {
       console.error('Failed to start simulation:', error);
       showError('Failed to start simulation. Please try again.');
@@ -672,10 +672,11 @@ export function useSimulation() {
       // Clear any animation states
       clearCardAnimationStates();
 
-      console.log(`Forked run to new run: ${newRunId}, starting at generation ${viewingGen}`);
+      return newRunId;
     } catch (error) {
       console.error('Failed to fork run:', error);
       showError('Failed to fork run');
+      return null;
     }
   }, [clearCardAnimationStates]);
 

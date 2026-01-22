@@ -1,5 +1,7 @@
 'use client';
 
+import { InfoTooltip } from '../ui/InfoTooltip';
+
 export interface ParamSliderProps {
   name: string;
   value: number;
@@ -8,6 +10,7 @@ export interface ParamSliderProps {
   max: number;
   step?: number;
   hint?: string;
+  tooltip?: string;
   onChange: (value: number) => void;
   width?: string;
 }
@@ -24,13 +27,17 @@ export function ParamSlider({
   max,
   step = 1,
   hint,
+  tooltip,
   onChange,
   width = '200px',
 }: ParamSliderProps) {
   return (
     <div className="param-group" style={{ width }}>
       <div className="param-label">
-        <span className="param-name">{name}</span>
+        <span className="param-name">
+          {name}
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </span>
         <span className="param-value">{displayValue}</span>
       </div>
       <input

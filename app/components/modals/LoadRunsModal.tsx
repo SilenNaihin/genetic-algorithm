@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useEvolutionStore } from '../../stores/evolutionStore';
-import { useSimulation } from '../../hooks/useSimulation';
 import { Modal } from '../common/Modal';
 import * as StorageService from '../../../src/services/StorageService';
 import type { SavedRun } from '../../../src/storage/RunStorage';
@@ -12,9 +12,9 @@ import type { SavedRun } from '../../../src/storage/RunStorage';
  * Shows a grid of run cards with name, date, generations, and delete option.
  */
 export function LoadRunsModal() {
+  const router = useRouter();
   const loadModalOpen = useEvolutionStore((s) => s.loadModalOpen);
   const setLoadModalOpen = useEvolutionStore((s) => s.setLoadModalOpen);
-  const { loadRun } = useSimulation();
 
   const [runs, setRuns] = useState<SavedRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,9 +56,9 @@ export function LoadRunsModal() {
     }
   };
 
-  const handleLoadRun = async (runId: string) => {
+  const handleLoadRun = (runId: string) => {
     setLoadModalOpen(false);
-    await loadRun(runId);
+    router.push(`/run/${runId}`);
   };
 
   return (

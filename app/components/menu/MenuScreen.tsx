@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEvolutionStore, useConfig } from '../../stores/evolutionStore';
 import { useSimulation } from '../../hooks/useSimulation';
 import { Button } from '../common/Button';
@@ -8,19 +9,24 @@ import { PreviewCanvas } from './PreviewCanvas';
 import { FitnessPanel } from './FitnessPanel';
 import { NeuralPanel } from './NeuralPanel';
 import { LoadRunsModal } from '../modals/LoadRunsModal';
+import { TOOLTIPS } from '../ui/InfoTooltip';
 
 /**
  * Main menu screen component.
  * Displays configuration sliders, 3D preview, and start/load buttons.
  */
 export function MenuScreen() {
+  const router = useRouter();
   const config = useConfig();
   const setConfig = useEvolutionStore((s) => s.setConfig);
   const setLoadModalOpen = useEvolutionStore((s) => s.setLoadModalOpen);
   const { startSimulation } = useSimulation();
 
   const handleStart = async () => {
-    await startSimulation();
+    const result = await startSimulation();
+    if (result?.runId) {
+      router.push(`/run/${result.runId}`);
+    }
   };
 
   const handleLoadRun = () => {
@@ -51,6 +57,7 @@ export function MenuScreen() {
             min={-30}
             max={-5}
             step={0.1}
+            tooltip={TOOLTIPS.gravity}
             onChange={(v) => setConfig({ gravity: v })}
           />
           <ParamSlider
@@ -59,7 +66,7 @@ export function MenuScreen() {
             displayValue={`${Math.round(config.mutationRate * 100)}%`}
             min={5}
             max={80}
-            hint="Per-gene change probability"
+            tooltip={TOOLTIPS.mutationRate}
             onChange={(v) => setConfig({ mutationRate: v / 100 })}
           />
           <ParamSlider
@@ -69,6 +76,7 @@ export function MenuScreen() {
             min={1}
             max={10}
             step={0.5}
+            tooltip={TOOLTIPS.maxAllowedFrequency}
             onChange={(v) => setConfig({ maxAllowedFrequency: v })}
           />
           <ParamSlider
@@ -77,6 +85,7 @@ export function MenuScreen() {
             displayValue={`${config.simulationDuration}s`}
             min={3}
             max={20}
+            tooltip={TOOLTIPS.simulationDuration}
             onChange={(v) => setConfig({ simulationDuration: v })}
           />
           <ParamSlider
@@ -85,6 +94,7 @@ export function MenuScreen() {
             displayValue={String(config.maxNodes)}
             min={2}
             max={15}
+            tooltip={TOOLTIPS.maxNodes}
             onChange={(v) => setConfig({ maxNodes: v })}
           />
           <ParamSlider
@@ -93,6 +103,7 @@ export function MenuScreen() {
             displayValue={String(config.maxMuscles)}
             min={1}
             max={30}
+            tooltip={TOOLTIPS.maxMuscles}
             onChange={(v) => setConfig({ maxMuscles: v })}
           />
         </div>
@@ -105,7 +116,7 @@ export function MenuScreen() {
             displayValue={`${Math.round(config.cullPercentage * 100)}%`}
             min={10}
             max={90}
-            hint="Bottom % removed each gen"
+            tooltip={TOOLTIPS.cullPercentage}
             onChange={(v) => setConfig({ cullPercentage: v / 100 })}
             width="200px"
           />
@@ -148,7 +159,7 @@ export function MenuScreen() {
               displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
               min={0}
               max={100}
-              hint="Crossover <- -> Mutation"
+              tooltip={TOOLTIPS.crossoverRate}
               onChange={(v) => setConfig({ crossoverRate: v / 100 })}
               width="200px"
             />

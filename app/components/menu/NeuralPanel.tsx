@@ -2,6 +2,7 @@
 
 import { useEvolutionStore, useConfig } from '../../stores/evolutionStore';
 import { ParamSlider } from './ParamSlider';
+import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
 
 /**
  * Neural network settings panel - fixed left side of menu screen.
@@ -25,6 +26,8 @@ export function NeuralPanel() {
   const labelStyle = {
     fontSize: '13px',
     color: 'var(--text-secondary)',
+    display: 'flex' as const,
+    alignItems: 'center' as const,
   };
 
   return (
@@ -74,7 +77,10 @@ export function NeuralPanel() {
           {/* Mode */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={labelStyle}>Mode</span>
+              <span style={labelStyle}>
+                Mode
+                <InfoTooltip text={TOOLTIPS.neuralMode} />
+              </span>
             </div>
             <select
               value={config.neuralMode}
@@ -96,6 +102,7 @@ export function NeuralPanel() {
               max={32}
               step={4}
               onChange={(v) => setConfig({ neuralHiddenSize: v })}
+              tooltip={TOOLTIPS.hiddenSize}
               width="100%"
             />
           </div>
@@ -103,7 +110,10 @@ export function NeuralPanel() {
           {/* Activation */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={labelStyle}>Activation</span>
+              <span style={labelStyle}>
+                Activation
+                <InfoTooltip text={TOOLTIPS.activation} />
+              </span>
             </div>
             <select
               value={config.neuralActivation}
@@ -125,6 +135,7 @@ export function NeuralPanel() {
               min={1}
               max={50}
               onChange={(v) => setConfig({ weightMutationRate: v / 100 })}
+              tooltip={TOOLTIPS.weightMutationRate}
               width="100%"
             />
           </div>
@@ -132,7 +143,10 @@ export function NeuralPanel() {
           {/* Rate Decay */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={labelStyle}>Rate Decay</span>
+              <span style={labelStyle}>
+                Rate Decay
+                <InfoTooltip text={TOOLTIPS.rateDecay} />
+              </span>
             </div>
             <select
               value={config.weightMutationDecay}
@@ -155,6 +169,22 @@ export function NeuralPanel() {
               max={1.0}
               step={0.1}
               onChange={(v) => setConfig({ weightMutationMagnitude: v })}
+              tooltip={TOOLTIPS.weightMutationMagnitude}
+              width="100%"
+            />
+          </div>
+
+          {/* Output Bias (how hard muscles are to activate) */}
+          <div style={{ marginBottom: '16px' }}>
+            <ParamSlider
+              name="Output Bias"
+              value={config.neuralOutputBias}
+              displayValue={String(config.neuralOutputBias)}
+              min={-2}
+              max={0}
+              step={0.1}
+              onChange={(v) => setConfig({ neuralOutputBias: v })}
+              tooltip={TOOLTIPS.outputBias}
               width="100%"
             />
           </div>
@@ -169,6 +199,7 @@ export function NeuralPanel() {
               max={2}
               step={0.1}
               onChange={(v) => setConfig({ fitnessEfficiencyPenalty: v })}
+              tooltip={TOOLTIPS.efficiencyPenalty}
               width="100%"
             />
           </div>

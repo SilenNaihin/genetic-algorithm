@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   useEvolutionStore,
   useGeneration,
@@ -16,6 +17,7 @@ import { useSimulation } from '../../hooks/useSimulation';
  * Uses stats-panel, stats-title, stat-row, stat-label, stat-value classes.
  */
 export function StatsPanel() {
+  const router = useRouter();
   const generation = useGeneration();
   const simulationResults = useSimulationResults();
   const config = useConfig();
@@ -220,7 +222,12 @@ export function StatsPanel() {
           </div>
           <button
             className="btn btn-secondary btn-small"
-            onClick={forkFromGeneration}
+            onClick={async () => {
+              const newRunId = await forkFromGeneration();
+              if (newRunId) {
+                router.push(`/run/${newRunId}`);
+              }
+            }}
             style={{ marginTop: '8px', width: '100%', fontSize: '11px' }}
           >
             Fork from Gen {displayGen}
