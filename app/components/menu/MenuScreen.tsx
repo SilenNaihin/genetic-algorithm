@@ -47,9 +47,14 @@ export function MenuScreen() {
         }}
       />
 
-      <div className="menu-controls">
-        {/* Main parameter sliders */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px', maxWidth: '450px' }}>
+      <div className="menu-controls" style={{ maxWidth: '700px', width: '100%' }}>
+        {/* Main parameter sliders - 4 column grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '16px 24px',
+          marginBottom: '24px'
+        }}>
           <ParamSlider
             name="Gravity"
             value={config.gravity}
@@ -61,7 +66,7 @@ export function MenuScreen() {
             onChange={(v) => setConfig({ gravity: v })}
           />
           <ParamSlider
-            name="Gene Mut. Rate"
+            name="Mutation Rate"
             value={config.mutationRate * 100}
             displayValue={`${Math.round(config.mutationRate * 100)}%`}
             min={5}
@@ -116,43 +121,35 @@ export function MenuScreen() {
             tooltip={TOOLTIPS.maxMuscles}
             onChange={(v) => setConfig({ maxMuscles: v })}
           />
-        </div>
-
-        {/* Cull percentage and evolution mode */}
-        <div style={{ marginBottom: '12px', textAlign: 'center' }}>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', margin: '12px 0' }}>
           <ParamSlider
-            name="Cull Percentage"
+            name="Cull %"
             value={config.cullPercentage * 100}
             displayValue={`${Math.round(config.cullPercentage * 100)}%`}
             min={10}
             max={90}
             tooltip={TOOLTIPS.cullPercentage}
             onChange={(v) => setConfig({ cullPercentage: v / 100 })}
-            width="200px"
           />
-          {/* Crossover vs Mutation split slider - only shown when both enabled */}
-          {config.useMutation && config.useCrossover && (
-            <ParamSlider
-              name="Crossover vs Mutation"
-              value={config.crossoverRate * 100}
-              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
-              min={0}
-              max={100}
-              tooltip={TOOLTIPS.crossoverRate}
-              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
-              width="200px"
-            />
-          )}</div>
+        </div>
 
+        {/* Evolution settings row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '24px',
+          marginBottom: '20px',
+          padding: '16px',
+          background: 'var(--bg-tertiary)',
+          borderRadius: '8px',
+        }}>
           {/* Evolution mode checkboxes */}
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', margin: '12px 0' }}>
+          <div style={{ display: 'flex', gap: '16px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
               <input
                 type="checkbox"
                 checked={config.useMutation}
                 onChange={(e) => {
-                  // Ensure at least one is checked
                   if (!e.target.checked && !config.useCrossover) return;
                   setConfig({ useMutation: e.target.checked });
                 }}
@@ -165,7 +162,6 @@ export function MenuScreen() {
                 type="checkbox"
                 checked={config.useCrossover}
                 onChange={(e) => {
-                  // Ensure at least one is checked
                   if (!e.target.checked && !config.useMutation) return;
                   setConfig({ useCrossover: e.target.checked });
                 }}
@@ -175,40 +171,45 @@ export function MenuScreen() {
             </label>
           </div>
 
-          
-        </div>
+          {/* Crossover ratio slider - only shown when both enabled */}
+          {config.useMutation && config.useCrossover && (
+            <ParamSlider
+              name="Cross/Mut Ratio"
+              value={config.crossoverRate * 100}
+              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
+              min={0}
+              max={100}
+              tooltip={TOOLTIPS.crossoverRate}
+              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
+              width="160px"
+            />
+          )}
 
-        {/* Replay Storage Mode */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Replay Storage:</span>
+          {/* Replay Storage */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Replay:</span>
             <select
               value={config.frameStorageMode}
               onChange={(e) => setConfig({ frameStorageMode: e.target.value as 'none' | 'sparse' | 'all' })}
               style={{
-                background: 'var(--bg-tertiary)',
+                background: 'var(--bg-secondary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 padding: '4px 8px',
                 color: 'var(--text-primary)',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
               }}
             >
-              <option value="all">All (full replays)</option>
-              <option value="sparse">Sparse (top/bottom only)</option>
-              <option value="none">None (fastest)</option>
+              <option value="all">All</option>
+              <option value="sparse">Sparse</option>
+              <option value="none">None</option>
             </select>
-          </div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', opacity: 0.7 }}>
-            {config.frameStorageMode === 'all' && 'Store frames for all creatures - slowest but full replay capability'}
-            {config.frameStorageMode === 'sparse' && `Store frames for top ${config.sparseTopCount} and bottom ${config.sparseBottomCount} only`}
-            {config.frameStorageMode === 'none' && 'No frame storage - fastest simulation but no replays'}
           </div>
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <Button variant="primary" onClick={handleStart}>
             <span>Start Evolution</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
