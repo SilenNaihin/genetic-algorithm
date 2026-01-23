@@ -611,8 +611,13 @@ def integrate_euler(
     # Update velocity: v = v + a * dt
     batch.velocities = batch.velocities + acceleration * dt
 
-    # Apply linear damping: v = v * (1 - damping)
-    batch.velocities = batch.velocities * (1.0 - linear_damping)
+    # Apply linear damping (time-step scaled, matches Cannon-ES behavior)
+    # Cannon-ES uses linearDamping as a per-second decay rate
+    # If damping=0.1, velocity should be 90% after 1 second
+    # Formula: v = v * (1 - damping)^dt
+    import math
+    damping_factor = math.pow(1.0 - linear_damping, dt)
+    batch.velocities = batch.velocities * damping_factor
 
     # Update position: x = x + v * dt
     batch.positions = batch.positions + batch.velocities * dt

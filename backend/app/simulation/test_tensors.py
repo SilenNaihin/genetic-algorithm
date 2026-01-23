@@ -132,12 +132,12 @@ class TestCreatureGenomesToBatch:
         genome = make_simple_genome("test-1", num_nodes=3, num_muscles=2)
         batch = creature_genomes_to_batch([genome])
 
-        # Check first 3 nodes have correct x positions (0, 1, 2)
-        # Y is offset by 1.0 (spawn above ground)
+        # Check first 3 nodes have correct positions
+        # Genome specifies y=0.5 and it's preserved directly (no offset)
         assert batch.positions[0, 0, 0].item() == 0.0  # x of node 0
         assert batch.positions[0, 1, 0].item() == 1.0  # x of node 1
         assert batch.positions[0, 2, 0].item() == 2.0  # x of node 2
-        assert batch.positions[0, 0, 1].item() == 1.5  # y of node 0 (0.5 + 1.0 offset)
+        assert batch.positions[0, 0, 1].item() == 0.5  # y of node 0 (genome value preserved)
 
     def test_node_mask_correct(self):
         """Test that node mask correctly indicates valid nodes."""
@@ -358,8 +358,8 @@ class TestEdgeCases:
         # Should have defaults
         assert batch.node_counts[0].item() == 2
         assert batch.muscle_counts[0].item() == 1
-        # Default position y = 0.5 + 1.0 offset = 1.5
-        assert batch.positions[0, 0, 1].item() == 1.5
+        # Default position y = 0.5 (genome values preserved directly)
+        assert batch.positions[0, 0, 1].item() == 0.5
 
 
 # =============================================================================
@@ -382,10 +382,10 @@ class TestGetCenterOfMass:
         batch = creature_genomes_to_batch([genome])
         com = get_center_of_mass(batch)
 
-        # COM should be at the single node position (y offset by 1.0)
+        # COM should be at the single node position (genome values preserved directly)
         assert com.shape == (1, 3)
         assert abs(com[0, 0].item() - 2.0) < 1e-5
-        assert abs(com[0, 1].item() - 2.0) < 1e-5  # 1.0 + 1.0 offset
+        assert abs(com[0, 1].item() - 1.0) < 1e-5  # genome y value preserved
         assert abs(com[0, 2].item() - 3.0) < 1e-5
 
     def test_symmetric_nodes_com(self):

@@ -173,7 +173,7 @@ def creature_genomes_to_batch(
 
             pos = node.get("position", {"x": 0, "y": 0.5, "z": 0})
             positions[b, i, 0] = pos.get("x", 0)
-            positions[b, i, 1] = pos.get("y", 0.5) + 1.0  # Spawn above ground (matches TS)
+            positions[b, i, 1] = pos.get("y", 0.5)  # Use genome Y directly (genome already sets spawn height)
             positions[b, i, 2] = pos.get("z", 0)
 
             # Calculate mass from size (matches TypeScript formula)
