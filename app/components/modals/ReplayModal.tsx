@@ -412,15 +412,15 @@ export function ReplayModal() {
   const currentTime = loadedResult.frames[currentFrame]?.time || 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1350px">
-      <div style={{ display: 'flex', gap: '16px' }}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1450px">
+      <div style={{ display: 'flex', gap: '20px' }}>
         {/* Left: Replay viewer */}
-        <div style={{ flex: '0 0 500px' }}>
+        <div style={{ flex: '0 0 480px' }}>
           <div
             ref={containerRef}
             style={{
-              width: '500px',
-              height: '350px',
+              width: '480px',
+              height: '340px',
               borderRadius: '12px',
               overflow: 'hidden',
               background: '#0f0f14',
@@ -525,39 +525,87 @@ export function ReplayModal() {
         </div>
 
         {/* Right: Genome Viewer + Neural Network + Family Tree */}
-        <div className="flex flex-1 gap-4 min-w-0">
+        <div style={{ display: 'flex', flex: 1, gap: '16px', minWidth: 0 }}>
           {/* Genome Viewer panel */}
-          <div className="flex-none w-72 max-h-[500px] overflow-auto bg-zinc-900/80 rounded-xl p-4 text-xs font-mono border border-zinc-700/50">
+          <div
+            style={{
+              flex: '0 0 260px',
+              maxHeight: '480px',
+              overflow: 'auto',
+              background: 'var(--bg-tertiary)',
+              borderRadius: '12px',
+              padding: '16px',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              border: '1px solid var(--border)',
+            }}
+          >
             {/* CREATURE INFO */}
-            <div className="mb-5">
-              <h3 className="text-cyan-400 font-semibold text-sm mb-3 pb-2 border-b border-zinc-700">
+            <div style={{ marginBottom: '20px' }}>
+              <h3 style={{
+                color: 'var(--accent)',
+                fontWeight: 600,
+                fontSize: '13px',
+                marginBottom: '12px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid var(--border-light)',
+              }}>
                 Creature Info
               </h3>
-              <div className="space-y-1 text-zinc-300">
-                <div className="flex justify-between"><span className="text-zinc-500">ID</span><span className="text-zinc-200 truncate max-w-[160px]" title={genome.id}>{genome.id.slice(0, 16)}...</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Generation</span><span className="text-zinc-200">{genome.generation}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Survival Streak</span><span className="text-emerald-400">{genome.survivalStreak}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Parents</span><span className="text-zinc-200">{genome.parentIds.length || 'Gen 0'}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Freq Multiplier</span><span className="text-zinc-200">{genome.globalFrequencyMultiplier.toFixed(2)}×</span></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>ID</span>
+                  <span style={{ color: 'var(--text-primary)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={genome.id}>{genome.id.slice(0, 12)}...</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Generation</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{genome.generation}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Survival Streak</span>
+                  <span style={{ color: 'var(--success)' }}>{genome.survivalStreak}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Parents</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{genome.parentIds.length || 'Gen 0'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Freq Mult</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{genome.globalFrequencyMultiplier.toFixed(2)}×</span>
+                </div>
               </div>
             </div>
 
             {/* NODES */}
-            <div className="mb-5">
-              <h3 className="text-cyan-400 font-semibold text-sm mb-3 pb-2 border-b border-zinc-700">
-                Nodes <span className="text-zinc-500 font-normal">({genome.nodes.length})</span>
+            <div style={{ marginBottom: '20px' }}>
+              <h3 style={{
+                color: 'var(--accent)',
+                fontWeight: 600,
+                fontSize: '13px',
+                marginBottom: '12px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid var(--border-light)',
+              }}>
+                Nodes <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({genome.nodes.length})</span>
               </h3>
-              <div className="space-y-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {genome.nodes.map((node, i) => (
-                  <div key={node.id} className="bg-zinc-800/60 rounded-lg p-2.5 border border-zinc-700/30">
-                    <div className="text-cyan-300 font-medium mb-1.5">N{i + 1}</div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
-                      <span className="text-zinc-500">Size</span><span className="text-zinc-300">{node.size.toFixed(2)}</span>
-                      <span className="text-zinc-500">Friction</span><span className="text-zinc-300">{node.friction.toFixed(2)}</span>
+                  <div key={node.id} style={{
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ color: 'var(--accent-light)', fontWeight: 500, marginBottom: '6px' }}>N{i + 1}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Size</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{node.size.toFixed(2)}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>Friction</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{node.friction.toFixed(2)}</span>
                     </div>
-                    <div className="text-[11px] mt-1">
-                      <span className="text-zinc-500">Pos </span>
-                      <span className="text-zinc-400">({node.position.x.toFixed(1)}, {node.position.y.toFixed(1)}, {node.position.z.toFixed(1)})</span>
+                    <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Pos </span>
+                      <span style={{ color: 'var(--text-secondary)' }}>({node.position.x.toFixed(1)}, {node.position.y.toFixed(1)}, {node.position.z.toFixed(1)})</span>
                     </div>
                   </div>
                 ))}
@@ -566,49 +614,61 @@ export function ReplayModal() {
 
             {/* MUSCLES */}
             <div>
-              <h3 className="text-cyan-400 font-semibold text-sm mb-3 pb-2 border-b border-zinc-700">
-                Muscles <span className="text-zinc-500 font-normal">({genome.muscles.length})</span>
+              <h3 style={{
+                color: 'var(--accent)',
+                fontWeight: 600,
+                fontSize: '13px',
+                marginBottom: '12px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid var(--border-light)',
+              }}>
+                Muscles <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({genome.muscles.length})</span>
               </h3>
-              <div className="space-y-2.5">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {genome.muscles.map((muscle, i) => {
                   const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
                   const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
                   const isPureNeural = hasNeuralGenome && config.neuralMode === 'pure';
                   return (
-                    <div key={muscle.id} className="bg-zinc-800/60 rounded-lg p-2.5 border border-zinc-700/30">
-                      <div className="text-amber-400 font-medium mb-2">
-                        M{i + 1} <span className="text-zinc-500 font-normal">N{nodeAIndex} ↔ N{nodeBIndex}</span>
+                    <div key={muscle.id} style={{
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ color: 'var(--warning)', fontWeight: 500, marginBottom: '8px' }}>
+                        M{i + 1} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>N{nodeAIndex} ↔ N{nodeBIndex}</span>
                       </div>
 
                       {/* Physical properties - always shown */}
-                      <div className="mb-2">
-                        <div className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Physical</div>
-                        <div className="grid grid-cols-3 gap-1 text-[11px]">
-                          <div><span className="text-zinc-500">len</span> <span className="text-zinc-300">{muscle.restLength.toFixed(1)}</span></div>
-                          <div><span className="text-zinc-500">stf</span> <span className="text-zinc-300">{muscle.stiffness.toFixed(1)}</span></div>
-                          <div><span className="text-zinc-500">dmp</span> <span className="text-zinc-300">{muscle.damping.toFixed(2)}</span></div>
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Physical</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', fontSize: '11px' }}>
+                          <div><span style={{ color: 'var(--text-muted)' }}>len</span> <span style={{ color: 'var(--text-secondary)' }}>{muscle.restLength.toFixed(1)}</span></div>
+                          <div><span style={{ color: 'var(--text-muted)' }}>stf</span> <span style={{ color: 'var(--text-secondary)' }}>{muscle.stiffness.toFixed(1)}</span></div>
+                          <div><span style={{ color: 'var(--text-muted)' }}>dmp</span> <span style={{ color: 'var(--text-secondary)' }}>{muscle.damping.toFixed(2)}</span></div>
                         </div>
                       </div>
 
                       {/* Oscillation - only for hybrid/oscillator mode */}
                       {!isPureNeural && (
-                        <div className="mb-2">
-                          <div className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Oscillation</div>
-                          <div className="grid grid-cols-3 gap-1 text-[11px]">
-                            <div><span className="text-zinc-500">frq</span> <span className="text-violet-400">{muscle.frequency.toFixed(1)}</span></div>
-                            <div><span className="text-zinc-500">amp</span> <span className="text-violet-400">{muscle.amplitude.toFixed(2)}</span></div>
-                            <div><span className="text-zinc-500">phs</span> <span className="text-violet-400">{muscle.phase.toFixed(1)}</span></div>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Oscillation</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', fontSize: '11px' }}>
+                            <div><span style={{ color: 'var(--text-muted)' }}>frq</span> <span style={{ color: 'var(--accent-light)' }}>{muscle.frequency.toFixed(1)}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>amp</span> <span style={{ color: 'var(--accent-light)' }}>{muscle.amplitude.toFixed(2)}</span></div>
+                            <div><span style={{ color: 'var(--text-muted)' }}>phs</span> <span style={{ color: 'var(--accent-light)' }}>{muscle.phase.toFixed(1)}</span></div>
                           </div>
                         </div>
                       )}
 
                       {/* Pure neural - just show amplitude (used as multiplier) */}
                       {isPureNeural && (
-                        <div className="mb-2">
-                          <div className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Neural Control</div>
-                          <div className="text-[11px]">
-                            <span className="text-zinc-500">amplitude</span> <span className="text-violet-400">{muscle.amplitude.toFixed(2)}</span>
-                            <span className="text-zinc-600 ml-1">(output multiplier)</span>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Neural Control</div>
+                          <div style={{ fontSize: '11px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>amplitude</span> <span style={{ color: 'var(--accent-light)' }}>{muscle.amplitude.toFixed(2)}</span>
+                            <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>(multiplier)</span>
                           </div>
                         </div>
                       )}
@@ -623,11 +683,12 @@ export function ReplayModal() {
           {hasNeuralGenome && (
             <div
               style={{
-                flex: '0 0 280px',
+                flex: '0 0 260px',
                 maxHeight: '480px',
                 background: 'var(--bg-tertiary)',
                 borderRadius: '12px',
                 padding: '16px',
+                border: '1px solid var(--border)',
               }}
             >
               <div
@@ -680,13 +741,14 @@ export function ReplayModal() {
           {/* Family Tree panel */}
           <div
             style={{
-              flex: '1 1 280px',
-              minWidth: '250px',
+              flex: '1 1 240px',
+              minWidth: '220px',
               maxHeight: '480px',
               overflow: 'auto',
               background: 'var(--bg-tertiary)',
               borderRadius: '12px',
               padding: '16px',
+              border: '1px solid var(--border)',
             }}
           >
             <div

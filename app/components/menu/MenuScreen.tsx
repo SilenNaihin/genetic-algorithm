@@ -49,7 +49,7 @@ export function MenuScreen() {
 
       <div className="menu-controls">
         {/* Main parameter sliders */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', maxWidth: '450px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px', maxWidth: '450px' }}>
           <ParamSlider
             name="Gravity"
             value={config.gravity}
