@@ -66,19 +66,22 @@ export class RemoteStorage {
   async saveGeneration(gen: number, results: CreatureSimulationResult[]): Promise<void> {
     if (!this.currentRunId) return;
 
+    // Helper to safely convert numbers (NaN/Infinity become 0)
+    const safeNum = (v: number) => Number.isFinite(v) ? v : 0;
+
     // Convert results to API format
     const creatures: Api.CreatureResultCreate[] = results.map(r => ({
       genome: Api.toApiGenome(r.genome),
-      fitness: r.finalFitness,
+      fitness: safeNum(r.finalFitness),
       pellets_collected: r.pelletsCollected,
       disqualified: r.disqualified !== null,
       disqualified_reason: r.disqualified,
       frames: this.compactFrames(r.frames, r.genome),
       pellet_data: r.pellets.map(p => ({
         position: {
-          x: Math.round(p.position.x * 1000) / 1000,
-          y: Math.round(p.position.y * 1000) / 1000,
-          z: Math.round(p.position.z * 1000) / 1000
+          x: safeNum(Math.round(p.position.x * 1000) / 1000),
+          y: safeNum(Math.round(p.position.y * 1000) / 1000),
+          z: safeNum(Math.round(p.position.z * 1000) / 1000)
         },
         collectedAtFrame: p.collectedAtFrame
       }))
@@ -113,16 +116,17 @@ export class RemoteStorage {
 
   private compactFrames(frames: SimulationFrame[], genome: { nodes: { id: string }[] }): number[][] {
     const nodeIds = genome.nodes.map(n => n.id);
+    // Helper to safely round numbers (NaN/Infinity become 0)
+    const safeRound = (v: number) => {
+      const rounded = Math.round(v * 1000) / 1000;
+      return Number.isFinite(rounded) ? rounded : 0;
+    };
     return frames.map(f => {
-      const arr: number[] = [Math.round(f.time * 1000) / 1000];
+      const arr: number[] = [safeRound(f.time)];
       for (const nodeId of nodeIds) {
         const pos = f.nodePositions.get(nodeId);
         if (pos) {
-          arr.push(
-            Math.round(pos.x * 1000) / 1000,
-            Math.round(pos.y * 1000) / 1000,
-            Math.round(pos.z * 1000) / 1000
-          );
+          arr.push(safeRound(pos.x), safeRound(pos.y), safeRound(pos.z));
         } else {
           arr.push(0, 0, 0);
         }

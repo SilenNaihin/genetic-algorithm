@@ -297,7 +297,7 @@ def create_muscle(
         'id': generate_id('muscle'),
         'nodeA': node_a['id'],
         'nodeB': node_b['id'],
-        'restLength': dist * random_range(0.8, 1.2),
+        'restLength': max(0.1, dist * random_range(0.8, 1.2)),
         'stiffness': random_range(constraints.min_stiffness, constraints.max_stiffness),
         'damping': random_range(0.05, 0.5),
         'frequency': random_range(constraints.min_frequency, constraints.max_frequency),

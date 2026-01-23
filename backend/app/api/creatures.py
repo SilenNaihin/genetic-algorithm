@@ -193,3 +193,58 @@ async def get_longest_survivor(
         parent_ids=creature.parent_ids,
         has_frames=False,
     )
+
+
+@router.get("/{creature_id}/ancestors")
+async def get_creature_ancestors(
+    creature_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    max_depth: int = 50,
+):
+    """
+    Get ancestor chain for a creature.
+    Returns a flat list of ancestors with their info for building a family tree.
+    This is much more efficient than loading all generations.
+    """
+    # Track visited to avoid cycles
+    visited = set()
+    ancestors = []
+    to_visit = [creature_id]
+
+    while to_visit and len(ancestors) < max_depth:
+        current_id = to_visit.pop(0)
+        if current_id in visited:
+            continue
+        visited.add(current_id)
+
+        result = await db.execute(
+            select(Creature).where(Creature.id == current_id)
+        )
+        creature = result.scalar_one_or_none()
+        if not creature:
+            continue
+
+        # Extract just the fields needed for family tree
+        genome = creature.genome or {}
+        color = genome.get("color", {"h": 0.5, "s": 0.7, "l": 0.5})
+        nodes = genome.get("nodes", [])
+        muscles = genome.get("muscles", [])
+
+        ancestors.append({
+            "id": creature.id,
+            "generation": creature.generation,
+            "fitness": creature.fitness,
+            "pellets_collected": creature.pellets_collected,
+            "node_count": len(nodes),
+            "muscle_count": len(muscles),
+            "color": color,
+            "parent_ids": creature.parent_ids or [],
+        })
+
+        # Queue parents for visiting
+        if creature.parent_ids:
+            for parent_id in creature.parent_ids:
+                if parent_id not in visited:
+                    to_visit.append(parent_id)
+
+    return {"ancestors": ancestors}

@@ -73,8 +73,12 @@ class SimulatorService:
         # Run simulation
         results = self._pytorch_simulator.simulate_batch(genomes, request.config)
 
+        import math
         elapsed_ms = int((time.time() - start_time) * 1000)
-        creatures_per_second = len(genomes) / (elapsed_ms / 1000) if elapsed_ms > 0 else 0
+        # Guard against division by zero and ensure JSON-serializable float
+        creatures_per_second = float(len(genomes) / (elapsed_ms / 1000)) if elapsed_ms > 0 else 0.0
+        if math.isnan(creatures_per_second) or math.isinf(creatures_per_second):
+            creatures_per_second = 0.0
 
         return BatchSimulationResponse(
             results=results,

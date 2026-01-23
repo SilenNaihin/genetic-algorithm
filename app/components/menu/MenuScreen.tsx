@@ -176,6 +176,35 @@ export function MenuScreen() {
           )}
         </div>
 
+        {/* Replay Storage Mode */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Replay Storage:</span>
+            <select
+              value={config.frameStorageMode}
+              onChange={(e) => setConfig({ frameStorageMode: e.target.value as 'none' | 'sparse' | 'all' })}
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                color: 'var(--text-primary)',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All (full replays)</option>
+              <option value="sparse">Sparse (top/bottom only)</option>
+              <option value="none">None (fastest)</option>
+            </select>
+          </div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', opacity: 0.7 }}>
+            {config.frameStorageMode === 'all' && 'Store frames for all creatures - slowest but full replay capability'}
+            {config.frameStorageMode === 'sparse' && `Store frames for top ${config.sparseTopCount} and bottom ${config.sparseBottomCount} only`}
+            {config.frameStorageMode === 'none' && 'No frame storage - fastest simulation but no replays'}
+          </div>
+        </div>
+
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="primary" onClick={handleStart}>

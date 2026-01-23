@@ -25,9 +25,8 @@ export function GridView() {
 
   useEffect(() => {
     if (simulationProgress !== null) {
-      // Show progress bar after 50ms delay (avoid flash for very fast operations)
-      const timer = setTimeout(() => setShowProgress(true), 50);
-      return () => clearTimeout(timer);
+      // Show progress immediately - no delay
+      setShowProgress(true);
     } else {
       setShowProgress(false);
     }

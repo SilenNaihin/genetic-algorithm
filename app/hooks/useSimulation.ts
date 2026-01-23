@@ -154,8 +154,8 @@ export function useSimulation() {
       await StorageService.initStorage();
       const runId = await StorageService.createRun(currentConfig);
 
-      // Create initial population
-      const population = SimulationService.createInitialPopulation(currentConfig);
+      // Create initial population from backend
+      const population = await SimulationService.createInitialPopulation(currentConfig);
       SimState.setPopulation(population);
 
       // Switch to grid view FIRST, then show simulation progress there
@@ -288,10 +288,11 @@ export function useSimulation() {
     }
 
     // === PHASE 3: Evolve and spawn new offspring ===
-    setGeneration(currentGen + 1);
+    // Evolve the population using backend (this kills bottom 50% and creates offspring)
+    const newGenomes = await SimulationService.evolvePopulation(population, currentGen);
 
-    // Evolve the population (this kills bottom 50% and creates offspring)
-    const newGenomes = SimulationService.evolvePopulation(population);
+    // Only increment generation AFTER successful backend response
+    setGeneration(currentGen + 1);
 
     // Create placeholder results for ALL creatures (including survivors)
     // All creatures show "..." until simulation runs
@@ -526,8 +527,23 @@ export function useSimulation() {
         // Set up state
         StorageService.setCurrentRunId(runId);
 
-        // Recreate population from loaded genomes
-        const population = SimulationService.createInitialPopulation(run.config);
+        // Recreate population container from loaded genomes (no backend call needed)
+        const genomeConstraints = {
+          minNodes: 2,
+          maxNodes: run.config.maxNodes,
+          minMuscles: 1,
+          maxMuscles: run.config.maxMuscles,
+          minSize: 0.2,
+          maxSize: 0.8,
+          minStiffness: 50,
+          maxStiffness: 500,
+          minFrequency: 0.5,
+          maxFrequency: run.config.maxAllowedFrequency,
+          maxAmplitude: 0.4,
+          spawnRadius: 2.0,
+        };
+        const { Population } = await import('../../src/genetics/Population');
+        const population = Population.createEmpty(run.config, genomeConstraints);
         population.replaceCreatures(results.map((r) => r.genome));
         SimulationService.updatePopulationFitness(population, results);
         SimState.setPopulation(population);
@@ -633,8 +649,23 @@ export function useSimulation() {
       const results = await StorageService.loadGeneration(newRunId, viewingGen, run.config);
       if (!results) throw new Error('Failed to load generation data');
 
-      // Recreate population from loaded genomes
-      const population = SimulationService.createInitialPopulation(run.config);
+      // Recreate population container from loaded genomes (no backend call needed)
+      const genomeConstraints = {
+        minNodes: 2,
+        maxNodes: run.config.maxNodes,
+        minMuscles: 1,
+        maxMuscles: run.config.maxMuscles,
+        minSize: 0.2,
+        maxSize: 0.8,
+        minStiffness: 50,
+        maxStiffness: 500,
+        minFrequency: 0.5,
+        maxFrequency: run.config.maxAllowedFrequency,
+        maxAmplitude: 0.4,
+        spawnRadius: 2.0,
+      };
+      const { Population } = await import('../../src/genetics/Population');
+      const population = Population.createEmpty(run.config, genomeConstraints);
       population.replaceCreatures(results.map((r) => r.genome));
       SimulationService.updatePopulationFitness(population, results);
       SimState.setPopulation(population);

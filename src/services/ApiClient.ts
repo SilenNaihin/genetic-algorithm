@@ -181,10 +181,10 @@ export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
     neural_output_bias: config.neuralOutputBias,
     fitness_efficiency_penalty: config.fitnessEfficiencyPenalty,
     neural_dead_zone: config.neuralDeadZone,
-    frame_storage_mode: 'all', // Always store frames when using UI
+    frame_storage_mode: config.frameStorageMode,
     frame_rate: 15,
-    sparse_top_count: 10,
-    sparse_bottom_count: 10,
+    sparse_top_count: config.sparseTopCount,
+    sparse_bottom_count: config.sparseBottomCount,
   };
 }
 
@@ -225,10 +225,29 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
     neuralOutputBias: api.neural_output_bias,
     fitnessEfficiencyPenalty: api.fitness_efficiency_penalty,
     neuralDeadZone: api.neural_dead_zone,
+    frameStorageMode: api.frame_storage_mode,
+    sparseTopCount: api.sparse_top_count,
+    sparseBottomCount: api.sparse_bottom_count,
   };
 }
 
 /** Convert genome to API format (ensure snake_case for nested objects) */
+// Helper to safely convert numbers (NaN/Infinity become default)
+const safeNum = (v: number | undefined, defaultVal: number = 0): number => {
+  if (v === undefined || v === null) return defaultVal;
+  return Number.isFinite(v) ? v : defaultVal;
+};
+
+// Helper to safely convert Vector3 (NaN/Infinity become 0)
+const safeVec3 = (v: { x: number; y: number; z: number } | undefined | null, defaultVal = { x: 0, y: 0, z: 0 }) => {
+  if (!v) return defaultVal;
+  return {
+    x: safeNum(v.x),
+    y: safeNum(v.y),
+    z: safeNum(v.z),
+  };
+};
+
 export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
   // Convert NeuralGenomeData (flat weights) to API format (separate matrices)
   let neuralGenome = null;
@@ -236,8 +255,7 @@ export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
     const { topology, weights } = genome.neuralGenome;
     const { inputSize, hiddenSize, outputSize } = topology;
 
-    // Reconstruct separate matrices from flat weights
-    // Order: weights_ih, biases_h, weights_ho, biases_o
+    // Reconstruct separate matrices from flat weights (with NaN guards)
     const ihSize = inputSize * hiddenSize;
     const hoSize = hiddenSize * outputSize;
 
@@ -245,42 +263,42 @@ export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
       input_size: inputSize,
       hidden_size: hiddenSize,
       output_size: outputSize,
-      weights_ih: weights.slice(0, ihSize),
-      biases_h: weights.slice(ihSize, ihSize + hiddenSize),
-      weights_ho: weights.slice(ihSize + hiddenSize, ihSize + hiddenSize + hoSize),
-      biases_o: weights.slice(ihSize + hiddenSize + hoSize),
+      weights_ih: weights.slice(0, ihSize).map(w => safeNum(w)),
+      biases_h: weights.slice(ihSize, ihSize + hiddenSize).map(w => safeNum(w)),
+      weights_ho: weights.slice(ihSize + hiddenSize, ihSize + hiddenSize + hoSize).map(w => safeNum(w)),
+      biases_o: weights.slice(ihSize + hiddenSize + hoSize).map(w => safeNum(w)),
     };
   }
 
   return {
     id: genome.id,
-    generation: genome.generation,
-    survival_streak: genome.survivalStreak,
+    generation: safeNum(genome.generation, 0),
+    survival_streak: safeNum(genome.survivalStreak, 0),
     parent_ids: genome.parentIds,
     nodes: genome.nodes.map(node => ({
       id: node.id,
-      position: node.position,
-      size: node.size,
-      friction: node.friction,
+      position: safeVec3(node.position),
+      size: safeNum(node.size, 0.5),
+      friction: safeNum(node.friction, 0.5),
     })),
     muscles: genome.muscles.map(muscle => ({
       id: muscle.id,
       node_a: muscle.nodeA,
       node_b: muscle.nodeB,
-      rest_length: muscle.restLength,
-      stiffness: muscle.stiffness,
-      damping: muscle.damping,
-      frequency: muscle.frequency,
-      amplitude: muscle.amplitude,
-      phase: muscle.phase,
-      direction_bias: muscle.directionBias ?? { x: 1, y: 0, z: 0 },
-      bias_strength: muscle.biasStrength,
-      velocity_bias: muscle.velocityBias ?? { x: 0, y: 0, z: 0 },
-      velocity_strength: muscle.velocityStrength,
-      distance_bias: muscle.distanceBias,
-      distance_strength: muscle.distanceStrength,
+      rest_length: safeNum(muscle.restLength, 1.0),
+      stiffness: safeNum(muscle.stiffness, 100.0),
+      damping: safeNum(muscle.damping, 0.5),
+      frequency: safeNum(muscle.frequency, 1.0),
+      amplitude: safeNum(muscle.amplitude, 0.3),
+      phase: safeNum(muscle.phase, 0.0),
+      direction_bias: safeVec3(muscle.directionBias, { x: 1, y: 0, z: 0 }),
+      bias_strength: safeNum(muscle.biasStrength, 0.0),
+      velocity_bias: safeVec3(muscle.velocityBias, { x: 0, y: 0, z: 0 }),
+      velocity_strength: safeNum(muscle.velocityStrength, 0.0),
+      distance_bias: safeNum(muscle.distanceBias, 0.0),
+      distance_strength: safeNum(muscle.distanceStrength, 0.0),
     })),
-    global_frequency_multiplier: genome.globalFrequencyMultiplier,
+    global_frequency_multiplier: safeNum(genome.globalFrequencyMultiplier, 1.0),
     controller_type: genome.controllerType,
     neural_genome: neuralGenome,
     color: genome.color,
@@ -386,6 +404,8 @@ async function fetchJson<T>(
     } catch {
       body = await response.text();
     }
+    // Log the full error details for debugging
+    console.error('[API] Error response:', { status: response.status, body });
     throw new ApiError(
       `API error: ${response.status} ${response.statusText}`,
       response.status,
@@ -412,6 +432,11 @@ export async function simulateBatch(
   const apiGenomes = genomes.map(toApiGenome);
   const apiConfig = toApiConfig(config);
 
+  // Debug: Log first genome to help diagnose 422 errors
+  if (apiGenomes.length > 0) {
+    console.log('[API] simulateBatch - first genome:', JSON.stringify(apiGenomes[0], null, 2));
+  }
+
   return fetchJson<ApiBatchSimulationResponse>('/api/simulation/batch', {
     method: 'POST',
     body: JSON.stringify({
@@ -429,37 +454,104 @@ export async function generateGenomes(
   count: number,
   config: SimulationConfig
 ): Promise<CreatureGenome[]> {
-  const response = await fetchJson<{ genomes: Record<string, unknown>[] }>(
+  const response = await fetchJson<{ genomes: Record<string, unknown>[]; count: number }>(
     '/api/genetics/generate',
     {
       method: 'POST',
       body: JSON.stringify({
-        count,
-        config: toApiConfig(config),
+        size: count,
+        constraints: {
+          minNodes: 2,
+          maxNodes: config.maxNodes,
+          minMuscles: 1,
+          maxMuscles: config.maxMuscles,
+          spawnRadius: 2.0,
+          minSize: 0.2,
+          maxSize: 0.8,
+          minStiffness: 50,
+          maxStiffness: 500,
+          minFrequency: 0.5,
+          maxFrequency: config.maxAllowedFrequency,
+          maxAmplitude: 0.4,
+        },
+        use_neural_net: config.useNeuralNet,
+        neural_hidden_size: config.neuralHiddenSize,
+        neural_output_bias: config.neuralOutputBias,
       }),
     }
   );
 
+  console.log(`[API] Generated ${response.count} genomes from backend`);
   return response.genomes.map(fromApiGenome);
 }
 
 export async function evolveGenomes(
   genomes: CreatureGenome[],
   fitnesses: number[],
-  config: SimulationConfig
+  config: SimulationConfig,
+  generation: number = 0
 ): Promise<CreatureGenome[]> {
-  const response = await fetchJson<{ genomes: Record<string, unknown>[] }>(
+  // Build the evolution config that matches backend schema
+  const evolutionConfig = {
+    population_size: config.populationSize,
+    elite_count: config.eliteCount,
+    cull_percentage: config.cullPercentage,
+    crossover_rate: config.crossoverRate,
+    use_mutation: config.useMutation,
+    use_crossover: config.useCrossover,
+    use_neural_net: config.useNeuralNet,
+    neural_output_bias: config.neuralOutputBias,
+    mutation: {
+      rate: config.mutationRate,
+      magnitude: config.mutationMagnitude,
+      structural_rate: 0.1,  // Default structural mutation rate
+      neural_rate: config.weightMutationRate,
+      neural_magnitude: config.weightMutationMagnitude,
+    },
+    decay: {
+      mode: config.weightMutationDecay,
+      start_rate: config.weightMutationRate,
+      end_rate: 0.01,
+      decay_generations: 100,
+    },
+    selection: {
+      method: 'truncation',
+      survival_rate: 1 - config.cullPercentage,
+      tournament_size: 3,
+    },
+    constraints: {
+      minNodes: 2,
+      maxNodes: config.maxNodes,
+      minMuscles: 1,
+      maxMuscles: config.maxMuscles,
+      spawnRadius: 2.0,
+      minSize: 0.2,
+      maxSize: 0.8,
+      minStiffness: 50,
+      maxStiffness: 500,
+      minFrequency: 0.5,
+      maxFrequency: config.maxAllowedFrequency,
+      maxAmplitude: 0.4,
+    },
+  };
+
+  // Safely convert fitnesses (NaN -> 0)
+  const safeFitnesses = fitnesses.map(f => Number.isFinite(f) ? f : 0);
+
+  const response = await fetchJson<{ genomes: Record<string, unknown>[]; generation: number }>(
     '/api/genetics/evolve',
     {
       method: 'POST',
       body: JSON.stringify({
         genomes: genomes.map(toApiGenome),
-        fitnesses,
-        config: toApiConfig(config),
+        fitness_scores: safeFitnesses,
+        config: evolutionConfig,
+        generation,
       }),
     }
   );
 
+  console.log(`[API] Evolved to generation ${response.generation} from backend`);
   return response.genomes.map(fromApiGenome);
 }
 
@@ -583,6 +675,24 @@ export async function getCreatureFrames(
   creatureId: string
 ): Promise<{ frames_data: number[][]; frame_count: number; frame_rate: number }> {
   return fetchJson(`/api/creatures/${creatureId}/frames`);
+}
+
+export interface AncestorInfo {
+  id: string;
+  generation: number;
+  fitness: number;
+  pellets_collected: number;
+  node_count: number;
+  muscle_count: number;
+  color: { h: number; s: number; l: number };
+  parent_ids: string[];
+}
+
+export async function getCreatureAncestors(
+  creatureId: string,
+  maxDepth: number = 50
+): Promise<{ ancestors: AncestorInfo[] }> {
+  return fetchJson(`/api/creatures/${creatureId}/ancestors?max_depth=${maxDepth}`);
 }
 
 // -------------------------------------------------------------------

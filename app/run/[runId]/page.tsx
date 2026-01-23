@@ -7,6 +7,7 @@ import { useSimulation } from '../../hooks/useSimulation';
 import { GridView } from '../../components/grid';
 import { Notification } from '../../components/ui/Notification';
 import * as StorageService from '../../../src/services/StorageService';
+import * as SimulationService from '../../../src/services/SimulationService';
 
 /**
  * Dynamic route page for loading a specific run.
@@ -23,6 +24,11 @@ export default function RunPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Try to use remote (PyTorch) simulation on startup
+  useEffect(() => {
+    SimulationService.tryUseRemoteSimulation();
+  }, []);
 
   // Load the run when the page mounts
   useEffect(() => {

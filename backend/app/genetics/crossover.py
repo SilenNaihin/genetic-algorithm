@@ -142,7 +142,7 @@ def single_point_crossover(
             'id': generate_id('muscle'),
             'nodeA': node_a,
             'nodeB': node_b,
-            'restLength': actual_distance * lerp(0.9, 1.1, random.random()),
+            'restLength': max(0.1, actual_distance * lerp(0.9, 1.1, random.random())),
             'stiffness': lerp(muscle1.get('stiffness', 100), muscle2.get('stiffness', 100), t),
             'damping': lerp(muscle1.get('damping', 0.5), muscle2.get('damping', 0.5), t),
             'frequency': lerp(muscle1.get('frequency', 1.0), muscle2.get('frequency', 1.0), t),
@@ -417,7 +417,7 @@ def clone_genome(
         'globalFrequencyMultiplier': genome.get('globalFrequencyMultiplier', genome.get('global_frequency_multiplier', 1.0)),
         'controllerType': genome.get('controllerType', genome.get('controller_type', 'oscillator')),
         'neuralGenome': neural_genome,
-        'color': dict(genome.get('color', {'h': 0.5, 's': 0.7, 'l': 0.5})),
+        'color': dict(genome.get('color') or {'h': 0.5, 's': 0.7, 'l': 0.5}),
     }
 
 

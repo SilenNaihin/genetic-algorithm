@@ -116,6 +116,7 @@ export class PreviewRenderer {
    */
   startAnimation(): void {
     if (this.animationId !== null) return;
+    console.log('[PreviewRenderer] Starting animation');
     this.animate();
   }
 
@@ -141,6 +142,9 @@ export class PreviewRenderer {
       const gravityStrength = Math.abs(config.gravity);
       const gravitySag = Math.max(0, (gravityStrength - 9.8) / 20) * 0.5;
 
+      // Safely get globalFrequencyMultiplier (default to 1)
+      const globalFreqMult = this.genome.globalFrequencyMultiplier ?? 1;
+
       for (const node of this.genome.nodes) {
         const mesh = nodeMeshes.get(node.id);
         if (!mesh) continue;
@@ -150,9 +154,11 @@ export class PreviewRenderer {
         for (const muscle of this.genome.muscles) {
           if (muscle.nodeA !== node.id && muscle.nodeB !== node.id) continue;
 
-          const freq = muscle.frequency * this.genome.globalFrequencyMultiplier;
-          const contraction = Math.sin(this.time * freq * Math.PI * 2 + muscle.phase);
-          const amount = contraction * muscle.amplitude * 0.3;
+          const freq = (muscle.frequency ?? 1) * globalFreqMult;
+          const phase = muscle.phase ?? 0;
+          const amplitude = muscle.amplitude ?? 0.3;
+          const contraction = Math.sin(this.time * freq * Math.PI * 2 + phase);
+          const amount = contraction * amplitude * 0.3;
 
           const otherNodeId = muscle.nodeA === node.id ? muscle.nodeB : muscle.nodeA;
           const otherNode = this.genome.nodes.find(n => n.id === otherNodeId);

@@ -31,10 +31,7 @@ export function PreviewCanvas({ config, isActive = true }: PreviewCanvasProps) {
 
     const renderer = new PreviewRenderer(container, () => configRef.current);
     rendererRef.current = renderer;
-
-    if (isActive) {
-      renderer.startAnimation();
-    }
+    renderer.startAnimation();
 
     return () => {
       renderer.dispose();

@@ -35,6 +35,14 @@ from app.simulation.fitness import (
 from app.neural.network import BatchedNeuralNetwork, NeuralConfig
 
 
+def _safe_float(val: float, default: float = 0.0) -> float:
+    """Convert float to JSON-safe value (handle NaN and Infinity)."""
+    import math
+    if math.isnan(val) or math.isinf(val):
+        return default
+    return val
+
+
 class PyTorchSimulator:
     """
     Service for running batched physics simulations using PyTorch.
@@ -183,12 +191,12 @@ class PyTorchSimulator:
                 disqualified = True
                 disqualified_reason = "physics_explosion"
 
-            # Calculate displacement metrics
+            # Calculate displacement metrics (with NaN guards for JSON serialization)
             final_com = result['final_com'][i]
-            net_displacement = torch.norm(
+            net_displacement = _safe_float(torch.norm(
                 final_com[[0, 2]] - initial_com[i][[0, 2]]
-            ).item()  # XZ only
-            distance_traveled = fitness_state.distance_traveled[i].item()
+            ).item())
+            distance_traveled = _safe_float(fitness_state.distance_traveled[i].item())
 
             # Get pellet info from pellet_batch
             pellets_collected = int(pellet_batch.total_collected[i].item())
@@ -200,19 +208,23 @@ class PyTorchSimulator:
                 net_displacement * fitness_config.distance_per_unit
             )
 
-            # Build fitness breakdown
+            # Build fitness breakdown (with NaN guards)
+            efficiency_penalty_val = _safe_float(
+                total_activation[i].item() * fitness_config.efficiency_penalty if use_neural else 0.0
+            )
+
             breakdown = FitnessBreakdown(
-                pellet_points=pellets_collected * fitness_config.pellet_points,
-                progress=progress_score,
-                net_displacement=min(
+                pellet_points=_safe_float(pellets_collected * fitness_config.pellet_points),
+                progress=_safe_float(progress_score),
+                net_displacement=_safe_float(min(
                     net_displacement * fitness_config.distance_per_unit,
                     fitness_config.net_displacement_max
-                ),
-                distance_traveled=min(
+                )),
+                distance_traveled=_safe_float(min(
                     distance_traveled * fitness_config.distance_per_unit,
                     fitness_config.distance_traveled_max
-                ),
-                efficiency_penalty=total_activation[i].item() * fitness_config.efficiency_penalty if use_neural else 0.0,
+                )),
+                efficiency_penalty=efficiency_penalty_val,
             )
 
             # Get frames if recorded
@@ -224,16 +236,20 @@ class PyTorchSimulator:
                 frame_count = frames_tensor.shape[0]
                 frames = frames_tensor.cpu().tolist()
 
+            # Extract fitness and activation with NaN guards
+            fitness_val = _safe_float(0.0 if disqualified else fitness_values[i].item())
+            activation_val = _safe_float(total_activation[i].item())
+
             results.append(SimulationResult(
                 genome_id=genome_id,
-                fitness=0.0 if disqualified else fitness_values[i].item(),
+                fitness=fitness_val,
                 pellets_collected=pellets_collected,
                 disqualified=disqualified,
                 disqualified_reason=disqualified_reason,
                 fitness_breakdown=breakdown,
                 net_displacement=net_displacement,
                 distance_traveled=distance_traveled,
-                total_activation=total_activation[i].item(),
+                total_activation=activation_val,
                 frame_count=frame_count,
                 frames=frames,
             ))

@@ -57,6 +57,11 @@ export interface SimulationConfig {
   neuralOutputBias: number;           // Initial output neuron bias (-2 to 0, more negative = muscles harder to activate)
   fitnessEfficiencyPenalty: number;   // Penalty per unit of total muscle activation (encourages efficient movement)
   neuralDeadZone: number;             // Dead zone threshold for pure mode (outputs < threshold become 0)
+
+  // Frame storage mode for replay capability
+  frameStorageMode: 'none' | 'sparse' | 'all';  // none = no replays, sparse = top/bottom only, all = all creatures
+  sparseTopCount: number;             // Number of top performers to store frames for (sparse mode)
+  sparseBottomCount: number;          // Number of bottom performers to store frames for (sparse mode)
 }
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -101,7 +106,12 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   weightMutationDecay: 'off',    // No decay by default
   neuralOutputBias: -0.5,        // Initial output neuron bias (-2 to 0, more negative = muscles harder to activate)
   fitnessEfficiencyPenalty: 0.5, // Subtract 0.5 * total_activation from fitness
-  neuralDeadZone: 0.1            // Outputs with absolute value < 0.1 become 0 in pure mode
+  neuralDeadZone: 0.1,           // Outputs with absolute value < 0.1 become 0 in pure mode
+
+  // Frame storage mode
+  frameStorageMode: 'all',       // Store frames for all creatures by default (enables replays)
+  sparseTopCount: 10,            // Store frames for top 10 performers in sparse mode
+  sparseBottomCount: 5,          // Store frames for bottom 5 performers in sparse mode
 };
 
 export interface CreatureState {

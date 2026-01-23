@@ -114,7 +114,8 @@ export class Population {
   }
 
   /**
-   * Create initial population with random genomes
+   * Create initial population with random genomes (local generation)
+   * @deprecated Use createEmpty + replaceCreatures with backend-generated genomes
    */
   static createInitial(
     config: SimulationConfig = DEFAULT_CONFIG,
@@ -133,6 +134,16 @@ export class Population {
     }
 
     return population;
+  }
+
+  /**
+   * Create an empty population container (for backend-generated genomes)
+   */
+  static createEmpty(
+    config: SimulationConfig = DEFAULT_CONFIG,
+    genomeConstraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
+  ): Population {
+    return new Population(config, genomeConstraints);
   }
 
   /**

@@ -25,7 +25,9 @@ export type ProgressCallback = (progress: SimulationProgress) => void;
 
 export type SimulationMode = 'local' | 'remote';
 
-let currentSimulationMode: SimulationMode = 'local';
+// Default to remote - backend is required for simulation
+let currentSimulationMode: SimulationMode = 'remote';
+let backendAvailable = false;
 
 /**
  * Get the current simulation mode
@@ -44,22 +46,37 @@ export function setSimulationMode(mode: SimulationMode): void {
 }
 
 /**
- * Check if backend is available and switch to remote mode
+ * Check if backend is available. Backend is required for simulation.
  */
 export async function tryUseRemoteSimulation(): Promise<boolean> {
   try {
     const connected = await Api.checkConnection();
     if (connected) {
+      backendAvailable = true;
       setSimulationMode('remote');
-      console.log('[SimulationService] Using remote backend simulation');
+      console.log('[SimulationService] Backend connected - using PyTorch simulation');
       return true;
     }
   } catch {
     // Backend not available
   }
-  console.log('[SimulationService] Using local simulation');
+  backendAvailable = false;
+  console.warn('[SimulationService] Backend not available! Simulation will fail.');
   return false;
 }
+
+/**
+ * Check if backend is available
+ */
+export function isBackendAvailable(): boolean {
+  return backendAvailable;
+}
+
+// Helper to safely convert numbers (NaN/Infinity become 0)
+const safeNum = (v: number | undefined | null): number => {
+  if (v === undefined || v === null) return 0;
+  return Number.isFinite(v) ? v : 0;
+};
 
 /**
  * Convert API simulation result to CreatureSimulationResult format
@@ -78,13 +95,13 @@ function apiResultToCreatureResult(
       const frameData = apiResult.frames[i];
       const nodePositions = new Map<string, Vector3>();
 
-      // First value is time, then x,y,z for each node
-      const time = frameData[0];
+      // First value is time, then x,y,z for each node (with NaN guards)
+      const time = safeNum(frameData[0]);
       for (let j = 0; j < nodeIds.length; j++) {
         nodePositions.set(nodeIds[j], {
-          x: frameData[1 + j * 3] ?? 0,
-          y: frameData[1 + j * 3 + 1] ?? 0,
-          z: frameData[1 + j * 3 + 2] ?? 0,
+          x: safeNum(frameData[1 + j * 3]),
+          y: safeNum(frameData[1 + j * 3 + 1]),
+          z: safeNum(frameData[1 + j * 3 + 2]),
         });
       }
 
@@ -100,7 +117,7 @@ function apiResultToCreatureResult(
       frames.push({
         time,
         nodePositions,
-        centerOfMass: { x: cx / n, y: cy / n, z: cz / n },
+        centerOfMass: { x: safeNum(cx / n), y: safeNum(cy / n), z: safeNum(cz / n) },
         activePelletIndex: 0, // Backend doesn't track this per-frame currently
       });
     }
@@ -137,19 +154,20 @@ function apiResultToCreatureResult(
   }));
 
   // Generate fitness over time from frames (simplified - just interpolate to final)
+  const safeFitness = safeNum(apiResult.fitness);
   const fitnessOverTime: number[] = frames.map((_, i) => {
     // Linear interpolation from 0 to final fitness
     const progress = frames.length > 1 ? i / (frames.length - 1) : 1;
-    return apiResult.fitness * progress;
+    return safeNum(safeFitness * progress);
   });
 
   return {
     genome,
     frames,
-    finalFitness: apiResult.fitness,
+    finalFitness: safeFitness,
     pelletsCollected: apiResult.pellets_collected,
-    distanceTraveled: apiResult.distance_traveled,
-    netDisplacement: apiResult.net_displacement,
+    distanceTraveled: safeNum(apiResult.distance_traveled),
+    netDisplacement: safeNum(apiResult.net_displacement),
     closestPelletDistance: 0, // Backend doesn't return this currently
     pellets,
     fitnessOverTime,
@@ -159,23 +177,22 @@ function apiResultToCreatureResult(
 
 /**
  * Run simulation for a population of genomes
- * Uses local or remote simulation based on current mode
+ * Always uses remote (PyTorch) simulation - backend is required
  */
 export async function runSimulation(
   genomes: CreatureGenome[],
   config: SimulationConfig,
   onProgress?: ProgressCallback
 ): Promise<CreatureSimulationResult[]> {
-  if (currentSimulationMode === 'remote') {
-    return runRemoteSimulation(genomes, config, onProgress);
-  }
-  return runLocalSimulation(genomes, config, onProgress);
+  // Always use remote simulation - backend is required
+  return runRemoteSimulation(genomes, config, onProgress);
 }
 
 /**
  * Run simulation locally using Cannon-ES
+ * @deprecated Use remote simulation - backend is required
  */
-async function runLocalSimulation(
+async function _runLocalSimulation(
   genomes: CreatureGenome[],
   config: SimulationConfig,
   onProgress?: ProgressCallback
@@ -184,9 +201,12 @@ async function runLocalSimulation(
     onProgress?.({ completed, total });
   });
 }
+// Keep reference to avoid unused import warning
+void _runLocalSimulation;
 
 /**
  * Run simulation remotely using backend API
+ * Backend is required - no fallback to local simulation
  */
 async function runRemoteSimulation(
   genomes: CreatureGenome[],
@@ -196,40 +216,38 @@ async function runRemoteSimulation(
   // Report initial progress
   onProgress?.({ completed: 0, total: genomes.length });
 
-  try {
-    // Call backend API
-    const response = await Api.simulateBatch(genomes, config);
+  // Call backend API
+  const response = await Api.simulateBatch(genomes, config);
 
-    // Convert API results to CreatureSimulationResult format
-    // Results come in same order as input genomes
-    const results: CreatureSimulationResult[] = [];
+  // Convert API results to CreatureSimulationResult format
+  // Results come in same order as input genomes
+  const results: CreatureSimulationResult[] = [];
 
-    for (let i = 0; i < response.results.length; i++) {
-      const apiResult = response.results[i];
-      // Find matching genome by ID or use index
-      const genome = genomes.find(g => g.id === apiResult.genome_id) ?? genomes[i];
+  for (let i = 0; i < response.results.length; i++) {
+    const apiResult = response.results[i];
+    // Find matching genome by ID or use index
+    const genome = genomes.find(g => g.id === apiResult.genome_id) ?? genomes[i];
 
-      const result = apiResultToCreatureResult(apiResult, genome, config);
-      results.push(result);
+    const result = apiResultToCreatureResult(apiResult, genome, config);
+    results.push(result);
 
-      // Report progress
-      onProgress?.({ completed: i + 1, total: genomes.length });
-    }
-
-    console.log(`[SimulationService] Remote simulation completed: ${response.results.length} creatures in ${response.total_time_ms}ms (${response.creatures_per_second.toFixed(1)} creatures/sec)`);
-
-    return results;
-  } catch (error) {
-    console.error('[SimulationService] Remote simulation failed, falling back to local:', error);
-    // Fall back to local simulation
-    return runLocalSimulation(genomes, config, onProgress);
+    // Report progress
+    onProgress?.({ completed: i + 1, total: genomes.length });
   }
+
+  console.log(`[SimulationService] Remote simulation completed: ${response.results.length} creatures in ${response.total_time_ms}ms (${response.creatures_per_second.toFixed(1)} creatures/sec)`);
+
+  return results;
 }
 
 /**
- * Create initial population
+ * Create initial population using backend genetics
  */
-export function createInitialPopulation(config: SimulationConfig): Population {
+export async function createInitialPopulation(config: SimulationConfig): Promise<Population> {
+  // Generate genomes from backend
+  const genomes = await Api.generateGenomes(config.populationSize, config);
+
+  // Create population container with empty initial and replace with backend-generated genomes
   const genomeConstraints = {
     minNodes: 2,
     maxNodes: config.maxNodes,
@@ -245,16 +263,30 @@ export function createInitialPopulation(config: SimulationConfig): Population {
     spawnRadius: 2.0,
   };
 
-  return Population.createInitial(config, genomeConstraints);
+  const population = Population.createEmpty(config, genomeConstraints);
+  population.replaceCreatures(genomes);
+
+  return population;
 }
 
 /**
- * Evolve population and get new genomes
+ * Evolve population using backend genetics and get new genomes
  */
-export function evolvePopulation(population: Population): CreatureGenome[] {
-  const newGenomes = population.evolve();
+export async function evolvePopulation(
+  population: Population,
+  generation: number = 0
+): Promise<CreatureGenome[]> {
+  const genomes = population.getGenomes();
+  const fitnesses = population.creatures.map(c => c.state.fitness);
+  const config = population.config;
+
+  // Call backend to evolve
+  const newGenomes = await Api.evolveGenomes(genomes, fitnesses, config, generation);
+
+  // Update population with new genomes
   population.replaceCreatures(newGenomes);
-  return population.getGenomes();
+
+  return newGenomes;
 }
 
 /**

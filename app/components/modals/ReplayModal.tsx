@@ -8,6 +8,7 @@ import { ReplayRenderer } from '../../../src/rendering/ReplayRenderer';
 import { NeuralVisualizer } from '../../../src/ui/NeuralVisualizer';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, NEURAL_INPUT_SIZE_PURE } from '../../../src/neural';
 import * as StorageService from '../../../src/services/StorageService';
+import * as ApiClient from '../../../src/services/ApiClient';
 import type { CreatureGenome } from '../../../src/types';
 import type { CreatureSimulationResult } from '../../../src/simulation/BatchSimulator';
 
@@ -42,8 +43,6 @@ export function ReplayModal() {
   const replayResult = useEvolutionStore((s) => s.replayResult);
   const setReplayResult = useEvolutionStore((s) => s.setReplayResult);
   const simulationResults = useEvolutionStore((s) => s.simulationResults);
-  const generation = useEvolutionStore((s) => s.generation);
-  const maxGeneration = useEvolutionStore((s) => s.maxGeneration);
   const config = useEvolutionStore((s) => s.config);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -186,31 +185,44 @@ export function ReplayModal() {
     };
   }, [isOpen, loadedResult]);
 
-  // Build family tree
+  // Build family tree using efficient backend endpoint
   const buildFamilyTree = useCallback(async (genome: CreatureGenome) => {
     setFamilyTreeLoading(true);
-
-    const currentRunId = StorageService.getCurrentRunId();
-    if (!currentRunId) {
-      setFamilyTree({
-        creature: genomeToAncestorInfo(genome, 0, 0),
-        parents: [],
-      });
-      setFamilyTreeLoading(false);
-      return;
-    }
 
     // Build ancestor map
     const ancestorMap = new Map<string, AncestorInfo>();
 
-    // Add current creature
+    // Add current creature from simulation results
     const currentResult = simulationResults.find((r) => r.genome.id === genome.id);
     ancestorMap.set(
       genome.id,
       genomeToAncestorInfo(genome, currentResult?.finalFitness || 0, currentResult?.pelletsCollected || 0)
     );
 
-    // Add all creatures from current results
+    // Try to fetch ancestors from backend using efficient endpoint
+    const creatureId = genome._apiCreatureId;
+    if (creatureId) {
+      try {
+        const { ancestors } = await ApiClient.getCreatureAncestors(creatureId, 50);
+        for (const ancestor of ancestors) {
+          ancestorMap.set(ancestor.id, {
+            id: ancestor.id,
+            generation: ancestor.generation,
+            fitness: ancestor.fitness,
+            pelletsCollected: ancestor.pellets_collected,
+            nodeCount: ancestor.node_count,
+            muscleCount: ancestor.muscle_count,
+            color: ancestor.color,
+            parentIds: ancestor.parent_ids,
+          });
+        }
+      } catch (error) {
+        console.warn('[ReplayModal] Failed to fetch ancestors:', error);
+        // Fall back to current results only
+      }
+    }
+
+    // Also add ancestors from current simulation results (in case they're not in DB yet)
     for (const result of simulationResults) {
       if (!ancestorMap.has(result.genome.id)) {
         ancestorMap.set(
@@ -220,32 +232,12 @@ export function ReplayModal() {
       }
     }
 
-    // Load previous generations
-    const maxGen = Math.max(genome.generation, generation, maxGeneration);
-    for (let gen = maxGen - 1; gen >= 0; gen--) {
-      try {
-        const results = await StorageService.loadGeneration(currentRunId, gen, config);
-        if (results) {
-          for (const result of results) {
-            if (!ancestorMap.has(result.genome.id)) {
-              ancestorMap.set(
-                result.genome.id,
-                genomeToAncestorInfo(result.genome, result.finalFitness, result.pelletsCollected)
-              );
-            }
-          }
-        }
-      } catch {
-        // Generation not found
-      }
-    }
-
     // Build tree
     const ancestorCount = { count: 0 };
     const tree = buildTreeNode(genome.id, ancestorMap, 0, 100, ancestorCount, lineageMode);
     setFamilyTree(tree);
     setFamilyTreeLoading(false);
-  }, [simulationResults, generation, maxGeneration, config, lineageMode]);
+  }, [simulationResults, lineageMode]);
 
   // Rebuild family tree when lineage mode changes
   useEffect(() => {
