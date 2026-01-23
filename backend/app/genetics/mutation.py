@@ -182,13 +182,11 @@ def mutate_muscle(
             config.magnitude
         )
 
-    # Phase
+    # Phase (use modulo to wrap around, keeping in [0, 2π) range)
     if random.random() < config.rate:
-        new_muscle['phase'] = mutate_value(
-            muscle.get('phase', 0),
-            0, math.pi * 2,
-            config.magnitude
-        )
+        phase = muscle.get('phase', 0)
+        delta = (random.random() * 2 - 1) * math.pi * 2 * config.magnitude
+        new_muscle['phase'] = (phase + delta) % (math.pi * 2)
 
     # Rest length (smaller magnitude to avoid drastic changes)
     if random.random() < config.rate:

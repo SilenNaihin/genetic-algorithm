@@ -20,6 +20,12 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 
+def clamp_phase(phase: float) -> float:
+    """Clamp phase to [0, 2π) range using modulo."""
+    two_pi = math.pi * 2
+    return phase % two_pi
+
+
 def lerp_vector3(a: dict, b: dict, t: float) -> dict:
     """Linear interpolation between two 3D vectors."""
     return {
@@ -147,7 +153,7 @@ def single_point_crossover(
             'damping': lerp(muscle1.get('damping', 0.5), muscle2.get('damping', 0.5), t),
             'frequency': lerp(muscle1.get('frequency', 1.0), muscle2.get('frequency', 1.0), t),
             'amplitude': lerp(muscle1.get('amplitude', 0.3), muscle2.get('amplitude', 0.3), t),
-            'phase': lerp(muscle1.get('phase', 0), muscle2.get('phase', 0), t),
+            'phase': clamp_phase(lerp(muscle1.get('phase', 0), muscle2.get('phase', 0), t)),
             # v1: Direction sensing
             'directionBias': lerped_dir,
             'biasStrength': lerp(
@@ -290,7 +296,7 @@ def uniform_crossover(
             'damping': muscle_s.get('damping', 0.5) if random.random() < 0.5 else muscle_o.get('damping', 0.5),
             'frequency': muscle_s.get('frequency', 1.0) if random.random() < 0.5 else muscle_o.get('frequency', 1.0),
             'amplitude': muscle_s.get('amplitude', 0.3) if random.random() < 0.5 else muscle_o.get('amplitude', 0.3),
-            'phase': muscle_s.get('phase', 0) if random.random() < 0.5 else muscle_o.get('phase', 0),
+            'phase': clamp_phase(muscle_s.get('phase', 0) if random.random() < 0.5 else muscle_o.get('phase', 0)),
             # v1
             'directionBias': (muscle_s.get('directionBias') or {'x': 0, 'y': 1, 'z': 0}) if random.random() < 0.5 else (muscle_o.get('directionBias') or {'x': 0, 'y': 1, 'z': 0}),
             'biasStrength': (muscle_s.get('biasStrength') or 0) if random.random() < 0.5 else (muscle_o.get('biasStrength') or 0),

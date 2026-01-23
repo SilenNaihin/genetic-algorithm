@@ -55,7 +55,7 @@ class MuscleGene(BaseModel):
     # Oscillation
     frequency: float = Field(default=1.0, ge=0.1, le=5.0)
     amplitude: float = Field(default=0.3, ge=0.0, le=1.0)
-    phase: float = Field(default=0.0, ge=0.0, le=6.283185)  # 0 to 2*PI
+    phase: float = Field(default=0.0, ge=0.0, le=6.29)  # 0 to 2*PI (with floating point margin)
 
     # v1: Direction bias (muscle responds to pellet direction)
     directionBias: Vector3 | None = Field(default=None, alias='direction_bias')
