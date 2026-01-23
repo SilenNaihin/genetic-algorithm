@@ -231,10 +231,23 @@ class PyTorchSimulator:
             frames = None
             frame_count = 0
             if config.record_frames and 'frames' in result:
-                # Convert tensor frames to list format
+                # Convert tensor frames [F, N, 3] to flat list format [time, x1,y1,z1, x2,y2,z2, ...]
+                # This format matches what the frontend expects
                 frames_tensor = result['frames'][i]  # [F, N, 3]
                 frame_count = frames_tensor.shape[0]
-                frames = frames_tensor.cpu().tolist()
+                frames = []
+
+                # Calculate time per frame: frame_index * frame_interval * dt
+                for f_idx in range(frame_count):
+                    time_val = f_idx * frame_interval * dt
+                    frame_data = [_safe_float(time_val)]  # Start with time
+
+                    # Flatten node positions: [N, 3] -> [x1,y1,z1, x2,y2,z2, ...]
+                    node_positions = frames_tensor[f_idx].cpu().tolist()  # [N, 3]
+                    for pos in node_positions:
+                        frame_data.extend([_safe_float(pos[0]), _safe_float(pos[1]), _safe_float(pos[2])])
+
+                    frames.append(frame_data)
 
             # Extract fitness and activation with NaN guards
             fitness_val = _safe_float(0.0 if disqualified else fitness_values[i].item())
