@@ -84,9 +84,19 @@ export function MenuScreen() {
             value={config.simulationDuration}
             displayValue={`${config.simulationDuration}s`}
             min={3}
-            max={20}
+            max={60}
             tooltip={TOOLTIPS.simulationDuration}
             onChange={(v) => setConfig({ simulationDuration: v })}
+          />
+          <ParamSlider
+            name="Physics FPS"
+            value={config.physicsFPS}
+            displayValue={`${config.physicsFPS}`}
+            min={15}
+            max={120}
+            step={15}
+            tooltip={TOOLTIPS.physicsFPS}
+            onChange={(v) => setConfig({ physicsFPS: v, timeStep: 1 / v })}
           />
           <ParamSlider
             name="Max Nodes"

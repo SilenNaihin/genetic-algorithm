@@ -23,7 +23,7 @@ class SimulationConfig(BaseModel):
     # Physics
     gravity: float = Field(default=-9.8, ge=-30.0, le=-1.0)
     ground_friction: float = Field(default=0.5, ge=0.3, le=1.0)
-    time_step: float = Field(default=1/60, ge=0.001, le=0.1)
+    time_step: float = Field(default=1/60, ge=1/120, le=1/15)  # 15-120 FPS
     simulation_duration: float = Field(default=10.0, ge=1.0, le=60.0)
 
     # Evolution (not used in simulation, but included for parity)

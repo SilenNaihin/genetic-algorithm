@@ -131,6 +131,7 @@ export const TOOLTIPS = {
 
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',
+  physicsFPS: 'Physics frames per second. Higher FPS = more expressive movement but more compute. 60 FPS default, 30 FPS for faster runs, 120 FPS for precision.',
   gravity: 'Downward force on creatures. Stronger gravity (-30) makes movement harder; weaker gravity (-9.8) is more forgiving.',
   groundFriction: 'How much the ground resists sliding. Higher friction allows better grip for pushing off.',
 

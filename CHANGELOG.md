@@ -5,12 +5,25 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Added
+- **Configurable Physics FPS**: Control simulation fidelity with 15-120 FPS physics
+  - Higher FPS = more expressive movement, better muscle resolution
+  - Lower FPS = faster simulation runs
+  - Default 60 FPS, configurable via menu slider
+  - Example: 30s @ 120 FPS = 3600 physics steps for maximum precision
+- **Comprehensive Parity Tests**: 88 tests verifying TypeScript/Python behavioral parity
+  - Edge-based distance calculation, regression penalty, opposite-half pellet spawning
+  - Variable collection radius, settling period, minimum fitness clamp
+  - Neural mode permutations, fitness config permutations, batch sizes
+- **Integration Tests**: 17 tests verifying frontend-backend config propagation
+  - All 28 menu config options flow correctly to backend
+  - Frame storage modes, fitness breakdowns, disqualification
+- **COMPUTE.md Documentation**: Explains tensor batching, sparse runs, FPS, performance
 - **Python Backend with PyTorch Physics**: Complete backend implementation for GPU-ready simulation
   - Batched tensor physics simulation (100+ creatures in <1s on CPU)
   - Batched neural network forward pass for creature control
   - Full genetics system ported from TypeScript (selection, mutation, crossover)
   - FastAPI endpoints for simulation and evolution
-  - 285 tests covering physics, neural, fitness, genetics, API integration
+  - 417 tests covering physics, neural, fitness, genetics, API, parity, integration
   - See `backend/README.md` for details
 
 ### Changed

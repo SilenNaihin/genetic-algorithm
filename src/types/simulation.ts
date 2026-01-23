@@ -14,7 +14,8 @@ export interface SimulationConfig {
   // Physics
   gravity: number;              // -9.8 to -30
   groundFriction: number;       // 0.3 to 1.0
-  timeStep: number;             // Physics timestep (1/60)
+  timeStep: number;             // Physics timestep (1/physicsFPS)
+  physicsFPS: number;           // Physics frames per second (15-120)
   simulationDuration: number;   // Seconds per generation
 
   // Evolution
@@ -62,6 +63,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   gravity: -9.8,
   groundFriction: 0.5,
   timeStep: 1 / 60,
+  physicsFPS: 60,
   simulationDuration: 10,
 
   populationSize: 100,

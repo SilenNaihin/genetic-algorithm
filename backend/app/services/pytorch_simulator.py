@@ -89,8 +89,9 @@ class PyTorchSimulator:
         pellet_batch = initialize_pellets(batch, arena_size=config.arena_size)
         fitness_state = initialize_fitness_state(batch, pellet_batch)
 
-        # Calculate number of simulation steps
-        num_steps = int(config.simulation_duration / TIME_STEP)
+        # Calculate number of simulation steps based on configurable timestep
+        dt = config.time_step
+        num_steps = int(config.simulation_duration / dt)
 
         # Get pellet positions for simulation - already [B, 3]
         pellet_positions = pellet_batch.positions
@@ -118,6 +119,10 @@ class PyTorchSimulator:
                 config=nn_config,
             )
 
+            # Calculate frame interval based on physics FPS and desired frame rate
+            physics_fps = int(1.0 / dt)
+            frame_interval = max(1, physics_fps // config.frame_rate) if config.record_frames else 1
+
             # Run neural simulation with integrated fitness tracking
             result = simulate_with_fitness_neural(
                 batch=batch,
@@ -128,12 +133,17 @@ class PyTorchSimulator:
                 fitness_config=fitness_config,
                 mode=config.neural_mode,
                 dead_zone=config.neural_dead_zone,
+                dt=dt,
                 record_frames=config.record_frames,
-                frame_interval=int(60 / config.frame_rate) if config.record_frames else 1,
+                frame_interval=frame_interval,
                 arena_size=config.arena_size,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:
+            # Calculate frame interval based on physics FPS and desired frame rate
+            physics_fps = int(1.0 / dt)
+            frame_interval = max(1, physics_fps // config.frame_rate) if config.record_frames else 1
+
             # Run oscillator simulation with integrated fitness tracking
             result = simulate_with_fitness(
                 batch=batch,
@@ -141,8 +151,9 @@ class PyTorchSimulator:
                 fitness_state=fitness_state,
                 num_steps=num_steps,
                 fitness_config=fitness_config,
+                dt=dt,
                 record_frames=config.record_frames,
-                frame_interval=int(60 / config.frame_rate) if config.record_frames else 1,
+                frame_interval=frame_interval,
                 arena_size=config.arena_size,
             )
             total_activation = torch.zeros(batch.batch_size, device=self.device)
@@ -151,7 +162,7 @@ class PyTorchSimulator:
         batch.positions = result['final_positions']
 
         # Calculate fitness
-        simulation_time = num_steps * TIME_STEP
+        simulation_time = num_steps * dt
         fitness_values = calculate_fitness(
             batch, pellet_batch, fitness_state, simulation_time, fitness_config
         )

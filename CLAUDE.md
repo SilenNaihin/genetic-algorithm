@@ -13,7 +13,7 @@ Browser-based genetic algorithm simulator where soft-bodied creatures evolve to 
 ### Backend (FastAPI + PyTorch)
 - Dev: `cd backend && uvicorn app.main:app --reload --port 8000`
 - Test: `cd backend && pytest`
-- 285 tests covering physics, neural, genetics, API
+- 417 tests covering physics, neural, genetics, API, parity, integration
 
 ## Directory Structure
 
@@ -126,7 +126,8 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-282 tests covering: genetics, genome, simulation, storage, neural networks, brain evolution, math utilities.
+282 frontend tests covering: genetics, genome, simulation, storage, neural networks, brain evolution, math utilities.
+417 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
 
 ## Global Commands
 
@@ -138,9 +139,11 @@ npm test -- --run  # Run once (no watch)
 ## Context Tips
 
 - `genetics-prd.json` tracks the genetics system overhaul - check status before implementing GA features
+- `COMPUTE.md` explains tensor batching, sparse frame storage, physics FPS, and performance
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
 - Fitness: 0-80 progress + 100 collection per pellet + 15 net displacement + 15 distance traveled (all XZ-only)
+- Physics FPS: Configurable 15-120 FPS (default 60). Higher = more expressive but more compute
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
   - Pure mode: 7 inputs (no time phase), NN has full control
   - Hybrid mode: 8 inputs (with time phase), NN modulates base oscillation
