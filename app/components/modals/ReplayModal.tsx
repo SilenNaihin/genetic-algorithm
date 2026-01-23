@@ -525,88 +525,77 @@ export function ReplayModal() {
         </div>
 
         {/* Right: Creature Info + Neural Network + Family Tree */}
-        <div style={{ flex: '1 1 auto', display: 'flex', gap: '16px', minWidth: 0 }}>
+        <div className="flex flex-1 gap-4 min-w-0">
           {/* Genome Viewer panel - matches vanilla implementation */}
-          <div
-            style={{
-              flex: '0 0 280px',
-              maxHeight: '500px',
-              overflow: 'auto',
-              background: 'var(--bg-tertiary)',
-              borderRadius: '12px',
-              padding: '16px',
-              fontSize: '12px',
-              fontFamily: 'monospace',
-            }}
-          >
+          <div className="flex-none w-[280px] max-h-[500px] overflow-auto bg-[var(--bg-tertiary)] rounded-xl p-4 text-xs font-mono">
             {/* CREATURE INFO section */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: '8px', fontSize: '13px', borderBottom: '1px solid var(--border-light)', paddingBottom: '4px' }}>
+            <div className="mb-4">
+              <div className="text-[var(--accent)] font-semibold mb-2 text-[13px] border-b border-[var(--border-light)] pb-1">
                 CREATURE INFO
               </div>
-              <div><span style={{ color: 'var(--text-muted)' }}>ID:</span> <span style={{ color: 'var(--text-primary)' }}>{genome.id}</span></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Generation:</span> <span style={{ color: 'var(--text-primary)' }}>{genome.generation}</span></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Survival Streak:</span> <span style={{ color: 'var(--text-primary)' }}>{genome.survivalStreak}</span></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Parents:</span> <span style={{ color: 'var(--text-primary)' }}>{genome.parentIds.length > 0 ? genome.parentIds.length : 'None (Gen 0)'}</span></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Global Freq Mult:</span> <span style={{ color: 'var(--text-primary)' }}>{genome.globalFrequencyMultiplier.toFixed(2)}</span></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Color (HSL):</span> <span style={{ color: 'var(--text-primary)' }}>{genome.color.h.toFixed(2)}, {genome.color.s.toFixed(2)}, {genome.color.l.toFixed(2)}</span></div>
+              <div><span className="text-[var(--text-muted)]">ID:</span> <span className="text-[var(--text-primary)]">{genome.id}</span></div>
+              <div><span className="text-[var(--text-muted)]">Generation:</span> <span className="text-[var(--text-primary)]">{genome.generation}</span></div>
+              <div><span className="text-[var(--text-muted)]">Survival Streak:</span> <span className="text-[var(--text-primary)]">{genome.survivalStreak}</span></div>
+              <div><span className="text-[var(--text-muted)]">Parents:</span> <span className="text-[var(--text-primary)]">{genome.parentIds.length > 0 ? genome.parentIds.length : 'None (Gen 0)'}</span></div>
+              <div><span className="text-[var(--text-muted)]">Global Freq Mult:</span> <span className="text-[var(--text-primary)]">{genome.globalFrequencyMultiplier.toFixed(2)}</span></div>
+              <div><span className="text-[var(--text-muted)]">Color (HSL):</span> <span className="text-[var(--text-primary)]">{genome.color.h.toFixed(2)}, {genome.color.s.toFixed(2)}, {genome.color.l.toFixed(2)}</span></div>
             </div>
 
             {/* NODES section */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: '8px', fontSize: '13px', borderBottom: '1px solid var(--border-light)', paddingBottom: '4px' }}>
+            <div className="mb-4">
+              <div className="text-[var(--accent)] font-semibold mb-2 text-[13px] border-b border-[var(--border-light)] pb-1">
                 NODES ({genome.nodes.length})
               </div>
               {genome.nodes.map((node, i) => (
-                <div key={node.id} style={{ marginBottom: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
-                  <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px', fontSize: '11px' }}>Node {i + 1}</div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Size:</span> <span style={{ color: 'var(--text-primary)' }}>{node.size.toFixed(2)}</span></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Friction:</span> <span style={{ color: 'var(--text-primary)' }}>{node.friction.toFixed(2)}</span></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Position:</span> <span style={{ color: 'var(--text-primary)' }}>({node.position.x.toFixed(2)}, {node.position.y.toFixed(2)}, {node.position.z.toFixed(2)})</span></div>
+                <div key={node.id} className="mb-2 p-2 bg-[var(--bg-secondary)] rounded-md">
+                  <div className="text-[var(--text-secondary)] font-semibold mb-1 text-[11px]">Node {i + 1}</div>
+                  <div><span className="text-[var(--text-muted)]">Size:</span> <span className="text-[var(--text-primary)]">{node.size.toFixed(2)}</span></div>
+                  <div><span className="text-[var(--text-muted)]">Friction:</span> <span className="text-[var(--text-primary)]">{node.friction.toFixed(2)}</span></div>
+                  <div><span className="text-[var(--text-muted)]">Position:</span> <span className="text-[var(--text-primary)]">({node.position.x.toFixed(2)}, {node.position.y.toFixed(2)}, {node.position.z.toFixed(2)})</span></div>
                 </div>
               ))}
             </div>
 
             {/* MUSCLES section */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: '8px', fontSize: '13px', borderBottom: '1px solid var(--border-light)', paddingBottom: '4px' }}>
+            <div className="mb-4">
+              <div className="text-[var(--accent)] font-semibold mb-2 text-[13px] border-b border-[var(--border-light)] pb-1">
                 MUSCLES ({genome.muscles.length})
               </div>
               {genome.muscles.map((muscle, i) => {
                 const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
                 const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
                 return (
-                  <div key={muscle.id} style={{ marginBottom: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px', fontSize: '11px' }}>
+                  <div key={muscle.id} className="mb-3 p-2 bg-[var(--bg-secondary)] rounded-md">
+                    <div className="text-[var(--text-secondary)] font-semibold mb-1 text-[11px]">
                       Muscle {i + 1} (Node {nodeAIndex} ↔ Node {nodeBIndex})
                     </div>
 
-                    <div style={{ marginBottom: '4px' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '2px' }}>PHYSICAL</div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Rest Length:</span> <span style={{ color: 'var(--text-primary)' }}>{muscle.restLength.toFixed(2)}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Stiffness:</span> <span style={{ color: 'var(--text-primary)' }}>{muscle.stiffness.toFixed(2)}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Damping:</span> <span style={{ color: 'var(--text-primary)' }}>{muscle.damping.toFixed(2)}</span></div>
+                    <div className="mb-1">
+                      <div className="text-[var(--text-muted)] text-[10px] mb-0.5">PHYSICAL</div>
+                      <div><span className="text-[var(--text-muted)]">Rest Length:</span> <span className="text-[var(--text-primary)]">{muscle.restLength.toFixed(2)}</span></div>
+                      <div><span className="text-[var(--text-muted)]">Stiffness:</span> <span className="text-[var(--text-primary)]">{muscle.stiffness.toFixed(2)}</span></div>
+                      <div><span className="text-[var(--text-muted)]">Damping:</span> <span className="text-[var(--text-primary)]">{muscle.damping.toFixed(2)}</span></div>
                     </div>
 
-                    <div style={{ marginBottom: '4px' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '2px' }}>OSCILLATION</div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Frequency:</span> <span style={{ color: 'var(--text-primary)' }}>{muscle.frequency.toFixed(2)} Hz</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Amplitude:</span> <span style={{ color: 'var(--text-primary)' }}>{muscle.amplitude.toFixed(2)}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Phase:</span> <span style={{ color: 'var(--text-primary)' }}>{muscle.phase.toFixed(2)} rad</span></div>
+                    <div className="mb-1">
+                      <div className="text-[var(--text-muted)] text-[10px] mb-0.5">OSCILLATION</div>
+                      <div><span className="text-[var(--text-muted)]">Frequency:</span> <span className="text-[var(--text-primary)]">{muscle.frequency.toFixed(2)} Hz</span></div>
+                      <div><span className="text-[var(--text-muted)]">Amplitude:</span> <span className="text-[var(--text-primary)]">{muscle.amplitude.toFixed(2)}</span></div>
+                      <div><span className="text-[var(--text-muted)]">Phase:</span> <span className="text-[var(--text-primary)]">{muscle.phase.toFixed(2)} rad</span></div>
                     </div>
 
-                    <div style={{ marginBottom: '4px' }}>
-                      <div style={{ color: 'var(--accent)', fontSize: '10px', marginBottom: '2px' }}>v1: DIRECTION SENSING</div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Direction Bias:</span> <span style={{ color: 'var(--text-primary)' }}>({muscle.directionBias?.x.toFixed(2) ?? '0'}, {muscle.directionBias?.y.toFixed(2) ?? '0'}, {muscle.directionBias?.z.toFixed(2) ?? '0'})</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Bias Strength:</span> <span style={{ color: 'var(--text-primary)' }}>{(muscle.biasStrength ?? 0).toFixed(2)}</span></div>
+                    <div className="mb-1">
+                      <div className="text-[var(--accent)] text-[10px] mb-0.5">v1: DIRECTION SENSING</div>
+                      <div><span className="text-[var(--text-muted)]">Direction Bias:</span> <span className="text-[var(--text-primary)]">({muscle.directionBias?.x.toFixed(2) ?? '0'}, {muscle.directionBias?.y.toFixed(2) ?? '0'}, {muscle.directionBias?.z.toFixed(2) ?? '0'})</span></div>
+                      <div><span className="text-[var(--text-muted)]">Bias Strength:</span> <span className="text-[var(--text-primary)]">{(muscle.biasStrength ?? 0).toFixed(2)}</span></div>
                     </div>
 
                     <div>
-                      <div style={{ color: 'var(--success)', fontSize: '10px', marginBottom: '2px' }}>v2: PROPRIOCEPTION & DISTANCE</div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Velocity Bias:</span> <span style={{ color: 'var(--text-primary)' }}>({muscle.velocityBias?.x.toFixed(2) ?? '0'}, {muscle.velocityBias?.y.toFixed(2) ?? '0'}, {muscle.velocityBias?.z.toFixed(2) ?? '0'})</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Velocity Strength:</span> <span style={{ color: 'var(--text-primary)' }}>{(muscle.velocityStrength ?? 0).toFixed(2)}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Distance Bias:</span> <span style={{ color: 'var(--text-primary)' }}>{(muscle.distanceBias ?? 0).toFixed(2)} ({(muscle.distanceBias ?? 0) > 0 ? 'near' : (muscle.distanceBias ?? 0) < 0 ? 'far' : 'neutral'})</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Distance Strength:</span> <span style={{ color: 'var(--text-primary)' }}>{(muscle.distanceStrength ?? 0).toFixed(2)}</span></div>
+                      <div className="text-[var(--success)] text-[10px] mb-0.5">v2: PROPRIOCEPTION & DISTANCE</div>
+                      <div><span className="text-[var(--text-muted)]">Velocity Bias:</span> <span className="text-[var(--text-primary)]">({muscle.velocityBias?.x.toFixed(2) ?? '0'}, {muscle.velocityBias?.y.toFixed(2) ?? '0'}, {muscle.velocityBias?.z.toFixed(2) ?? '0'})</span></div>
+                      <div><span className="text-[var(--text-muted)]">Velocity Strength:</span> <span className="text-[var(--text-primary)]">{(muscle.velocityStrength ?? 0).toFixed(2)}</span></div>
+                      <div><span className="text-[var(--text-muted)]">Distance Bias:</span> <span className="text-[var(--text-primary)]">{(muscle.distanceBias ?? 0).toFixed(2)} ({(muscle.distanceBias ?? 0) > 0 ? 'near' : (muscle.distanceBias ?? 0) < 0 ? 'far' : 'neutral'})</span></div>
+                      <div><span className="text-[var(--text-muted)]">Distance Strength:</span> <span className="text-[var(--text-primary)]">{(muscle.distanceStrength ?? 0).toFixed(2)}</span></div>
                     </div>
                   </div>
                 );
