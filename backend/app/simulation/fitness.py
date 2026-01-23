@@ -753,6 +753,9 @@ def calculate_fitness(
         - regression_penalty
     )
 
+    # Clamp to minimum 0 (matches TypeScript Math.max(0, fitness))
+    fitness = torch.clamp(fitness, min=0)
+
     # Zero out disqualified creatures
     fitness = torch.where(state.disqualified, torch.zeros_like(fitness), fitness)
 

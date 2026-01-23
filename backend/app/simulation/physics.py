@@ -879,6 +879,119 @@ def simulate_with_pellets(
     return result
 
 
+@torch.no_grad()
+def simulate_with_fitness(
+    batch: CreatureBatch,
+    pellets: "PelletBatch",
+    fitness_state: "FitnessState",
+    num_steps: int,
+    fitness_config: "FitnessConfig",
+    dt: float = TIME_STEP,
+    gravity: float = GRAVITY,
+    record_frames: bool = False,
+    frame_interval: int = 1,
+    arena_size: float = 50.0,
+) -> dict:
+    """
+    Run physics simulation with proper pellet collection tracking.
+
+    This version integrates with the fitness system:
+    - Checks for pellet collision each step
+    - Spawns new pellets when collected (opposite-half spawning)
+    - Tracks closest_edge_distance for regression penalty
+    - Updates distance_traveled continuously
+
+    Args:
+        batch: CreatureBatch (modified in place)
+        pellets: PelletBatch to update during simulation
+        fitness_state: FitnessState to update during simulation
+        num_steps: Number of physics steps to run
+        fitness_config: FitnessConfig with parameters
+        dt: Time step per step
+        gravity: Gravity acceleration
+        record_frames: Whether to record position frames
+        frame_interval: Record every N frames (if recording)
+        arena_size: Arena size for pellet spawning bounds
+
+    Returns:
+        Dict with:
+            - 'final_positions': [B, N, 3] final positions
+            - 'final_com': [B, 3] final center of mass
+            - 'frames': [B, num_frames, N, 3] recorded frames (if record_frames=True)
+            - 'total_collected': [B] pellets collected per creature
+    """
+    # Import here to avoid circular import
+    from app.simulation.fitness import (
+        check_pellet_collisions,
+        update_pellets,
+        update_fitness_state,
+        compute_edge_distances,
+        calculate_creature_xz_radius,
+    )
+
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        return {
+            'final_positions': torch.zeros(0, MAX_NODES, 3, device=device),
+            'final_com': torch.zeros(0, 3, device=device),
+            'total_collected': torch.zeros(0, dtype=torch.long, device=device),
+        }
+
+    # Store base rest lengths (before any oscillation)
+    base_rest_lengths = batch.spring_rest_length.clone()
+
+    # Initialize previous COM for velocity calculation
+    previous_com = get_center_of_mass(batch)
+
+    frames = []
+    time = 0.0
+
+    for step in range(num_steps):
+        # Physics step with modulation (uses current pellet positions for direction)
+        current_com = physics_step_modulated(
+            batch, base_rest_lengths, pellets.positions, previous_com, time, dt, gravity
+        )
+
+        # Update fitness state (distance traveled, closest edge distance)
+        update_fitness_state(batch, fitness_state, pellets, fitness_config)
+
+        # Check for pellet collisions and spawn new pellets
+        newly_collected = check_pellet_collisions(batch, pellets)
+
+        if newly_collected.any():
+            # Update pellets (spawns new ones for collectors)
+            update_pellets(batch, pellets, arena_size)
+
+            # Reset closest_edge_distance for creatures that collected
+            # New initial distance is already set in update_pellets
+            fitness_state.closest_edge_distance = torch.where(
+                newly_collected,
+                pellets.initial_distances,
+                fitness_state.closest_edge_distance
+            )
+
+        # Update previous COM for next step
+        previous_com = current_com
+        time += dt
+
+        # Record frame if needed
+        if record_frames and (step % frame_interval == 0):
+            frames.append(batch.positions.clone())
+
+    result = {
+        'final_positions': batch.positions.clone(),
+        'final_com': get_center_of_mass(batch),
+        'total_collected': pellets.total_collected.clone(),
+    }
+
+    if record_frames and frames:
+        result['frames'] = torch.stack(frames, dim=1)  # [B, F, N, 3]
+
+    return result
+
+
 # =============================================================================
 # Neural Network Integration
 # =============================================================================
@@ -1099,6 +1212,145 @@ def simulate_with_neural(
         'final_positions': batch.positions.clone(),
         'final_com': get_center_of_mass(batch),
         'total_activation': total_activation,
+    }
+
+    if record_frames and frames:
+        result['frames'] = torch.stack(frames, dim=1)  # [B, F, N, 3]
+
+    return result
+
+
+@torch.no_grad()
+def simulate_with_fitness_neural(
+    batch: CreatureBatch,
+    neural_network,  # BatchedNeuralNetwork
+    pellets: "PelletBatch",
+    fitness_state: "FitnessState",
+    num_steps: int,
+    fitness_config: "FitnessConfig",
+    mode: str = 'hybrid',
+    dead_zone: float = 0.1,
+    dt: float = TIME_STEP,
+    gravity: float = GRAVITY,
+    record_frames: bool = False,
+    frame_interval: int = 1,
+    arena_size: float = 50.0,
+) -> dict:
+    """
+    Run neural simulation with proper pellet collection tracking.
+
+    Integrates neural network control with the fitness system:
+    - Checks for pellet collision each step
+    - Spawns new pellets when collected (opposite-half spawning)
+    - Tracks closest_edge_distance for regression penalty
+    - Updates distance_traveled continuously
+    - Accumulates muscle activation for efficiency penalty
+
+    Args:
+        batch: CreatureBatch (modified in place)
+        neural_network: BatchedNeuralNetwork for control
+        pellets: PelletBatch to update during simulation
+        fitness_state: FitnessState to update during simulation
+        num_steps: Number of physics steps to run
+        fitness_config: FitnessConfig with parameters
+        mode: 'pure' or 'hybrid' neural control mode
+        dead_zone: Dead zone threshold for pure mode
+        dt: Time step per step
+        gravity: Gravity acceleration
+        record_frames: Whether to record position frames
+        frame_interval: Record every N frames (if recording)
+        arena_size: Arena size for pellet spawning bounds
+
+    Returns:
+        Dict with:
+            - 'final_positions': [B, N, 3] final positions
+            - 'final_com': [B, 3] final center of mass
+            - 'total_activation': [B] total muscle activation
+            - 'frames': [B, num_frames, N, 3] recorded frames (if record_frames=True)
+            - 'total_collected': [B] pellets collected per creature
+    """
+    # Import here to avoid circular import
+    from app.simulation.fitness import (
+        check_pellet_collisions,
+        update_pellets,
+        update_fitness_state,
+    )
+
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        return {
+            'final_positions': torch.zeros(0, MAX_NODES, 3, device=device),
+            'final_com': torch.zeros(0, 3, device=device),
+            'total_activation': torch.zeros(0, device=device),
+            'total_collected': torch.zeros(0, dtype=torch.long, device=device),
+        }
+
+    # Store base rest lengths
+    base_rest_lengths = batch.spring_rest_length.clone()
+
+    # Initialize previous COM for velocity calculation
+    previous_com = get_center_of_mass(batch)
+
+    # Accumulators
+    total_activation = torch.zeros(B, device=device)
+    frames = []
+    time = 0.0
+
+    for step in range(num_steps):
+        # 1. Gather sensor inputs (uses current pellet positions)
+        sensor_inputs = gather_sensor_inputs(
+            batch, pellets.positions, previous_com, time, mode=mode
+        )
+
+        # 2. Forward pass through NN
+        if mode == 'pure':
+            nn_outputs = neural_network.forward_with_dead_zone(sensor_inputs, dead_zone)
+        else:
+            nn_outputs = neural_network.forward(sensor_inputs)
+
+        # 3. Physics step with neural control
+        current_com, step_activation = physics_step_neural(
+            batch, base_rest_lengths, nn_outputs, time, mode, dt, gravity
+        )
+
+        # 4. Accumulate activation
+        total_activation += step_activation
+
+        # 5. Update fitness state (distance traveled, closest edge distance)
+        update_fitness_state(batch, fitness_state, pellets, fitness_config)
+
+        # 6. Also track total activation in fitness state
+        fitness_state.total_activation += step_activation
+
+        # 7. Check for pellet collisions and spawn new pellets
+        newly_collected = check_pellet_collisions(batch, pellets)
+
+        if newly_collected.any():
+            # Update pellets (spawns new ones for collectors)
+            update_pellets(batch, pellets, arena_size)
+
+            # Reset closest_edge_distance for creatures that collected
+            fitness_state.closest_edge_distance = torch.where(
+                newly_collected,
+                pellets.initial_distances,
+                fitness_state.closest_edge_distance
+            )
+
+        # Update previous COM
+        previous_com = current_com
+        time += dt
+
+        # Record frame if needed
+        if record_frames and (step % frame_interval == 0):
+            frames.append(batch.positions.clone())
+
+    result = {
+        'final_positions': batch.positions.clone(),
+        'final_com': get_center_of_mass(batch),
+        'total_activation': total_activation,
+        'total_collected': pellets.total_collected.clone(),
     }
 
     if record_frames and frames:

@@ -20,6 +20,8 @@ from app.simulation.tensors import creature_genomes_to_batch, get_center_of_mass
 from app.simulation.physics import (
     simulate_with_pellets,
     simulate_with_neural,
+    simulate_with_fitness,
+    simulate_with_fitness_neural,
     TIME_STEP,
 )
 from app.simulation.fitness import (
@@ -116,32 +118,37 @@ class PyTorchSimulator:
                 config=nn_config,
             )
 
-            # Run neural simulation
-            result = simulate_with_neural(
+            # Run neural simulation with integrated fitness tracking
+            result = simulate_with_fitness_neural(
                 batch=batch,
                 neural_network=network,
-                pellet_positions=pellet_positions,
+                pellets=pellet_batch,
+                fitness_state=fitness_state,
                 num_steps=num_steps,
+                fitness_config=fitness_config,
                 mode=config.neural_mode,
                 dead_zone=config.neural_dead_zone,
                 record_frames=config.record_frames,
                 frame_interval=int(60 / config.frame_rate) if config.record_frames else 1,
+                arena_size=config.arena_size,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:
-            # Run oscillator simulation
-            result = simulate_with_pellets(
+            # Run oscillator simulation with integrated fitness tracking
+            result = simulate_with_fitness(
                 batch=batch,
-                pellet_positions=pellet_positions,
+                pellets=pellet_batch,
+                fitness_state=fitness_state,
                 num_steps=num_steps,
+                fitness_config=fitness_config,
                 record_frames=config.record_frames,
                 frame_interval=int(60 / config.frame_rate) if config.record_frames else 1,
+                arena_size=config.arena_size,
             )
             total_activation = torch.zeros(batch.batch_size, device=self.device)
 
-        # Update fitness state with final positions
+        # Update batch positions from result
         batch.positions = result['final_positions']
-        update_fitness_state(batch, fitness_state, pellet_batch, fitness_config)
 
         # Calculate fitness
         simulation_time = num_steps * TIME_STEP
