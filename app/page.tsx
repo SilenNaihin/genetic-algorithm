@@ -14,10 +14,10 @@ import * as SimulationService from '../src/services/SimulationService';
 export default function HomePage() {
   const appState = useAppState();
 
-  // Try to use remote (PyTorch) simulation on startup
+  // Check backend connection on startup
   useEffect(() => {
-    SimulationService.tryUseRemoteSimulation().then((usingRemote) => {
-      console.log(`[HomePage] Simulation mode: ${usingRemote ? 'remote (PyTorch)' : 'local (Cannon-ES)'}`);
+    SimulationService.checkBackendConnection().then((connected) => {
+      console.log(`[HomePage] Backend: ${connected ? 'connected' : 'not available'}`);
     });
   }, []);
 

@@ -1,139 +1,28 @@
 import type {
   CreatureGenome,
   SimulationConfig,
-  PopulationStats,
   GenomeConstraints
 } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_GENOME_CONSTRAINTS } from '../types';
-import { generateRandomGenome } from '../core/Genome';
-import { truncationSelection, rankBasedProbabilities, weightedRandomSelect } from './Selection';
-import { mutateGenome, MutationConfig, DEFAULT_MUTATION_CONFIG } from './Mutation';
-import { singlePointCrossover, cloneGenome } from './Crossover';
 import { Creature } from '../core/Creature';
 
 /**
- * Decay configuration for mutation rate scheduling.
- */
-export interface DecayConfig {
-  decayMode: 'off' | 'linear' | 'exponential';
-  startRate: number;        // Initial mutation rate (default 0.5)
-  endRate: number;          // Final mutation rate (default 0.1)
-  decayGenerations: number; // Generations over which decay occurs (default 100)
-}
-
-/**
- * Calculate decayed mutation rate based on generation.
+ * Population - Thin state container for creatures.
  *
- * When decay is enabled, mutation rate transitions from startRate to endRate
- * over decayGenerations using either linear or exponential interpolation.
- *
- * @param generation - Current generation number
- * @param config - Decay configuration (or use legacy overload)
- * @returns Effective mutation rate for this generation
+ * All genetics (generation, evolution) are handled by the backend.
+ * This class only manages the local state of creatures for display.
  */
-export function calculateDecayedRate(
-  generation: number,
-  config: DecayConfig
-): number;
-export function calculateDecayedRate(
-  endRate: number,
-  generation: number,
-  decayMode: 'off' | 'linear' | 'exponential'
-): number;
-export function calculateDecayedRate(
-  arg1: number,
-  arg2: DecayConfig | number,
-  arg3?: 'off' | 'linear' | 'exponential'
-): number {
-  // Handle legacy 3-argument signature for backwards compatibility
-  if (typeof arg2 === 'number') {
-    const endRate = arg1;
-    const generation = arg2;
-    const decayMode = arg3!;
-
-    if (decayMode === 'off') {
-      return endRate;
-    }
-
-    // Legacy behavior: start at 5x target rate, capped at 50%, decay over 50 generations
-    const startRate = Math.min(0.5, endRate * 5);
-    const warmupGenerations = 50;
-
-    if (decayMode === 'linear') {
-      const progress = Math.min(1, generation / warmupGenerations);
-      return startRate - (startRate - endRate) * progress;
-    } else {
-      const tau = warmupGenerations / 3;
-      return endRate + (startRate - endRate) * Math.exp(-generation / tau);
-    }
-  }
-
-  // New config-based signature
-  const generation = arg1;
-  const config = arg2 as DecayConfig;
-
-  if (config.decayMode === 'off') {
-    return config.endRate;
-  }
-
-  const { startRate, endRate, decayGenerations, decayMode } = config;
-
-  if (decayMode === 'linear') {
-    // Linear decay: rate = start - (start - end) * min(1, gen / decayGenerations)
-    const progress = Math.min(1, generation / decayGenerations);
-    return startRate - (startRate - endRate) * progress;
-  } else {
-    // Exponential decay: rate = end + (start - end) * exp(-gen / tau)
-    // tau chosen so rate is ~95% decayed after decayGenerations
-    const tau = decayGenerations / 3;
-    return endRate + (startRate - endRate) * Math.exp(-generation / tau);
-  }
-}
-
 export class Population {
   creatures: Creature[] = [];
-  generation: number = 0;
   config: SimulationConfig;
   genomeConstraints: GenomeConstraints;
-  mutationConfig: MutationConfig;
 
   constructor(
     config: SimulationConfig = DEFAULT_CONFIG,
-    genomeConstraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS,
-    mutationConfig: MutationConfig = DEFAULT_MUTATION_CONFIG
+    genomeConstraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
   ) {
     this.config = config;
     this.genomeConstraints = genomeConstraints;
-    this.mutationConfig = {
-      ...mutationConfig,
-      rate: config.mutationRate,
-      magnitude: config.mutationMagnitude,
-      neuralRate: config.weightMutationRate,
-      neuralMagnitude: config.weightMutationMagnitude
-    };
-  }
-
-  /**
-   * Create initial population with random genomes (local generation)
-   * @deprecated Use createEmpty + replaceCreatures with backend-generated genomes
-   */
-  static createInitial(
-    config: SimulationConfig = DEFAULT_CONFIG,
-    genomeConstraints: GenomeConstraints = DEFAULT_GENOME_CONSTRAINTS
-  ): Population {
-    const population = new Population(config, genomeConstraints);
-
-    for (let i = 0; i < config.populationSize; i++) {
-      // Pass simulation config to enable neural genome initialization if configured
-      const genome = generateRandomGenome({
-        constraints: genomeConstraints,
-        simulationConfig: config
-      });
-      const creature = new Creature(genome);
-      population.creatures.push(creature);
-    }
-
-    return population;
   }
 
   /**
@@ -161,108 +50,6 @@ export class Population {
   }
 
   /**
-   * Get population statistics
-   */
-  getStats(): PopulationStats {
-    const fitnesses = this.creatures.map(c => c.state.fitness);
-    const sortedFitnesses = [...fitnesses].sort((a, b) => b - a);
-
-    const avgNodes = this.creatures.reduce((sum, c) => sum + c.genome.nodes.length, 0) / this.creatures.length;
-    const avgMuscles = this.creatures.reduce((sum, c) => sum + c.genome.muscles.length, 0) / this.creatures.length;
-
-    return {
-      generation: this.generation,
-      bestFitness: sortedFitnesses[0] || 0,
-      averageFitness: fitnesses.reduce((a, b) => a + b, 0) / fitnesses.length || 0,
-      worstFitness: sortedFitnesses[sortedFitnesses.length - 1] || 0,
-      avgNodes,
-      avgMuscles
-    };
-  }
-
-  /**
-   * Evolve to next generation
-   *
-   * Survivors (top performers based on cullPercentage) pass through UNCHANGED.
-   * New creatures are created to fill the culled slots via crossover or mutation.
-   */
-  evolve(): CreatureGenome[] {
-    // Select survivors - these pass through unchanged
-    const { survivors } = truncationSelection(this.creatures, 1 - this.config.cullPercentage);
-
-    // Survivors pass through with incremented survivalStreak (unchanged otherwise)
-    const survivorGenomes = survivors.map(c => ({
-      ...c.genome,
-      survivalStreak: c.genome.survivalStreak + 1
-    }));
-
-    // Calculate selection probabilities based on rank (for creating new creatures)
-    const probabilities = rankBasedProbabilities(survivors);
-
-    // Calculate decayed neural mutation rate for this generation
-    const effectiveNeuralRate = calculateDecayedRate(
-      this.config.weightMutationRate,
-      this.generation,
-      this.config.weightMutationDecay
-    );
-
-    // Create mutation config with decayed neural rate
-    const currentMutationConfig: MutationConfig = {
-      ...this.mutationConfig,
-      neuralRate: effectiveNeuralRate
-    };
-
-    // Start with all survivors
-    const newGenomes: CreatureGenome[] = [...survivorGenomes];
-    const targetSize = this.config.populationSize;
-    const newCreaturesNeeded = targetSize - survivors.length;
-
-    // Create new creatures to fill the culled slots
-    // All new creatures are either crossover or mutation (controlled by crossoverRate)
-    for (let i = 0; i < newCreaturesNeeded; i++) {
-      const useCrossover = this.config.useCrossover !== false;
-      const useMutation = this.config.useMutation !== false;
-
-      // Determine crossover vs mutation based on rates
-      const crossoverProb = useCrossover ? this.config.crossoverRate : 0;
-      const doCrossover = Math.random() < crossoverProb && survivors.length >= 2;
-
-      if (doCrossover) {
-        // Create via crossover of two survivors
-        const parent1 = weightedRandomSelect(survivors, probabilities);
-        let parent2 = weightedRandomSelect(survivors, probabilities);
-
-        // Ensure different parents
-        let attempts = 0;
-        while (parent2.genome.id === parent1.genome.id && attempts < 10) {
-          parent2 = weightedRandomSelect(survivors, probabilities);
-          attempts++;
-        }
-
-        const child = singlePointCrossover(parent1.genome, parent2.genome, this.genomeConstraints);
-        newGenomes.push(child);
-      } else if (useMutation) {
-        // Create via mutation of a survivor (clone + mutate)
-        const parent = weightedRandomSelect(survivors, probabilities);
-        const child = cloneGenome(parent.genome, this.genomeConstraints);
-        const mutatedChild = mutateGenome(child, currentMutationConfig, this.genomeConstraints);
-        newGenomes.push(mutatedChild);
-      } else {
-        // Only crossover enabled but couldn't do it (e.g., not enough survivors)
-        // Fall back to clone
-        const parent = weightedRandomSelect(survivors, probabilities);
-        const child = cloneGenome(parent.genome, this.genomeConstraints);
-        newGenomes.push(child);
-      }
-    }
-
-    // Increment population generation counter
-    this.generation++;
-
-    return newGenomes;
-  }
-
-  /**
    * Replace current creatures with new genomes
    */
   replaceCreatures(genomes: CreatureGenome[]): void {
@@ -280,19 +67,6 @@ export class Population {
    */
   updateConfig(config: Partial<SimulationConfig>): void {
     Object.assign(this.config, config);
-
-    if (config.mutationRate !== undefined) {
-      this.mutationConfig.rate = config.mutationRate;
-    }
-    if (config.mutationMagnitude !== undefined) {
-      this.mutationConfig.magnitude = config.mutationMagnitude;
-    }
-    if (config.weightMutationRate !== undefined) {
-      this.mutationConfig.neuralRate = config.weightMutationRate;
-    }
-    if (config.weightMutationMagnitude !== undefined) {
-      this.mutationConfig.neuralMagnitude = config.weightMutationMagnitude;
-    }
   }
 
   /**

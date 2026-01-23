@@ -1,16 +1,11 @@
 /**
  * Simulation Service
  *
- * Thin abstraction layer over domain simulation logic.
- * Supports two modes:
- * - Local: Calls BatchSimulator directly (client-side Cannon-ES)
- * - Remote: Calls backend API (server-side PyTorch)
- *
- * Use setSimulationMode('remote') to switch to backend simulation.
- * Default is 'local' for backward compatibility.
+ * Thin abstraction layer that calls backend API for all simulation.
+ * Backend (PyTorch) is required - no local simulation fallback.
  */
 
-import { simulatePopulation, type CreatureSimulationResult, type SimulationFrame, type PelletData, type DisqualificationReason } from '../simulation/BatchSimulator';
+import { type CreatureSimulationResult, type SimulationFrame, type PelletData, type DisqualificationReason } from '../simulation/BatchSimulator';
 import { Population } from '../genetics/Population';
 import type { SimulationConfig } from '../types/simulation';
 import type { CreatureGenome, Vector3 } from '../types/genome';
@@ -23,46 +18,25 @@ export interface SimulationProgress {
 
 export type ProgressCallback = (progress: SimulationProgress) => void;
 
-export type SimulationMode = 'local' | 'remote';
-
-// Default to remote - backend is required for simulation
-let currentSimulationMode: SimulationMode = 'remote';
 let backendAvailable = false;
-
-/**
- * Get the current simulation mode
- */
-export function getSimulationMode(): SimulationMode {
-  return currentSimulationMode;
-}
-
-/**
- * Set the simulation mode
- * @param mode 'local' for client-side Cannon-ES, 'remote' for backend PyTorch
- */
-export function setSimulationMode(mode: SimulationMode): void {
-  currentSimulationMode = mode;
-  console.log(`[SimulationService] Mode set to: ${mode}`);
-}
 
 /**
  * Check if backend is available. Backend is required for simulation.
  */
-export async function tryUseRemoteSimulation(): Promise<boolean> {
+export async function checkBackendConnection(): Promise<boolean> {
   try {
     const connected = await Api.checkConnection();
+    backendAvailable = connected;
     if (connected) {
-      backendAvailable = true;
-      setSimulationMode('remote');
-      console.log('[SimulationService] Backend connected - using PyTorch simulation');
-      return true;
+      console.log('[SimulationService] Backend connected');
+    } else {
+      console.warn('[SimulationService] Backend not available! Simulation will fail.');
     }
+    return connected;
   } catch {
-    // Backend not available
+    backendAvailable = false;
+    return false;
   }
-  backendAvailable = false;
-  console.warn('[SimulationService] Backend not available! Simulation will fail.');
-  return false;
 }
 
 /**
@@ -177,38 +151,9 @@ function apiResultToCreatureResult(
 
 /**
  * Run simulation for a population of genomes
- * Always uses remote (PyTorch) simulation - backend is required
+ * Uses backend (PyTorch) simulation
  */
 export async function runSimulation(
-  genomes: CreatureGenome[],
-  config: SimulationConfig,
-  onProgress?: ProgressCallback
-): Promise<CreatureSimulationResult[]> {
-  // Always use remote simulation - backend is required
-  return runRemoteSimulation(genomes, config, onProgress);
-}
-
-/**
- * Run simulation locally using Cannon-ES
- * @deprecated Use remote simulation - backend is required
- */
-async function _runLocalSimulation(
-  genomes: CreatureGenome[],
-  config: SimulationConfig,
-  onProgress?: ProgressCallback
-): Promise<CreatureSimulationResult[]> {
-  return simulatePopulation(genomes, config, (completed, total) => {
-    onProgress?.({ completed, total });
-  });
-}
-// Keep reference to avoid unused import warning
-void _runLocalSimulation;
-
-/**
- * Run simulation remotely using backend API
- * Backend is required - no fallback to local simulation
- */
-async function runRemoteSimulation(
   genomes: CreatureGenome[],
   config: SimulationConfig,
   onProgress?: ProgressCallback
@@ -235,7 +180,7 @@ async function runRemoteSimulation(
     onProgress?.({ completed: i + 1, total: genomes.length });
   }
 
-  console.log(`[SimulationService] Remote simulation completed: ${response.results.length} creatures in ${response.total_time_ms}ms (${response.creatures_per_second.toFixed(1)} creatures/sec)`);
+  console.log(`[SimulationService] Simulation completed: ${response.results.length} creatures in ${response.total_time_ms}ms (${response.creatures_per_second.toFixed(1)} creatures/sec)`);
 
   return results;
 }

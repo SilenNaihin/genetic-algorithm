@@ -25,9 +25,9 @@ export default function RunPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Try to use remote (PyTorch) simulation on startup
+  // Check backend connection on startup
   useEffect(() => {
-    SimulationService.tryUseRemoteSimulation();
+    SimulationService.checkBackendConnection();
   }, []);
 
   // Load the run when the page mounts

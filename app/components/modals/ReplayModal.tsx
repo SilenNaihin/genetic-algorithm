@@ -412,7 +412,7 @@ export function ReplayModal() {
   const currentTime = loadedResult.frames[currentFrame]?.time || 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1100px">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1350px">
       <div style={{ display: 'flex', gap: '16px' }}>
         {/* Left: Replay viewer */}
         <div style={{ flex: '0 0 500px' }}>
@@ -524,8 +524,81 @@ export function ReplayModal() {
           </div>
         </div>
 
-        {/* Right: Neural Network + Family Tree side by side */}
+        {/* Right: Creature Info + Neural Network + Family Tree */}
         <div style={{ flex: '1 1 auto', display: 'flex', gap: '16px', minWidth: 0 }}>
+          {/* Creature Info panel */}
+          <div
+            style={{
+              flex: '0 0 220px',
+              maxHeight: '480px',
+              overflow: 'auto',
+              background: 'var(--bg-tertiary)',
+              borderRadius: '12px',
+              padding: '16px',
+            }}
+          >
+            <div
+              style={{
+                color: 'var(--accent)',
+                fontWeight: 600,
+                fontSize: '13px',
+                marginBottom: '12px',
+                borderBottom: '1px solid var(--border-light)',
+                paddingBottom: '4px',
+              }}
+            >
+              CREATURE INFO
+            </div>
+            <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+              {/* Basic stats */}
+              <div style={{ marginBottom: '8px' }}>
+                <div><span style={{ color: 'var(--text-muted)' }}>ID:</span> {genome.id.slice(0, 12)}...</div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Generation:</span> {genome.generation}</div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Controller:</span> {genome.controllerType}</div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Freq Mult:</span> {genome.globalFrequencyMultiplier.toFixed(2)}</div>
+              </div>
+
+              {/* Nodes */}
+              <div style={{ marginBottom: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '4px' }}>
+                  NODES ({genome.nodes.length})
+                </div>
+                {genome.nodes.map((node, i) => (
+                  <div key={node.id} style={{ marginBottom: '2px', fontSize: '10px' }}>
+                    <span style={{ color: 'var(--accent)' }}>N{i + 1}</span>{' '}
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      r={node.size.toFixed(2)} f={node.friction.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Muscles */}
+              <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '4px' }}>
+                  MUSCLES ({genome.muscles.length})
+                </div>
+                {genome.muscles.map((muscle, i) => {
+                  const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
+                  const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
+                  return (
+                    <div key={muscle.id} style={{ marginBottom: '4px', fontSize: '10px' }}>
+                      <div>
+                        <span style={{ color: 'var(--success)' }}>M{i + 1}</span>{' '}
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          N{nodeAIndex}↔N{nodeBIndex}
+                        </span>
+                      </div>
+                      <div style={{ marginLeft: '12px', color: 'var(--text-muted)', fontSize: '9px' }}>
+                        freq={muscle.frequency.toFixed(2)} amp={muscle.amplitude.toFixed(2)} rest={muscle.restLength.toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           {/* Neural Network panel (only shown for neural creatures) */}
           {hasNeuralGenome && (
             <div
