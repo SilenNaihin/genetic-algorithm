@@ -1275,6 +1275,7 @@ def simulate_with_fitness_neural(
         update_pellets,
         update_fitness_state,
     )
+    from app.neural.sensors import gather_sensor_inputs
 
     B = batch.batch_size
     device = batch.device
