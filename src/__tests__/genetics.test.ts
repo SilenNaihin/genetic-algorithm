@@ -11,7 +11,7 @@ import {
 } from '../genetics/Selection';
 import { singlePointCrossover, uniformCrossover, cloneGenome } from '../genetics/Crossover';
 import { mutateGenome, mutateNode, mutateMuscle, DEFAULT_MUTATION_CONFIG } from '../genetics/Mutation';
-import { DEFAULT_CONFIG, DEFAULT_GENOME_CONSTRAINTS } from '../types';
+import { DEFAULT_GENOME_CONSTRAINTS } from '../types';
 
 // Helper to create creatures with known fitness values
 function createCreatureWithFitness(fitness: number): Creature {
@@ -459,37 +459,42 @@ describe('Mutation', () => {
 });
 
 describe('Population', () => {
-  describe('createInitial', () => {
-    it('creates population with correct size', () => {
-      const config = { ...DEFAULT_CONFIG, populationSize: 50 };
-      const population = Population.createInitial(config);
-      expect(population.creatures.length).toBe(50);
+  describe('createEmpty', () => {
+    it('creates empty population', () => {
+      const population = Population.createEmpty();
+      expect(population.creatures.length).toBe(0);
     });
+  });
 
-    it('starts at generation 0', () => {
-      const population = Population.createInitial();
-      expect(population.generation).toBe(0);
-    });
+  describe('replaceCreatures', () => {
+    it('replaces creatures with new genomes', () => {
+      const population = Population.createEmpty();
+      const genomes = [generateRandomGenome(), generateRandomGenome()];
 
-    it('creates unique creature genomes', () => {
-      const population = Population.createInitial();
-      const ids = new Set(population.creatures.map(c => c.genome.id));
-      expect(ids.size).toBe(population.creatures.length);
+      population.replaceCreatures(genomes);
+
+      expect(population.creatures.length).toBe(2);
+      expect(population.creatures[0].genome.id).toBe(genomes[0].id);
+      expect(population.creatures[1].genome.id).toBe(genomes[1].id);
     });
   });
 
   describe('getGenomes', () => {
     it('returns all genomes', () => {
-      const config = { ...DEFAULT_CONFIG, populationSize: 10 };
-      const population = Population.createInitial(config);
-      const genomes = population.getGenomes();
-      expect(genomes.length).toBe(10);
+      const population = Population.createEmpty();
+      const genomes = Array.from({ length: 10 }, () => generateRandomGenome());
+      population.replaceCreatures(genomes);
+
+      const result = population.getGenomes();
+      expect(result.length).toBe(10);
     });
   });
 
   describe('rankByFitness', () => {
     it('returns creatures sorted by fitness descending', () => {
-      const population = Population.createInitial({ ...DEFAULT_CONFIG, populationSize: 5 });
+      const population = Population.createEmpty();
+      const genomes = Array.from({ length: 5 }, () => generateRandomGenome());
+      population.replaceCreatures(genomes);
 
       // Assign known fitness values
       population.creatures[0].state.fitness = 30;
@@ -508,79 +513,11 @@ describe('Population', () => {
     });
   });
 
-  describe('getStats', () => {
-    it('calculates correct statistics', () => {
-      const population = Population.createInitial({ ...DEFAULT_CONFIG, populationSize: 4 });
-
-      population.creatures[0].state.fitness = 10;
-      population.creatures[1].state.fitness = 20;
-      population.creatures[2].state.fitness = 30;
-      population.creatures[3].state.fitness = 40;
-
-      const stats = population.getStats();
-
-      expect(stats.bestFitness).toBe(40);
-      expect(stats.worstFitness).toBe(10);
-      expect(stats.averageFitness).toBe(25);
-    });
-
-    it('includes generation number', () => {
-      const population = Population.createInitial();
-      population.generation = 5;
-      const stats = population.getStats();
-      expect(stats.generation).toBe(5);
-    });
-  });
-
-  describe('evolve', () => {
-    it('returns genomes for next generation', () => {
-      const config = { ...DEFAULT_CONFIG, populationSize: 20 };
-      const population = Population.createInitial(config);
-
-      // Assign fitness
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 10;
-      });
-
-      const newGenomes = population.evolve();
-
-      expect(newGenomes.length).toBe(20);
-    });
-
-    it('increments generation counter', () => {
-      const population = Population.createInitial();
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 10;
-      });
-
-      expect(population.generation).toBe(0);
-      population.evolve();
-      expect(population.generation).toBe(1);
-    });
-
-    it('preserves elite genomes', () => {
-      const config = { ...DEFAULT_CONFIG, populationSize: 10, eliteCount: 2 };
-      const population = Population.createInitial(config);
-
-      // Assign distinct fitness values
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 100;
-      });
-
-      const topCreatures = population.rankByFitness().slice(0, 2);
-      const topIds = new Set(topCreatures.map(c => c.genome.id));
-
-      const newGenomes = population.evolve();
-
-      // Elite genomes should be preserved (with same ID)
-      const preservedCount = newGenomes.filter(g => topIds.has(g.id)).length;
-      expect(preservedCount).toBe(2);
-    });
-  });
-
   describe('getBest', () => {
     it('returns creature with highest fitness', () => {
-      const population = Population.createInitial({ ...DEFAULT_CONFIG, populationSize: 5 });
+      const population = Population.createEmpty();
+      const genomes = Array.from({ length: 5 }, () => generateRandomGenome());
+      population.replaceCreatures(genomes);
 
       population.creatures[0].state.fitness = 30;
       population.creatures[1].state.fitness = 100;
@@ -594,7 +531,9 @@ describe('Population', () => {
 
   describe('dispose', () => {
     it('clears all creatures', () => {
-      const population = Population.createInitial({ ...DEFAULT_CONFIG, populationSize: 10 });
+      const population = Population.createEmpty();
+      const genomes = Array.from({ length: 10 }, () => generateRandomGenome());
+      population.replaceCreatures(genomes);
       expect(population.creatures.length).toBe(10);
 
       population.dispose();

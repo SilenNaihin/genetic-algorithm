@@ -1,11 +1,13 @@
 /**
- * End-to-end integration tests for the evolution pipeline
- * Tests the complete flow: genome generation → simulation → selection → crossover/mutation → next generation
+ * Integration tests for evolution pipeline components
+ * Tests genome validity, selection, and simulation
+ *
+ * Note: Full evolution cycles (Population.evolve) are now handled by backend.
+ * These tests verify the standalone components work correctly.
  */
 import { describe, it, expect } from 'vitest';
 import { generateRandomGenome } from '../core/Genome';
 import { Creature } from '../core/Creature';
-import { Population } from '../genetics/Population';
 import { simulatePopulation, simulateCreature } from '../simulation/BatchSimulator';
 import { singlePointCrossover, cloneGenome } from '../genetics/Crossover';
 import { mutateGenome, DEFAULT_MUTATION_CONFIG } from '../genetics/Mutation';
@@ -21,86 +23,6 @@ const TEST_CONFIG = {
 };
 
 describe('Evolution Pipeline', () => {
-  describe('Full Generation Cycle', () => {
-    it('completes generation 0 → 1 evolution cycle', async () => {
-      // Create initial population
-      const population = Population.createInitial(TEST_CONFIG);
-      expect(population.creatures.length).toBe(10);
-      expect(population.generation).toBe(0);
-
-      // Simulate all creatures
-      const genomes = population.getGenomes();
-      const results = await simulatePopulation(genomes, TEST_CONFIG);
-
-      // Assign fitness back to creatures
-      for (let i = 0; i < results.length; i++) {
-        population.creatures[i].state.fitness = results[i].finalFitness;
-        population.creatures[i].state.pelletsCollected = results[i].pelletsCollected;
-      }
-
-      // Evolve to next generation
-      const newGenomes = population.evolve();
-
-      expect(newGenomes.length).toBe(10);
-      expect(population.generation).toBe(1);
-    });
-
-    it('preserves elite genomes across generations', async () => {
-      const population = Population.createInitial(TEST_CONFIG);
-
-      // Assign distinct fitness values
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = (i + 1) * 100;
-      });
-
-      // Get top 2 IDs before evolution
-      const eliteIds = population.rankByFitness().slice(0, 2).map(c => c.genome.id);
-
-      const newGenomes = population.evolve();
-
-      // Elite genomes should be preserved (same IDs)
-      const preservedElites = newGenomes.filter(g => eliteIds.includes(g.id));
-      expect(preservedElites.length).toBe(2);
-    });
-
-    it('new offspring have incremented generation numbers', async () => {
-      const population = Population.createInitial({ ...TEST_CONFIG, cullPercentage: 0.5 });
-
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 10;
-        c.genome.generation = 0;
-      });
-
-      // Track survivor IDs before evolution
-      const survivorCount = Math.ceil(population.creatures.length * (1 - TEST_CONFIG.cullPercentage));
-      const sortedCreatures = [...population.creatures].sort((a, b) => b.state.fitness - a.state.fitness);
-      const survivorIds = new Set(sortedCreatures.slice(0, survivorCount).map(c => c.genome.id));
-
-      const newGenomes = population.evolve();
-
-      // Survivors keep their generation, new offspring should have generation >= 1
-      const newOffspring = newGenomes.filter(g => !survivorIds.has(g.id));
-      expect(newOffspring.every(g => g.generation >= 1)).toBe(true);
-    });
-
-    it('runs 5 generations without error', async () => {
-      const population = Population.createInitial(TEST_CONFIG);
-
-      for (let gen = 0; gen < 5; gen++) {
-        const genomes = population.getGenomes();
-        const results = await simulatePopulation(genomes, TEST_CONFIG);
-
-        for (let i = 0; i < results.length; i++) {
-          population.creatures[i].state.fitness = results[i].finalFitness;
-        }
-
-        population.evolve();
-      }
-
-      expect(population.generation).toBe(5);
-    });
-  });
-
   describe('Genome Validity Through Evolution', () => {
     it('all genomes remain valid after crossover', () => {
       for (let i = 0; i < 20; i++) {
@@ -260,24 +182,7 @@ describe('Evolution Pipeline', () => {
     });
   });
 
-  describe('Survival Streak Tracking', () => {
-    it('elite survivors get incremented survival streak', () => {
-      const population = Population.createInitial({ ...TEST_CONFIG, eliteCount: 2 });
-
-      // Assign fitness so we know who survives
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 100;
-        c.genome.survivalStreak = 0;
-      });
-
-      const topCreatureIds = population.rankByFitness().slice(0, 2).map(c => c.genome.id);
-      const newGenomes = population.evolve();
-
-      // Elite genomes should have survivalStreak = 1
-      const eliteGenomes = newGenomes.filter(g => topCreatureIds.includes(g.id));
-      expect(eliteGenomes.every(g => g.survivalStreak === 1)).toBe(true);
-    });
-
+  describe('Survival Streak', () => {
     it('offspring start with survival streak 0', () => {
       const parent1 = generateRandomGenome();
       const parent2 = generateRandomGenome();
@@ -299,91 +204,7 @@ describe('Evolution Pipeline', () => {
     });
   });
 
-  describe('Mutation/Crossover Mode Toggle', () => {
-    it('mutation-only mode creates new offspring via cloning', () => {
-      const config = { ...TEST_CONFIG, useMutation: true, useCrossover: false, cullPercentage: 0.5 };
-      const population = Population.createInitial(config);
-
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 10;
-      });
-
-      // Track survivor IDs before evolution
-      const survivorCount = Math.ceil(population.creatures.length * (1 - config.cullPercentage));
-      const sortedCreatures = [...population.creatures].sort((a, b) => b.state.fitness - a.state.fitness);
-      const survivorIds = new Set(sortedCreatures.slice(0, survivorCount).map(c => c.genome.id));
-
-      const newGenomes = population.evolve();
-
-      // New offspring (not survivors) should be clones (single parent)
-      const newOffspring = newGenomes.filter(g => !survivorIds.has(g.id));
-
-      for (const offspring of newOffspring) {
-        expect(offspring.parentIds.length).toBe(1);
-      }
-    });
-
-    it('crossover-only mode uses two parents for new offspring when crossover rate is high', () => {
-      const config = { ...TEST_CONFIG, useMutation: false, useCrossover: true, cullPercentage: 0.5, crossoverRate: 1.0 };
-      const population = Population.createInitial(config);
-
-      population.creatures.forEach((c, i) => {
-        c.state.fitness = i * 10;
-      });
-
-      // Track survivor IDs before evolution
-      const survivorCount = Math.ceil(population.creatures.length * (1 - config.cullPercentage));
-      const sortedCreatures = [...population.creatures].sort((a, b) => b.state.fitness - a.state.fitness);
-      const survivorIds = new Set(sortedCreatures.slice(0, survivorCount).map(c => c.genome.id));
-
-      const newGenomes = population.evolve();
-
-      // New offspring (not survivors) should have two parents (crossover) when crossoverRate is 1.0
-      const newOffspring = newGenomes.filter(g => !survivorIds.has(g.id));
-      const twoParentCount = newOffspring.filter(g => g.parentIds.length === 2).length;
-      expect(twoParentCount).toBeGreaterThan(newOffspring.length / 2);
-    });
-  });
-
   describe('Edge Cases', () => {
-    it('handles population of 1', async () => {
-      const config = { ...TEST_CONFIG, populationSize: 1, eliteCount: 1 };
-      const population = Population.createInitial(config);
-
-      expect(population.creatures.length).toBe(1);
-
-      population.creatures[0].state.fitness = 100;
-
-      // Should not throw
-      const newGenomes = population.evolve();
-      expect(newGenomes.length).toBe(1);
-    });
-
-    it('handles all creatures having same fitness', async () => {
-      const population = Population.createInitial(TEST_CONFIG);
-
-      // All same fitness
-      population.creatures.forEach(c => {
-        c.state.fitness = 50;
-      });
-
-      // Should not throw
-      const newGenomes = population.evolve();
-      expect(newGenomes.length).toBe(TEST_CONFIG.populationSize);
-    });
-
-    it('handles creatures with 0 fitness', async () => {
-      const population = Population.createInitial(TEST_CONFIG);
-
-      population.creatures.forEach(c => {
-        c.state.fitness = 0;
-      });
-
-      // Should not throw
-      const newGenomes = population.evolve();
-      expect(newGenomes.length).toBe(TEST_CONFIG.populationSize);
-    });
-
     it('handles genome at minimum node count', () => {
       const constraints = { ...DEFAULT_GENOME_CONSTRAINTS, minNodes: 2, maxNodes: 2 };
       const genome = generateRandomGenome(constraints);
