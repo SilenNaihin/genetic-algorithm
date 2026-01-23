@@ -120,6 +120,7 @@ export function MenuScreen() {
 
         {/* Cull percentage and evolution mode */}
         <div style={{ marginBottom: '12px', textAlign: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', margin: '12px 0' }}>
           <ParamSlider
             name="Cull Percentage"
             value={config.cullPercentage * 100}
@@ -130,6 +131,19 @@ export function MenuScreen() {
             onChange={(v) => setConfig({ cullPercentage: v / 100 })}
             width="200px"
           />
+          {/* Crossover vs Mutation split slider - only shown when both enabled */}
+          {config.useMutation && config.useCrossover && (
+            <ParamSlider
+              name="Crossover vs Mutation"
+              value={config.crossoverRate * 100}
+              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
+              min={0}
+              max={100}
+              tooltip={TOOLTIPS.crossoverRate}
+              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
+              width="200px"
+            />
+          )}</div>
 
           {/* Evolution mode checkboxes */}
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', margin: '12px 0' }}>
@@ -161,19 +175,7 @@ export function MenuScreen() {
             </label>
           </div>
 
-          {/* Crossover vs Mutation split slider - only shown when both enabled */}
-          {config.useMutation && config.useCrossover && (
-            <ParamSlider
-              name="Crossover vs Mutation"
-              value={config.crossoverRate * 100}
-              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
-              min={0}
-              max={100}
-              tooltip={TOOLTIPS.crossoverRate}
-              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
-              width="200px"
-            />
-          )}
+          
         </div>
 
         {/* Replay Storage Mode */}

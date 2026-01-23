@@ -524,82 +524,98 @@ export function ReplayModal() {
           </div>
         </div>
 
-        {/* Right: Creature Info + Neural Network + Family Tree */}
+        {/* Right: Genome Viewer + Neural Network + Family Tree */}
         <div className="flex flex-1 gap-4 min-w-0">
-          {/* Genome Viewer panel - matches vanilla implementation */}
-          <div className="flex-none w-[280px] max-h-[500px] overflow-auto bg-[var(--bg-tertiary)] rounded-xl p-4 text-xs font-mono">
-            {/* CREATURE INFO section */}
-            <div className="mb-4">
-              <div className="text-[var(--accent)] font-semibold mb-2 text-[13px] border-b border-[var(--border-light)] pb-1">
-                CREATURE INFO
+          {/* Genome Viewer panel */}
+          <div className="flex-none w-72 max-h-[500px] overflow-auto bg-zinc-900/80 rounded-xl p-4 text-xs font-mono border border-zinc-700/50">
+            {/* CREATURE INFO */}
+            <div className="mb-5">
+              <h3 className="text-cyan-400 font-semibold text-sm mb-3 pb-2 border-b border-zinc-700">
+                Creature Info
+              </h3>
+              <div className="space-y-1 text-zinc-300">
+                <div className="flex justify-between"><span className="text-zinc-500">ID</span><span className="text-zinc-200 truncate max-w-[160px]" title={genome.id}>{genome.id.slice(0, 16)}...</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Generation</span><span className="text-zinc-200">{genome.generation}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Survival Streak</span><span className="text-emerald-400">{genome.survivalStreak}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Parents</span><span className="text-zinc-200">{genome.parentIds.length || 'Gen 0'}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Freq Multiplier</span><span className="text-zinc-200">{genome.globalFrequencyMultiplier.toFixed(2)}×</span></div>
               </div>
-              <div><span className="text-[var(--text-muted)]">ID:</span> <span className="text-[var(--text-primary)]">{genome.id}</span></div>
-              <div><span className="text-[var(--text-muted)]">Generation:</span> <span className="text-[var(--text-primary)]">{genome.generation}</span></div>
-              <div><span className="text-[var(--text-muted)]">Survival Streak:</span> <span className="text-[var(--text-primary)]">{genome.survivalStreak}</span></div>
-              <div><span className="text-[var(--text-muted)]">Parents:</span> <span className="text-[var(--text-primary)]">{genome.parentIds.length > 0 ? genome.parentIds.length : 'None (Gen 0)'}</span></div>
-              <div><span className="text-[var(--text-muted)]">Global Freq Mult:</span> <span className="text-[var(--text-primary)]">{genome.globalFrequencyMultiplier.toFixed(2)}</span></div>
-              <div><span className="text-[var(--text-muted)]">Color (HSL):</span> <span className="text-[var(--text-primary)]">{genome.color.h.toFixed(2)}, {genome.color.s.toFixed(2)}, {genome.color.l.toFixed(2)}</span></div>
             </div>
 
-            {/* NODES section */}
-            <div className="mb-4">
-              <div className="text-[var(--accent)] font-semibold mb-2 text-[13px] border-b border-[var(--border-light)] pb-1">
-                NODES ({genome.nodes.length})
-              </div>
-              {genome.nodes.map((node, i) => (
-                <div key={node.id} className="mb-2 p-2 bg-[var(--bg-secondary)] rounded-md">
-                  <div className="text-[var(--text-secondary)] font-semibold mb-1 text-[11px]">Node {i + 1}</div>
-                  <div><span className="text-[var(--text-muted)]">Size:</span> <span className="text-[var(--text-primary)]">{node.size.toFixed(2)}</span></div>
-                  <div><span className="text-[var(--text-muted)]">Friction:</span> <span className="text-[var(--text-primary)]">{node.friction.toFixed(2)}</span></div>
-                  <div><span className="text-[var(--text-muted)]">Position:</span> <span className="text-[var(--text-primary)]">({node.position.x.toFixed(2)}, {node.position.y.toFixed(2)}, {node.position.z.toFixed(2)})</span></div>
-                </div>
-              ))}
-            </div>
-
-            {/* MUSCLES section */}
-            <div className="mb-4">
-              <div className="text-[var(--accent)] font-semibold mb-2 text-[13px] border-b border-[var(--border-light)] pb-1">
-                MUSCLES ({genome.muscles.length})
-              </div>
-              {genome.muscles.map((muscle, i) => {
-                const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
-                const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
-                return (
-                  <div key={muscle.id} className="mb-3 p-2 bg-[var(--bg-secondary)] rounded-md">
-                    <div className="text-[var(--text-secondary)] font-semibold mb-1 text-[11px]">
-                      Muscle {i + 1} (Node {nodeAIndex} ↔ Node {nodeBIndex})
+            {/* NODES */}
+            <div className="mb-5">
+              <h3 className="text-cyan-400 font-semibold text-sm mb-3 pb-2 border-b border-zinc-700">
+                Nodes <span className="text-zinc-500 font-normal">({genome.nodes.length})</span>
+              </h3>
+              <div className="space-y-2">
+                {genome.nodes.map((node, i) => (
+                  <div key={node.id} className="bg-zinc-800/60 rounded-lg p-2.5 border border-zinc-700/30">
+                    <div className="text-cyan-300 font-medium mb-1.5">N{i + 1}</div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                      <span className="text-zinc-500">Size</span><span className="text-zinc-300">{node.size.toFixed(2)}</span>
+                      <span className="text-zinc-500">Friction</span><span className="text-zinc-300">{node.friction.toFixed(2)}</span>
                     </div>
-
-                    <div className="mb-1">
-                      <div className="text-[var(--text-muted)] text-[10px] mb-0.5">PHYSICAL</div>
-                      <div><span className="text-[var(--text-muted)]">Rest Length:</span> <span className="text-[var(--text-primary)]">{muscle.restLength.toFixed(2)}</span></div>
-                      <div><span className="text-[var(--text-muted)]">Stiffness:</span> <span className="text-[var(--text-primary)]">{muscle.stiffness.toFixed(2)}</span></div>
-                      <div><span className="text-[var(--text-muted)]">Damping:</span> <span className="text-[var(--text-primary)]">{muscle.damping.toFixed(2)}</span></div>
-                    </div>
-
-                    <div className="mb-1">
-                      <div className="text-[var(--text-muted)] text-[10px] mb-0.5">OSCILLATION</div>
-                      <div><span className="text-[var(--text-muted)]">Frequency:</span> <span className="text-[var(--text-primary)]">{muscle.frequency.toFixed(2)} Hz</span></div>
-                      <div><span className="text-[var(--text-muted)]">Amplitude:</span> <span className="text-[var(--text-primary)]">{muscle.amplitude.toFixed(2)}</span></div>
-                      <div><span className="text-[var(--text-muted)]">Phase:</span> <span className="text-[var(--text-primary)]">{muscle.phase.toFixed(2)} rad</span></div>
-                    </div>
-
-                    <div className="mb-1">
-                      <div className="text-[var(--accent)] text-[10px] mb-0.5">v1: DIRECTION SENSING</div>
-                      <div><span className="text-[var(--text-muted)]">Direction Bias:</span> <span className="text-[var(--text-primary)]">({muscle.directionBias?.x.toFixed(2) ?? '0'}, {muscle.directionBias?.y.toFixed(2) ?? '0'}, {muscle.directionBias?.z.toFixed(2) ?? '0'})</span></div>
-                      <div><span className="text-[var(--text-muted)]">Bias Strength:</span> <span className="text-[var(--text-primary)]">{(muscle.biasStrength ?? 0).toFixed(2)}</span></div>
-                    </div>
-
-                    <div>
-                      <div className="text-[var(--success)] text-[10px] mb-0.5">v2: PROPRIOCEPTION & DISTANCE</div>
-                      <div><span className="text-[var(--text-muted)]">Velocity Bias:</span> <span className="text-[var(--text-primary)]">({muscle.velocityBias?.x.toFixed(2) ?? '0'}, {muscle.velocityBias?.y.toFixed(2) ?? '0'}, {muscle.velocityBias?.z.toFixed(2) ?? '0'})</span></div>
-                      <div><span className="text-[var(--text-muted)]">Velocity Strength:</span> <span className="text-[var(--text-primary)]">{(muscle.velocityStrength ?? 0).toFixed(2)}</span></div>
-                      <div><span className="text-[var(--text-muted)]">Distance Bias:</span> <span className="text-[var(--text-primary)]">{(muscle.distanceBias ?? 0).toFixed(2)} ({(muscle.distanceBias ?? 0) > 0 ? 'near' : (muscle.distanceBias ?? 0) < 0 ? 'far' : 'neutral'})</span></div>
-                      <div><span className="text-[var(--text-muted)]">Distance Strength:</span> <span className="text-[var(--text-primary)]">{(muscle.distanceStrength ?? 0).toFixed(2)}</span></div>
+                    <div className="text-[11px] mt-1">
+                      <span className="text-zinc-500">Pos </span>
+                      <span className="text-zinc-400">({node.position.x.toFixed(1)}, {node.position.y.toFixed(1)}, {node.position.z.toFixed(1)})</span>
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            </div>
+
+            {/* MUSCLES */}
+            <div>
+              <h3 className="text-cyan-400 font-semibold text-sm mb-3 pb-2 border-b border-zinc-700">
+                Muscles <span className="text-zinc-500 font-normal">({genome.muscles.length})</span>
+              </h3>
+              <div className="space-y-2.5">
+                {genome.muscles.map((muscle, i) => {
+                  const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
+                  const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
+                  const isPureNeural = hasNeuralGenome && config.neuralMode === 'pure';
+                  return (
+                    <div key={muscle.id} className="bg-zinc-800/60 rounded-lg p-2.5 border border-zinc-700/30">
+                      <div className="text-amber-400 font-medium mb-2">
+                        M{i + 1} <span className="text-zinc-500 font-normal">N{nodeAIndex} ↔ N{nodeBIndex}</span>
+                      </div>
+
+                      {/* Physical properties - always shown */}
+                      <div className="mb-2">
+                        <div className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Physical</div>
+                        <div className="grid grid-cols-3 gap-1 text-[11px]">
+                          <div><span className="text-zinc-500">len</span> <span className="text-zinc-300">{muscle.restLength.toFixed(1)}</span></div>
+                          <div><span className="text-zinc-500">stf</span> <span className="text-zinc-300">{muscle.stiffness.toFixed(1)}</span></div>
+                          <div><span className="text-zinc-500">dmp</span> <span className="text-zinc-300">{muscle.damping.toFixed(2)}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Oscillation - only for hybrid/oscillator mode */}
+                      {!isPureNeural && (
+                        <div className="mb-2">
+                          <div className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Oscillation</div>
+                          <div className="grid grid-cols-3 gap-1 text-[11px]">
+                            <div><span className="text-zinc-500">frq</span> <span className="text-violet-400">{muscle.frequency.toFixed(1)}</span></div>
+                            <div><span className="text-zinc-500">amp</span> <span className="text-violet-400">{muscle.amplitude.toFixed(2)}</span></div>
+                            <div><span className="text-zinc-500">phs</span> <span className="text-violet-400">{muscle.phase.toFixed(1)}</span></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pure neural - just show amplitude (used as multiplier) */}
+                      {isPureNeural && (
+                        <div className="mb-2">
+                          <div className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Neural Control</div>
+                          <div className="text-[11px]">
+                            <span className="text-zinc-500">amplitude</span> <span className="text-violet-400">{muscle.amplitude.toFixed(2)}</span>
+                            <span className="text-zinc-600 ml-1">(output multiplier)</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
