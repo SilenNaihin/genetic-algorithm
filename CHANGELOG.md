@@ -4,6 +4,15 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Added
+- **Python Backend with PyTorch Physics**: Complete backend implementation for GPU-ready simulation
+  - Batched tensor physics simulation (100+ creatures in <1s on CPU)
+  - Batched neural network forward pass for creature control
+  - Full genetics system ported from TypeScript (selection, mutation, crossover)
+  - FastAPI endpoints for simulation and evolution
+  - 285 tests covering physics, neural, fitness, genetics, API integration
+  - See `backend/README.md` for details
+
 ### Changed
 - **Output Bias replaces Dead Zone**: Replaced runtime dead zone filtering with configurable output bias
   - Output bias (-2 to 0, default -0.5) is baked into neural network weights

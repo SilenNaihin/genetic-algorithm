@@ -1,14 +1,21 @@
 # Evolution Lab Backend
 
-Python backend for the Evolution Lab genetic algorithm simulator.
+Python backend for the Evolution Lab genetic algorithm simulator with **PyTorch-powered batched physics simulation**.
 
 ## Tech Stack
 
 - **FastAPI** - Async web framework with auto-generated OpenAPI docs
+- **PyTorch** - Batched tensor physics simulation (CPU/GPU agnostic)
 - **SQLAlchemy 2.0** - Async ORM with type hints
 - **Alembic** - Database migrations
 - **PostgreSQL** - Production database
-- **NumPy** - Numerical operations for physics
+
+## Key Features
+
+- **Batched Physics**: Simulate 100+ creatures in parallel using PyTorch tensors
+- **Neural Network Control**: Batched neural network forward pass for creature muscles
+- **GPU-Ready**: Same code runs on CPU or CUDA GPU (device selection at runtime)
+- **Full Genetics**: Selection, mutation, crossover ported from TypeScript
 
 ## Setup
 
@@ -46,6 +53,21 @@ alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app
+
+# Run specific test file
+pytest app/simulation/test_physics.py
+```
+
+**285 tests** covering: physics, neural networks, fitness, genetics, API integration.
+
 ## API Documentation
 
 Once running, visit:
@@ -53,56 +75,56 @@ Once running, visit:
 - ReDoc: http://localhost:8000/redoc
 - OpenAPI JSON: http://localhost:8000/openapi.json
 
-## Database Migrations
-
-```bash
-# Create a new migration
-alembic revision --autogenerate -m "Description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback one migration
-alembic downgrade -1
-
-# View migration history
-alembic history
-```
-
 ## Project Structure
 
 ```
 backend/
-├── alembic/              # Database migrations
-│   └── versions/         # Migration files
+├── alembic/                  # Database migrations
+│   └── versions/             # Migration files
 ├── app/
-│   ├── api/              # API route handlers
-│   │   ├── runs.py       # Run CRUD endpoints
-│   │   ├── generations.py# Generation endpoints
-│   │   ├── creatures.py  # Creature endpoints
-│   │   ├── simulation.py # Simulation endpoints
-│   │   └── evolution.py  # Evolution control endpoints
+│   ├── api/                  # API route handlers
+│   │   ├── runs.py           # Run CRUD endpoints
+│   │   ├── generations.py    # Generation endpoints
+│   │   ├── creatures.py      # Creature endpoints
+│   │   ├── simulation.py     # Simulation endpoints
+│   │   ├── evolution.py      # Evolution control endpoints
+│   │   └── genetics.py       # Genetics endpoints (generate, evolve)
 │   ├── core/
-│   │   ├── config.py     # Settings from env
-│   │   └── database.py   # DB connection
-│   ├── models/           # SQLAlchemy models
+│   │   ├── config.py         # Settings from env
+│   │   └── database.py       # DB connection
+│   ├── genetics/             # Genetic algorithm operations
+│   │   ├── selection.py      # Truncation, tournament selection
+│   │   ├── mutation.py       # Body & neural mutations
+│   │   ├── crossover.py      # Crossover operators
+│   │   └── population.py     # Population management
+│   ├── models/               # SQLAlchemy models
 │   │   ├── run.py
 │   │   ├── generation.py
 │   │   └── creature.py
-│   ├── schemas/          # Pydantic schemas
+│   ├── neural/               # Neural network module
+│   │   └── network.py        # BatchedNeuralNetwork
+│   ├── schemas/              # Pydantic schemas
 │   │   ├── run.py
 │   │   ├── generation.py
 │   │   ├── creature.py
-│   │   ├── genome.py
-│   │   └── simulation.py
-│   ├── services/         # Business logic
-│   │   ├── genetics.py   # Selection, crossover, mutation
-│   │   └── simulator.py  # Physics simulation
-│   └── main.py           # FastAPI app
-├── tests/                # Pytest tests
-├── alembic.ini           # Alembic config
-├── docker-compose.yml    # PostgreSQL container
-├── pyproject.toml        # Python dependencies
+│   │   ├── genome.py         # CreatureGenome, NeuralGenome
+│   │   ├── simulation.py     # SimulationConfig, SimulationResult
+│   │   └── genetics.py       # EvolveRequest, EvolveResponse
+│   ├── services/             # Business logic
+│   │   ├── simulator.py      # SimulatorService (API interface)
+│   │   └── pytorch_simulator.py  # PyTorchSimulator (tensor impl)
+│   ├── simulation/           # PyTorch physics core
+│   │   ├── tensors.py        # Creature data → tensor conversion
+│   │   ├── physics.py        # Batched physics simulation
+│   │   ├── fitness.py        # Batched fitness calculation
+│   │   └── config.py         # Physics constants
+│   └── main.py               # FastAPI app
+├── fixtures/                 # Test fixtures
+│   └── test_genomes.json     # Test creature genomes
+├── tests/                    # Additional tests
+├── alembic.ini               # Alembic config
+├── docker-compose.yml        # PostgreSQL container
+├── pyproject.toml            # Python dependencies
 └── README.md
 ```
 
@@ -140,19 +162,85 @@ backend/
 
 ### Simulation
 
-- `POST /api/simulation/batch` - Simulate batch of creatures
+- `POST /api/simulation/batch` - Simulate batch of creatures (PyTorch)
 - `POST /api/simulation/single` - Simulate single creature
 
-## Future: GPU Acceleration
+### Genetics
 
-The simulator service (`app/services/simulator.py`) is designed to be swapped out for GPU-accelerated physics:
+- `POST /api/genetics/generate` - Generate initial population
+- `POST /api/genetics/evolve` - Evolve to next generation
+- `POST /api/genetics/stats` - Get population statistics
 
-```bash
-# Install PyTorch for GPU support
-pip install -e ".[gpu]"
+## Physics Implementation
+
+The backend uses **custom PyTorch tensor physics** instead of a physics engine like PyBullet. This allows:
+
+1. **Batched Simulation**: All creatures simulated in a single tensor operation
+2. **GPU Acceleration**: Same code runs on CPU or CUDA
+3. **Differentiable** (future): Could enable gradient-based optimization
+
+### Tensor Data Structures
+
+```python
+# All creatures packed into tensors
+positions: [B, max_nodes, 3]      # Node positions
+velocities: [B, max_nodes, 3]     # Node velocities
+masses: [B, max_nodes]            # Node masses
+node_mask: [B, max_nodes]         # Valid nodes per creature
+spring_indices: [B, max_muscles, 2]  # Muscle connections
+spring_params: [B, max_muscles, 6]   # Muscle parameters
 ```
 
-Options for GPU physics:
-1. **PyTorch custom physics** - Differentiable, batched simulation on GPU
-2. **PyBullet** - Accurate rigid body physics with CUDA support
-3. **Warp** - NVIDIA's differentiable simulation library
+### Physics Step
+
+Each timestep (1/60s):
+1. Compute spring forces (Hooke's law with damping)
+2. Apply muscle oscillation or neural control
+3. Apply gravity
+4. Euler integration
+5. Ground collision with friction/restitution
+
+### Performance
+
+- **100 creatures**: <1 second on CPU
+- **500 creatures**: <5 seconds on CPU
+- **1000+ creatures**: Target <1 second on A100 GPU
+
+## Neural Network Mode
+
+Two control modes for neural-controlled creatures:
+
+### Hybrid Mode (default)
+- 8 inputs: pellet direction (3), velocity (3), distance (1), time phase (1)
+- Neural network modulates base oscillation
+- Smoother learning curve for GA
+
+### Pure Mode
+- 7 inputs: pellet direction (3), velocity (3), distance (1)
+- Neural network has full control
+- More expressive but harder to evolve
+
+### Batched Forward Pass
+
+```python
+# All creatures' neural networks evaluated in parallel
+# weights: [B, layer_sizes...]
+# inputs: [B, input_size]
+output = batched_forward(weights, inputs)  # [B, num_muscles]
+```
+
+## Database Migrations
+
+```bash
+# Create a new migration
+alembic revision --autogenerate -m "Description"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback one migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+```

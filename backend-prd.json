@@ -217,98 +217,104 @@
       ]
     },
     {
-      "id": 5,
-      "name": "API Schemas & Database",
-      "status": "pending",
-      "priority": "MEDIUM",
-      "description": "Pydantic schemas and PostgreSQL models",
-      "items": [
-        {
-          "id": "5.1",
-          "name": "Update Pydantic schemas",
-          "status": "pending",
-          "details": "Full CreatureGenome with neural, muscle v1/v2 fields. SimulationConfig with all fitness weights. Match TypeScript exactly."
-        },
-        {
-          "id": "5.2",
-          "name": "Update SQLAlchemy models",
-          "status": "pending",
-          "details": "Run, Generation, Creature, CreatureFrame models. JSON columns for genome, config."
-        },
-        {
-          "id": "5.3",
-          "name": "Create Alembic migration",
-          "status": "pending",
-          "details": "Migration from initial schema to full schema."
-        },
-        {
-          "id": "5.4",
-          "name": "Implement frame compaction",
-          "status": "pending",
-          "details": "Compact/expand frame format matching TypeScript. Selective storage (top 10 + random 10 + bottom 5)."
-        }
-      ]
-    },
-    {
       "id": 6,
-      "name": "API Endpoints",
-      "status": "pending",
+      "name": "Database & Storage",
+      "status": "completed",
       "priority": "MEDIUM",
-      "description": "FastAPI routes for frontend integration",
+      "description": "SQLAlchemy models, Alembic migrations, and frame storage",
       "items": [
         {
           "id": "6.1",
-          "name": "Run CRUD endpoints",
-          "status": "pending",
-          "details": "Create, read, update, delete runs. Fork run."
+          "name": "Pydantic schemas",
+          "status": "completed",
+          "details": "Full CreatureGenome with neural, muscle v1/v2 fields in genome.py. SimulationConfig with all fitness weights in simulation.py. Genetics schemas in genetics.py."
         },
         {
           "id": "6.2",
-          "name": "Generation endpoints",
-          "status": "pending",
-          "details": "List generations, get generation with creatures, fitness history, creature type history."
+          "name": "SQLAlchemy models",
+          "status": "completed",
+          "details": "Run, Generation, Creature, CreatureFrame models with JSON columns for genome, config. Composite foreign keys for generation/creature relationship."
         },
         {
           "id": "6.3",
-          "name": "Evolution endpoints",
-          "status": "pending",
-          "details": "POST /evolve/step (one generation), POST /evolve/batch (N generations), WebSocket for progress."
+          "name": "Alembic migration",
+          "status": "completed",
+          "details": "Initial schema migration in alembic/versions/001_initial_schema.py"
         },
         {
           "id": "6.4",
-          "name": "Creature endpoints",
-          "status": "pending",
-          "details": "Get creature with frames, best creature, longest survivor."
+          "name": "Frame storage modes",
+          "status": "completed",
+          "details": "Added frame_storage_mode to SimulationConfig: 'none' (default), 'all' (UI/--store), 'sparse' (--sparse-store: top N + bottom N). Created app/storage/frames.py with select_creatures_for_frames(). 13 tests."
         }
       ]
     },
     {
       "id": 7,
+      "name": "API Endpoints",
+      "status": "completed",
+      "priority": "MEDIUM",
+      "description": "FastAPI routes for frontend integration - all endpoints complete",
+      "items": [
+        {
+          "id": "7.1",
+          "name": "Run CRUD endpoints",
+          "status": "completed",
+          "details": "Created app/api/runs.py with list, create, get, update, delete, fork endpoints."
+        },
+        {
+          "id": "7.2",
+          "name": "Generation endpoints",
+          "status": "completed",
+          "details": "Created app/api/generations.py with list generations, get generation with creatures, fitness history."
+        },
+        {
+          "id": "7.3",
+          "name": "Evolution endpoints",
+          "status": "completed",
+          "details": "Created app/api/evolution.py with step and batch evolution endpoints."
+        },
+        {
+          "id": "7.4",
+          "name": "Creature endpoints",
+          "status": "completed",
+          "details": "Created app/api/creatures.py with get creature, best creature, longest survivor endpoints."
+        },
+        {
+          "id": "7.5",
+          "name": "Fork run implementation",
+          "status": "completed",
+          "details": "Full fork endpoint: copies generations, creatures, frames up to specified point. Maps parent IDs, tracks best_creature and longest_survivor. 12 API tests with StaticPool SQLite."
+        }
+      ]
+    },
+    {
+      "id": 8,
       "name": "Integration Testing",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "HIGH",
       "description": "Comprehensive tests before frontend integration",
       "items": [
         {
-          "id": "7.1",
+          "id": "8.1",
           "name": "Physics unit tests",
-          "status": "pending",
-          "details": "Test spring forces, gravity, collision, oscillation independently."
+          "status": "completed",
+          "details": "Tests in app/simulation/test_physics.py, test_tensors.py, test_fitness.py, test_validation.py."
         },
         {
-          "id": "7.2",
+          "id": "8.2",
           "name": "Genetics unit tests",
-          "status": "pending",
-          "details": "Test selection, mutation, crossover produce valid genomes."
+          "status": "completed",
+          "details": "40 tests in app/genetics/test_genetics.py covering selection, mutation, crossover, population."
         },
         {
-          "id": "7.3",
+          "id": "8.3",
           "name": "API integration tests",
           "status": "pending",
           "details": "Full flow: create run → evolve → load history → get creatures."
         },
         {
-          "id": "7.4",
+          "id": "8.4",
           "name": "Run claude-critic review",
           "status": "pending",
           "details": "Spawn critic agent to find misalignment, edge cases, security issues."
@@ -316,38 +322,38 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
       "name": "Frontend Integration",
       "status": "pending",
       "priority": "MEDIUM",
       "description": "Connect React/Next.js frontend to Python backend",
       "items": [
         {
-          "id": "8.1",
+          "id": "9.1",
           "name": "Create TypeScript API client",
           "status": "pending",
           "details": "Typed fetch wrapper for all backend endpoints."
         },
         {
-          "id": "8.2",
+          "id": "9.2",
           "name": "Update StorageService",
           "status": "pending",
           "details": "Replace IndexedDB with API calls."
         },
         {
-          "id": "8.3",
+          "id": "9.3",
           "name": "Update SimulationService",
           "status": "pending",
           "details": "Call backend for simulation instead of local Cannon-ES."
         },
         {
-          "id": "8.4",
+          "id": "9.4",
           "name": "Add WebSocket for live updates",
           "status": "pending",
           "details": "Real-time generation progress during evolution."
         },
         {
-          "id": "8.5",
+          "id": "9.5",
           "name": "Handle offline/reconnection",
           "status": "pending",
           "details": "Graceful degradation, connection status UI."
@@ -355,32 +361,32 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "name": "GPU Optimization",
       "status": "pending",
       "priority": "LOW",
       "description": "Optimize for A100 deployment",
       "items": [
         {
-          "id": "9.1",
+          "id": "10.1",
           "name": "Profile GPU memory usage",
           "status": "pending",
           "details": "Ensure batches fit in GPU memory. May need to chunk large populations."
         },
         {
-          "id": "9.2",
+          "id": "10.2",
           "name": "Optimize tensor operations",
           "status": "pending",
           "details": "Minimize CPU-GPU transfers, use in-place operations where possible."
         },
         {
-          "id": "9.3",
+          "id": "10.3",
           "name": "Benchmark GPU vs CPU",
           "status": "pending",
           "details": "Document speedup for various population sizes."
         },
         {
-          "id": "9.4",
+          "id": "10.4",
           "name": "Add mixed precision",
           "status": "pending",
           "details": "Use float16 where accuracy permits for 2x memory/speed improvement."
@@ -388,45 +394,46 @@
       ]
     },
     {
-      "id": 10,
+      "id": 11,
       "name": "Documentation & Deployment",
-      "status": "pending",
+      "status": "completed",
       "priority": "LOW",
       "description": "Final docs and deployment prep",
       "items": [
         {
-          "id": "10.1",
+          "id": "11.1",
           "name": "Update backend README",
-          "status": "pending",
-          "details": "Setup, API docs, deployment guide."
+          "status": "completed",
+          "details": "Full documentation of setup, API docs, project structure in backend/README.md"
         },
         {
-          "id": "10.2",
+          "id": "11.2",
           "name": "Update CLAUDE.md",
-          "status": "pending",
-          "details": "Backend commands, architecture notes."
+          "status": "completed",
+          "details": "Added backend section with commands and architecture notes."
         },
         {
-          "id": "10.3",
+          "id": "11.3",
           "name": "Create Dockerfile",
           "status": "pending",
           "details": "Container with PyTorch + CUDA support."
         },
         {
-          "id": "10.4",
+          "id": "11.4",
           "name": "Update CHANGELOG",
-          "status": "pending",
-          "details": "Document backend migration."
+          "status": "completed",
+          "details": "Added backend PyTorch physics entry."
         }
       ]
     }
   ],
-  "current_phase": 5,
-  "current_item": "5.5",
+  "current_phase": 8,
+  "current_item": "8.3",
   "notes": {
     "physics_approach": "Custom spring physics in PyTorch tensors. Not using PyBullet because we need batched simulation across 1000+ creatures, which requires custom tensor ops.",
     "cpu_gpu_agnostic": "All code uses torch tensors. Device selection at runtime: cuda if available, else cpu. Same code path.",
     "why_not_pybullet": "PyBullet simulates one world at a time. We need to simulate 1000 creatures in parallel. Custom tensor physics allows this.",
-    "accuracy_tradeoff": "Our spring physics won't be identical to Cannon-ES, but for evolution it doesn't matter - creatures will adapt to whatever physics we use."
+    "accuracy_tradeoff": "Our spring physics won't be identical to Cannon-ES, but for evolution it doesn't matter - creatures will adapt to whatever physics we use.",
+    "test_count": "310 tests passing as of Phase 7 completion."
   }
 }

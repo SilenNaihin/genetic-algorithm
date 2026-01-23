@@ -565,32 +565,27 @@ function rankBasedSelection(population: Creature[]): Creature {
 | `selectionMethod` | enum | 'truncation' | 'truncation', 'tournament', or 'rank' |
 | `tournamentSize` | number | 5 | Number of contestants per tournament (if tournament selection) |
 
-### TypeScript Interface
+### Configuration Schema
 
-```typescript
-interface NeuralConfig {
-  // Core settings
-  useNeuralNet: boolean;
-  neuralMode: 'hybrid' | 'pure';
-  hiddenSize: number;
-  activation: 'tanh' | 'relu' | 'sigmoid';
+```python
+class SimulationConfig(BaseModel):
+    # Core settings
+    use_neural_net: bool = True
+    neural_mode: Literal['hybrid', 'pure'] = 'hybrid'
+    neural_hidden_size: int = 8
+    activation: Literal['tanh', 'relu', 'sigmoid'] = 'tanh'
 
-  // Mutation
-  mutationMagnitude: number;
-  weightMutationRate: number;
-  weightMutationDecay: number;
+    # Mutation
+    mutation_magnitude: float = 0.3
+    weight_mutation_rate: float = 0.1
+    weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'linear'
 
-  // Initialization
-  outputBias: number;
+    # Initialization
+    neural_output_bias: float = -0.5
 
-  // Diversity
-  fitnessSharing: boolean;
-  sharingThreshold: number;
-
-  // Selection
-  selectionMethod: 'truncation' | 'tournament' | 'rank';
-  tournamentSize: number;
-}
+    # Selection
+    selection_method: Literal['truncation', 'tournament'] = 'truncation'
+    tournament_size: int = 5
 ```
 
 ---
@@ -746,3 +741,17 @@ See `docs/NEAT_IMPLEMENTATION.md` (future) for details.
 - NEAT-Python: https://github.com/CodeReclwordholder/NEAT-Python
 - PyTorch-NEAT: https://github.com/uber-research/PyTorch-NEAT
 - SharpNEAT: https://github.com/colgreen/sharpneat (C# implementation with good docs)
+
+---
+
+## Implementation
+
+| Component | File |
+|-----------|------|
+| Network class | `backend/app/neural/network.py` |
+| Genome storage | `backend/app/schemas/genome.py` |
+| Weight mutation | `backend/app/genetics/mutation.py` |
+| Weight crossover | `backend/app/genetics/crossover.py` |
+| Sensor gathering | `backend/app/simulation/physics.py` |
+
+Uses **batched PyTorch tensors** for parallel neural network evaluation across all creatures simultaneously.

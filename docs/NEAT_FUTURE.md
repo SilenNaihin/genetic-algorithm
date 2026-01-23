@@ -26,43 +26,44 @@ This document outlines the plan for migrating from fixed-topology neural network
 
 Instead of a weight matrix, NEAT uses **connection genes**:
 
-```typescript
-interface ConnectionGene {
-  innovationNumber: number;  // Global unique ID
-  inputNode: number;         // Source node ID
-  outputNode: number;        // Target node ID
-  weight: number;            // Connection weight
-  enabled: boolean;          // Can be disabled by mutation
-}
+```python
+@dataclass
+class ConnectionGene:
+    innovation_number: int    # Global unique ID
+    input_node: int           # Source node ID
+    output_node: int          # Target node ID
+    weight: float             # Connection weight
+    enabled: bool = True      # Can be disabled by mutation
 
-interface NodeGene {
-  id: number;
-  type: 'input' | 'hidden' | 'output';
-  activationFn: string;
-}
+@dataclass
+class NodeGene:
+    id: int
+    type: Literal['input', 'hidden', 'output']
+    activation_fn: str = 'tanh'
 
-interface NEATGenome {
-  nodes: NodeGene[];
-  connections: ConnectionGene[];
-}
+@dataclass
+class NEATGenome:
+    nodes: list[NodeGene]
+    connections: list[ConnectionGene]
 ```
 
 ### 2. Historical Markings
 
 Every time a new connection is created (anywhere in the population), it gets a **unique innovation number**:
 
-```typescript
-let globalInnovationCounter = 0;
+```python
+global_innovation_counter = 0
 
-function createConnection(input: number, output: number, weight: number): ConnectionGene {
-  return {
-    innovationNumber: globalInnovationCounter++,
-    inputNode: input,
-    outputNode: output,
-    weight,
-    enabled: true
-  };
-}
+def create_connection(input_node: int, output_node: int, weight: float) -> ConnectionGene:
+    global global_innovation_counter
+    conn = ConnectionGene(
+        innovation_number=global_innovation_counter,
+        input_node=input_node,
+        output_node=output_node,
+        weight=weight,
+    )
+    global_innovation_counter += 1
+    return conn
 ```
 
 This allows meaningful crossover between different topologies by aligning genes by innovation number.
@@ -83,60 +84,56 @@ Child:     [1, 2, 3, 4, 5, ?, ?, 8]
 
 ### 4. Structural Mutations
 
-```typescript
-// Add a new connection between existing nodes
-function mutateAddConnection(genome: NEATGenome): void {
-  const input = randomNode(genome, ['input', 'hidden']);
-  const output = randomNode(genome, ['hidden', 'output']);
+```python
+def mutate_add_connection(genome: NEATGenome) -> None:
+    """Add a new connection between existing nodes."""
+    input_node = random_node(genome, ['input', 'hidden'])
+    output_node = random_node(genome, ['hidden', 'output'])
 
-  if (!connectionExists(genome, input, output)) {
-    genome.connections.push(createConnection(input.id, output.id, randomWeight()));
-  }
-}
+    if not connection_exists(genome, input_node, output_node):
+        genome.connections.append(
+            create_connection(input_node.id, output_node.id, random_weight())
+        )
 
-// Add a new node by splitting an existing connection
-function mutateAddNode(genome: NEATGenome): void {
-  const conn = randomEnabledConnection(genome);
-  conn.enabled = false;  // Disable old connection
+def mutate_add_node(genome: NEATGenome) -> None:
+    """Add a new node by splitting an existing connection."""
+    conn = random_enabled_connection(genome)
+    conn.enabled = False  # Disable old connection
 
-  const newNode: NodeGene = {
-    id: nextNodeId++,
-    type: 'hidden',
-    activationFn: 'tanh'
-  };
-  genome.nodes.push(newNode);
+    new_node = NodeGene(
+        id=next_node_id(),
+        type='hidden',
+        activation_fn='tanh'
+    )
+    genome.nodes.append(new_node)
 
-  // Add two new connections through the new node
-  genome.connections.push(createConnection(conn.inputNode, newNode.id, 1.0));
-  genome.connections.push(createConnection(newNode.id, conn.outputNode, conn.weight));
-}
+    # Add two new connections through the new node
+    genome.connections.append(create_connection(conn.input_node, new_node.id, 1.0))
+    genome.connections.append(create_connection(new_node.id, conn.output_node, conn.weight))
 ```
 
 ### 5. Speciation
 
 Networks are grouped into **species** based on structural similarity:
 
-```typescript
-function compatibilityDistance(g1: NEATGenome, g2: NEATGenome): number {
-  const { matching, disjoint, excess } = alignGenes(g1, g2);
+```python
+def compatibility_distance(g1: NEATGenome, g2: NEATGenome) -> float:
+    matching, disjoint, excess = align_genes(g1, g2)
 
-  const N = Math.max(g1.connections.length, g2.connections.length);
-  const avgWeightDiff = matching.reduce((sum, [c1, c2]) =>
-    sum + Math.abs(c1.weight - c2.weight), 0) / matching.length;
+    N = max(len(g1.connections), len(g2.connections))
+    avg_weight_diff = sum(
+        abs(c1.weight - c2.weight) for c1, c2 in matching
+    ) / len(matching) if matching else 0
 
-  return (c1 * excess / N) + (c2 * disjoint / N) + (c3 * avgWeightDiff);
-}
+    return (c1 * excess / N) + (c2 * disjoint / N) + (c3 * avg_weight_diff)
 
-function assignToSpecies(genome: NEATGenome, species: Species[]): void {
-  for (const sp of species) {
-    if (compatibilityDistance(genome, sp.representative) < threshold) {
-      sp.members.push(genome);
-      return;
-    }
-  }
-  // No compatible species found, create new one
-  species.push({ representative: genome, members: [genome] });
-}
+def assign_to_species(genome: NEATGenome, species: list[Species]) -> None:
+    for sp in species:
+        if compatibility_distance(genome, sp.representative) < threshold:
+            sp.members.append(genome)
+            return
+    # No compatible species found, create new one
+    species.append(Species(representative=genome, members=[genome]))
 ```
 
 Selection happens **within species**, protecting novel structures.
@@ -147,34 +144,33 @@ Selection happens **within species**, protecting novel structures.
 
 ### Current Fixed-Topology Code
 
-```typescript
-// Current: flat weight array
-const weights: number[] = [...];
-const nn = NeuralNetwork.fromWeights(weights, config);
-const output = nn.predict(inputs);
+```python
+# Current: flat weight array
+weights = [...]
+nn = NeuralNetwork.from_weights(weights, config)
+output = nn.predict(inputs)
 ```
 
 ### NEAT Equivalent
 
-```typescript
-// NEAT: gene-based genome
-const genome: NEATGenome = {
-  nodes: [...],
-  connections: [...]
-};
-const nn = NEATNetwork.fromGenome(genome);
-const output = nn.predict(inputs);
+```python
+# NEAT: gene-based genome
+genome = NEATGenome(
+    nodes=[...],
+    connections=[...]
+)
+nn = NEATNetwork.from_genome(genome)
+output = nn.predict(inputs)
 ```
 
 ### Shared Interface
 
 Both should implement:
 
-```typescript
-interface NeuralController {
-  predict(inputs: number[]): number[];
-  getActivations(): { hidden: number[]; outputs: number[] };
-}
+```python
+class NeuralController(Protocol):
+    def predict(self, inputs: list[float]) -> list[float]: ...
+    def get_activations(self) -> dict[str, list[float]]: ...
 ```
 
 ---
@@ -244,65 +240,58 @@ Visualization must handle:
 
 ## Configuration Additions
 
-```typescript
-interface NEATConfig extends NeuralConfig {
-  // Mutation probabilities
-  addNodeProb: number;           // 0.03 default
-  addConnectionProb: number;     // 0.05 default
+```python
+class NEATConfig(SimulationConfig):
+    # Mutation probabilities
+    add_node_prob: float = 0.03
+    add_connection_prob: float = 0.05
 
-  // Speciation
-  compatibilityThreshold: number; // 3.0 default
-  c1: number;                     // Excess coefficient
-  c2: number;                     // Disjoint coefficient
-  c3: number;                     // Weight difference coefficient
+    # Speciation
+    compatibility_threshold: float = 3.0
+    c1: float = 1.0  # Excess coefficient
+    c2: float = 1.0  # Disjoint coefficient
+    c3: float = 0.4  # Weight difference coefficient
 
-  // Species management
-  speciesStagnationLimit: number; // Generations before removing stagnant species
-  elitismPerSpecies: number;      // Top N from each species survive
-}
+    # Species management
+    species_stagnation_limit: int = 15  # Generations before removing stagnant species
+    elitism_per_species: int = 1        # Top N from each species survive
 ```
 
 ---
 
 ## Testing NEAT
 
-```typescript
-describe('NEAT', () => {
-  describe('Structural Mutations', () => {
-    it('should add connections between valid nodes', () => {
-      const genome = createMinimalGenome(8, 10);
-      const beforeCount = genome.connections.length;
-      mutateAddConnection(genome);
-      expect(genome.connections.length).toBe(beforeCount + 1);
-    });
+```python
+class TestNEAT:
+    class TestStructuralMutations:
+        def test_add_connections_between_valid_nodes(self):
+            genome = create_minimal_genome(8, 10)
+            before_count = len(genome.connections)
+            mutate_add_connection(genome)
+            assert len(genome.connections) == before_count + 1
 
-    it('should split connection when adding node', () => {
-      const genome = createMinimalGenome(8, 10);
-      const conn = genome.connections[0];
-      mutateAddNode(genome);
-      expect(conn.enabled).toBe(false);
-      expect(genome.nodes.filter(n => n.type === 'hidden').length).toBe(1);
-    });
-  });
+        def test_split_connection_when_adding_node(self):
+            genome = create_minimal_genome(8, 10)
+            conn = genome.connections[0]
+            mutate_add_node(genome)
+            assert conn.enabled == False
+            assert len([n for n in genome.nodes if n.type == 'hidden']) == 1
 
-  describe('Speciation', () => {
-    it('should group similar genomes', () => {
-      const g1 = createMinimalGenome(8, 10);
-      const g2 = cloneGenome(g1);
-      mutateWeights(g2, 0.1, 0.1);  // Small weight changes
+    class TestSpeciation:
+        def test_group_similar_genomes(self):
+            g1 = create_minimal_genome(8, 10)
+            g2 = clone_genome(g1)
+            mutate_weights(g2, 0.1, 0.1)  # Small weight changes
 
-      expect(compatibilityDistance(g1, g2)).toBeLessThan(3.0);
-    });
+            assert compatibility_distance(g1, g2) < 3.0
 
-    it('should separate structurally different genomes', () => {
-      const g1 = createMinimalGenome(8, 10);
-      const g2 = createMinimalGenome(8, 10);
-      for (let i = 0; i < 5; i++) mutateAddNode(g2);
+        def test_separate_structurally_different_genomes(self):
+            g1 = create_minimal_genome(8, 10)
+            g2 = create_minimal_genome(8, 10)
+            for _ in range(5):
+                mutate_add_node(g2)
 
-      expect(compatibilityDistance(g1, g2)).toBeGreaterThan(3.0);
-    });
-  });
-});
+            assert compatibility_distance(g1, g2) > 3.0
 ```
 
 ---
@@ -316,35 +305,31 @@ NEAT networks can have arbitrary topology. Forward pass requires:
 1. **Topological sort** of nodes (inputs → hidden → outputs)
 2. **Handle recurrent connections** (optional: either disallow or use previous activation)
 
-```typescript
-function forwardPass(genome: NEATGenome, inputs: number[]): number[] {
-  const nodeValues = new Map<number, number>();
+```python
+def forward_pass(genome: NEATGenome, inputs: list[float]) -> list[float]:
+    node_values: dict[int, float] = {}
 
-  // Set input values
-  genome.nodes
-    .filter(n => n.type === 'input')
-    .forEach((n, i) => nodeValues.set(n.id, inputs[i]));
+    # Set input values
+    input_nodes = [n for n in genome.nodes if n.type == 'input']
+    for i, node in enumerate(input_nodes):
+        node_values[node.id] = inputs[i]
 
-  // Process nodes in topological order
-  const sortedNodes = topologicalSort(genome);
-  for (const node of sortedNodes) {
-    if (node.type === 'input') continue;
+    # Process nodes in topological order
+    sorted_nodes = topological_sort(genome)
+    for node in sorted_nodes:
+        if node.type == 'input':
+            continue
 
-    // Sum incoming connections
-    let sum = 0;
-    for (const conn of genome.connections) {
-      if (conn.outputNode === node.id && conn.enabled) {
-        sum += nodeValues.get(conn.inputNode)! * conn.weight;
-      }
-    }
-    nodeValues.set(node.id, activate(sum, node.activationFn));
-  }
+        # Sum incoming connections
+        total = 0.0
+        for conn in genome.connections:
+            if conn.output_node == node.id and conn.enabled:
+                total += node_values[conn.input_node] * conn.weight
+        node_values[node.id] = activate(total, node.activation_fn)
 
-  // Return output values
-  return genome.nodes
-    .filter(n => n.type === 'output')
-    .map(n => nodeValues.get(n.id)!);
-}
+    # Return output values
+    output_nodes = [n for n in genome.nodes if n.type == 'output']
+    return [node_values[n.id] for n in output_nodes]
 ```
 
 ### Memory for Large Populations

@@ -420,9 +420,22 @@ Neural networks replace the oscillator-based control with learned input→output
 | Phase Coupling | Medium | Medium | Fast | Future |
 | Reflex Arcs | High | Medium-High | Medium | Future |
 | Behavioral Modes | Very High | High | Slow | Future |
-| Neural Networks (Fixed) | High | Medium | Medium | **In Progress** |
+| Neural Networks (Fixed) | High | Medium | Medium | **Complete** |
 | Neural Networks (NEAT) | Unlimited | Very High | Slow | Planned |
 
 **Current focus:** Fixed-topology neural networks with hybrid/pure control modes.
 
 **Recommended future order:** Phase Coupling → Reflex Arcs → NEAT → Behavioral Modes
+
+---
+
+## Implementation
+
+| Component | File |
+|-----------|------|
+| Genome types | `backend/app/schemas/genome.py` |
+| Random genome | `backend/app/genetics/population.py` |
+| Mutation | `backend/app/genetics/mutation.py` |
+| Crossover | `backend/app/genetics/crossover.py` |
+| Selection | `backend/app/genetics/selection.py` |
+| Population | `backend/app/genetics/population.py` |

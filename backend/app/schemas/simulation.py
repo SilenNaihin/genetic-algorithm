@@ -75,8 +75,16 @@ class SimulationConfig(BaseModel):
     max_pellet_distance: float = Field(default=20.0, ge=5.0, le=100.0)
 
     # Frame recording
-    record_frames: bool = False
+    # frame_storage_mode: 'none' (default), 'all' (UI/--store), 'sparse' (--sparse-store: top 10 + bottom 10)
+    frame_storage_mode: Literal['none', 'all', 'sparse'] = 'none'
     frame_rate: int = Field(default=15, ge=1, le=60)
+    sparse_top_count: int = Field(default=10, ge=1, le=50)
+    sparse_bottom_count: int = Field(default=10, ge=1, le=50)
+
+    @property
+    def record_frames(self) -> bool:
+        """Backwards-compatible property: True if any frame storage is enabled."""
+        return self.frame_storage_mode != 'none'
 
     class Config:
         extra = 'ignore'  # Ignore unknown fields for forward compatibility

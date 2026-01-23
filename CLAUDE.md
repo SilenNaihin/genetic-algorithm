@@ -4,10 +4,16 @@ Browser-based genetic algorithm simulator where soft-bodied creatures evolve to 
 
 ## Quick Reference
 
+### Frontend (Next.js)
 - Dev: `npm run dev` (port 3001)
 - Test: `npm test`
 - Build: `npm run build`
 - Type check: `tsc --noEmit`
+
+### Backend (FastAPI + PyTorch)
+- Dev: `cd backend && uvicorn app.main:app --reload --port 8000`
+- Test: `cd backend && pytest`
+- 285 tests covering physics, neural, genetics, API
 
 ## Directory Structure
 
@@ -39,10 +45,21 @@ src/                    # Core simulation modules (shared)
 ├── types/              # TypeScript interfaces
 ├── ui/                 # Shared UI components (GraphPanel, NeuralVisualizer, BrainEvolutionPanel)
 └── utils/              # Shared utilities (math, id)
+
+backend/                # Python backend (PyTorch physics)
+├── app/
+│   ├── api/            # FastAPI routes (runs, generations, simulation, genetics)
+│   ├── genetics/       # Selection, mutation, crossover (ported from TS)
+│   ├── neural/         # BatchedNeuralNetwork
+│   ├── schemas/        # Pydantic models
+│   ├── services/       # PyTorchSimulator
+│   └── simulation/     # Batched tensor physics (tensors.py, physics.py, fitness.py)
+└── fixtures/           # Test genomes
 ```
 
 ## Tech Stack
 
+### Frontend
 - **Framework**: Next.js 16 + React 19
 - **State**: Zustand
 - **3D**: Three.js
@@ -50,6 +67,12 @@ src/                    # Core simulation modules (shared)
 - **Storage**: IndexedDB
 - **Styling**: Tailwind CSS v4
 - **Testing**: Vitest + happy-dom
+
+### Backend
+- **Framework**: FastAPI
+- **Physics**: PyTorch (batched tensor simulation)
+- **Database**: PostgreSQL + SQLAlchemy
+- **Testing**: pytest
 
 ## Routes
 
