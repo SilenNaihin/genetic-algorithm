@@ -20,6 +20,7 @@ export function MenuScreen() {
   const config = useConfig();
   const setConfig = useEvolutionStore((s) => s.setConfig);
   const setLoadModalOpen = useEvolutionStore((s) => s.setLoadModalOpen);
+  const menuMountKey = useEvolutionStore((s) => s.menuMountKey);
   const { startSimulation } = useSimulation();
 
   const handleStart = async () => {
@@ -45,6 +46,7 @@ export function MenuScreen() {
           maxAllowedFrequency: config.maxAllowedFrequency,
           gravity: config.gravity,
         }}
+        mountKey={menuMountKey}
       />
 
       <div className="menu-controls" style={{ maxWidth: '700px', width: '100%' }}>

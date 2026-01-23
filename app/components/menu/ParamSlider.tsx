@@ -13,6 +13,7 @@ export interface ParamSliderProps {
   tooltip?: string;
   onChange: (value: number) => void;
   width?: string;
+  className?: string;
 }
 
 /**
@@ -30,9 +31,10 @@ export function ParamSlider({
   tooltip,
   onChange,
   width = '200px',
+  className,
 }: ParamSliderProps) {
   return (
-    <div className="param-group" style={{ width }}>
+    <div className={`param-group ${className}`} style={{ width }}>
       <div className="param-label">
         <span className="param-name">
           {name}

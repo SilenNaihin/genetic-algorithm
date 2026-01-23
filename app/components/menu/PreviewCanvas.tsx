@@ -6,16 +6,22 @@ import { PreviewRenderer, type PreviewConfig } from '../../../src/rendering/Prev
 export interface PreviewCanvasProps {
   config: PreviewConfig;
   isActive?: boolean;
+  mountKey?: number;
 }
 
 /**
  * 3D creature preview canvas for the menu screen.
  * Wraps the imperative PreviewRenderer with React lifecycle management.
+ *
+ * Uses delayed initialization to handle React StrictMode's double-mount behavior
+ * and prevent WebGL context exhaustion during rapid mount/unmount cycles.
  */
-export function PreviewCanvas({ config, isActive = true }: PreviewCanvasProps) {
+export function PreviewCanvas({ config, isActive = true, mountKey = 0 }: PreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<PreviewRenderer | null>(null);
   const configRef = useRef(config);
+  const lastMountKeyRef = useRef(mountKey);
+  const mountedRef = useRef(true);
 
   // Keep config ref updated for the renderer's getConfig callback
   useEffect(() => {
@@ -24,22 +30,47 @@ export function PreviewCanvas({ config, isActive = true }: PreviewCanvasProps) {
     rendererRef.current?.regenerateCreature();
   }, [config.maxNodes, config.maxMuscles, config.maxAllowedFrequency, config.gravity]);
 
-  // Create renderer on mount
+  // Create renderer with a small delay to handle StrictMode double-mount
   useEffect(() => {
+    mountedRef.current = true;
     const container = containerRef.current;
     if (!container) return;
 
-    const renderer = new PreviewRenderer(container, () => configRef.current);
-    rendererRef.current = renderer;
-    renderer.startAnimation();
+    // Small delay to let React StrictMode settle
+    const timerId = setTimeout(() => {
+      if (!mountedRef.current || !containerRef.current) return;
+
+      // Only create if we don't have one
+      if (!rendererRef.current) {
+        const renderer = new PreviewRenderer(containerRef.current, () => configRef.current);
+        rendererRef.current = renderer;
+        renderer.startAnimation();
+      }
+    }, 50);
 
     return () => {
-      renderer.dispose();
-      rendererRef.current = null;
+      mountedRef.current = false;
+      clearTimeout(timerId);
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+      }
     };
-  }, []);
+  }, []); // Empty deps - only run on mount/unmount
 
-  // Handle animation start/stop
+  // When mountKey changes (after reset), regenerate creature and restart animation
+  useEffect(() => {
+    if (mountKey !== lastMountKeyRef.current) {
+      lastMountKeyRef.current = mountKey;
+      const renderer = rendererRef.current;
+      if (renderer) {
+        renderer.regenerateCreature();
+        renderer.startAnimation();
+      }
+    }
+  }, [mountKey]);
+
+  // Handle animation start/stop based on isActive prop
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;

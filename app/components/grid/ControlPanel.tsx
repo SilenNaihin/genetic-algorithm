@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEvolutionStore, useEvolutionStep, useIsAutoRunning } from '../../stores/evolutionStore';
 import { useSimulation } from '../../hooks/useSimulation';
 import { Button } from '../common/Button';
@@ -14,7 +15,7 @@ export function ControlPanel() {
   const isAutoRunning = useIsAutoRunning();
   const viewingGeneration = useEvolutionStore((s) => s.viewingGeneration);
   const simulationProgress = useEvolutionStore((s) => s.simulationProgress);
-  const setAppState = useEvolutionStore((s) => s.setAppState);
+  const router = useRouter();
   const setGraphsVisible = useEvolutionStore((s) => s.setGraphsVisible);
   const graphsVisible = useEvolutionStore((s) => s.graphsVisible);
   const reset = useEvolutionStore((s) => s.reset);
@@ -72,7 +73,7 @@ export function ControlPanel() {
 
   const handleReset = () => {
     reset();
-    setAppState('menu');
+    router.push('/');
   };
 
   return (

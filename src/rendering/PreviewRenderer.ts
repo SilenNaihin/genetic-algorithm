@@ -23,6 +23,7 @@ export class PreviewRenderer {
   private time: number = 0;
   private animationId: number | null = null;
   private getConfig: () => PreviewConfig;
+  private disposed: boolean = false;
 
   constructor(container: HTMLElement, getConfig: () => PreviewConfig) {
     this.getConfig = getConfig;
@@ -82,6 +83,9 @@ export class PreviewRenderer {
    * Generate a new random creature at max complexity.
    */
   regenerateCreature(): void {
+    // Reset animation time for fresh oscillation
+    this.time = 0;
+
     // Remove old creature
     if (this.creature) {
       this.scene.remove(this.creature);
@@ -115,8 +119,8 @@ export class PreviewRenderer {
    * Start the animation loop.
    */
   startAnimation(): void {
+    if (this.disposed) return;
     if (this.animationId !== null) return;
-    console.log('[PreviewRenderer] Starting animation');
     this.animate();
   }
 
@@ -131,6 +135,8 @@ export class PreviewRenderer {
   }
 
   private animate = (): void => {
+    if (this.disposed) return;
+
     this.animationId = requestAnimationFrame(this.animate);
     this.time += 0.016;
 
@@ -202,6 +208,7 @@ export class PreviewRenderer {
    * Clean up resources.
    */
   dispose(): void {
+    this.disposed = true;
     this.stopAnimation();
     this.renderer.dispose();
   }

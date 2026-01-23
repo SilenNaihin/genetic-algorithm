@@ -471,10 +471,12 @@ def evolve_population(
         if g['id'] in survivor_ids
     ]
 
-    # Survivors pass through with incremented survivalStreak
+    # Survivors pass through with incremented survivalStreak and updated generation
+    next_gen = generation + 1
     survivor_genomes = []
     for genome in survivors:
         new_genome = dict(genome)
+        new_genome['generation'] = next_gen
         new_genome['survivalStreak'] = genome.get('survivalStreak', 0) + 1
         survivor_genomes.append(new_genome)
 
@@ -524,6 +526,9 @@ def evolve_population(
                 attempts += 1
 
             child = single_point_crossover(parent1, parent2, constraints)
+            # New offspring start at next generation with 0 survival streak
+            child['generation'] = next_gen
+            child['survivalStreak'] = 0
             new_genomes.append(child)
 
         elif use_mutation:
@@ -531,12 +536,18 @@ def evolve_population(
             parent = weighted_random_select(survivors, probabilities)
             child = clone_genome(parent, constraints)
             mutated = mutate_genome(child, mutation_config, constraints)
+            # New offspring start at next generation with 0 survival streak
+            mutated['generation'] = next_gen
+            mutated['survivalStreak'] = 0
             new_genomes.append(mutated)
 
         else:
             # Just clone
             parent = weighted_random_select(survivors, probabilities)
             child = clone_genome(parent, constraints)
+            # New offspring start at next generation with 0 survival streak
+            child['generation'] = next_gen
+            child['survivalStreak'] = 0
             new_genomes.append(child)
 
     # Calculate stats

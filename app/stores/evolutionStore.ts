@@ -85,6 +85,9 @@ interface EvolutionState {
 
   // Error notification
   notification: { message: string; type: 'error' | 'info' } | null;
+
+  // Key to force MenuScreen remount on reset (increments each reset)
+  menuMountKey: number;
 }
 
 /**
@@ -153,6 +156,7 @@ const initialState: EvolutionState = {
   brainEvolutionModalOpen: false,
   generationJumpModalOpen: false,
   notification: null,
+  menuMountKey: 0,
 };
 
 /**
@@ -221,8 +225,11 @@ export const useEvolutionStore = create<EvolutionStore>()(
       setNotification: (notification) => set({ notification }, false, 'setNotification'),
       showError: (message) => set({ notification: { message, type: 'error' } }, false, 'showError'),
 
-      // Reset to initial state
-      reset: () => set(initialState, false, 'reset'),
+      // Reset to initial state (increment menuMountKey to force MenuScreen remount)
+      reset: () => set((state) => ({
+        ...initialState,
+        menuMountKey: state.menuMountKey + 1,
+      }), false, 'reset'),
     }),
     { name: 'evolution-store' }
   )

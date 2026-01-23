@@ -18,7 +18,6 @@ export default function RunPage() {
   const router = useRouter();
   const runId = params.runId as string;
 
-  const appState = useEvolutionStore((s) => s.appState);
   const showError = useEvolutionStore((s) => s.showError);
   const { loadRun } = useSimulation();
 
@@ -63,13 +62,6 @@ export default function RunPage() {
 
     load();
   }, [runId, loadRun, showError]);
-
-  // If we're on the menu state, redirect to /
-  useEffect(() => {
-    if (!loading && appState === 'menu') {
-      router.push('/');
-    }
-  }, [loading, appState, router]);
 
   if (loading) {
     return (
