@@ -158,7 +158,9 @@ export function useSimulation() {
       const population = await SimulationService.createInitialPopulation(currentConfig);
       SimState.setPopulation(population);
 
-      // Switch to grid view FIRST, then show simulation progress there
+      // Set initial progress BEFORE switching to grid - this prevents flickering
+      // where the grid briefly shows with no content
+      setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
       setEvolutionStep('simulate');
       setAppState('grid');
 

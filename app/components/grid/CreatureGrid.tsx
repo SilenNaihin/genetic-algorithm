@@ -152,8 +152,28 @@ export function CreatureGrid() {
     hideTooltip();
   };
 
-  // Don't render until we have results and renderer is ready
-  if (displayResults.length === 0 || !rendererReady) {
+  // Show loading state while waiting for results
+  if (displayResults.length === 0) {
+    return (
+      <div
+        className="creature-grid"
+        style={{
+          width: `${gridWidth}px`,
+          height: `${gridHeight}px`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--text-secondary)',
+          fontSize: '14px',
+        }}
+      >
+        Loading creatures...
+      </div>
+    );
+  }
+
+  // Wait for renderer to be ready (should be fast)
+  if (!rendererReady) {
     return null;
   }
 
