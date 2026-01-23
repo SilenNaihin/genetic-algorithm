@@ -70,9 +70,19 @@ function getStorage(): RunStorage | RemoteStorage {
 
 /**
  * Initialize storage (IndexedDB or Remote)
+ * Automatically tries to use backend if available.
  */
 export async function initStorage(): Promise<void> {
   if (isInitialized) return;
+
+  // Auto-detect backend on first init (tryUseRemoteStorage sets isInitialized)
+  if (currentMode === 'local') {
+    const usedRemote = await tryUseRemoteStorage();
+    if (usedRemote) {
+      // Remote storage already initialized by tryUseRemoteStorage
+      return;
+    }
+  }
 
   if (currentMode === 'remote') {
     if (!remoteStorage) {
