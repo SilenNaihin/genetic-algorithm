@@ -85,7 +85,7 @@ class PyTorchSimulator:
 
         # Initialize pellets and fitness state
         pellet_batch = initialize_pellets(batch, arena_size=config.arena_size)
-        fitness_state = initialize_fitness_state(batch)
+        fitness_state = initialize_fitness_state(batch, pellet_batch)
 
         # Calculate number of simulation steps
         num_steps = int(config.simulation_duration / TIME_STEP)
@@ -141,7 +141,7 @@ class PyTorchSimulator:
 
         # Update fitness state with final positions
         batch.positions = result['final_positions']
-        update_fitness_state(batch, fitness_state, fitness_config)
+        update_fitness_state(batch, fitness_state, pellet_batch, fitness_config)
 
         # Calculate fitness
         simulation_time = num_steps * TIME_STEP

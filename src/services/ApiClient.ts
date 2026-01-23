@@ -1,0 +1,620 @@
+/**
+ * API Client for Python Backend
+ *
+ * Typed fetch wrapper for all backend endpoints.
+ * Handles JSON serialization, error handling, and type conversion.
+ */
+
+import type { SimulationConfig } from '../types/simulation';
+import type { CreatureGenome } from '../types/genome';
+
+// Base URL for backend API
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// -------------------------------------------------------------------
+// API Types (matching backend Pydantic schemas)
+// -------------------------------------------------------------------
+
+/** Backend uses snake_case, we convert to camelCase */
+export interface ApiSimulationConfig {
+  gravity: number;
+  ground_friction: number;
+  time_step: number;
+  simulation_duration: number;
+  population_size: number;
+  cull_percentage: number;
+  mutation_rate: number;
+  mutation_magnitude: number;
+  crossover_rate: number;
+  elite_count: number;
+  use_mutation: boolean;
+  use_crossover: boolean;
+  min_nodes: number;
+  max_nodes: number;
+  max_muscles: number;
+  max_allowed_frequency: number;
+  pellet_count: number;
+  arena_size: number;
+  fitness_pellet_points: number;
+  fitness_progress_max: number;
+  fitness_net_displacement_max: number;
+  fitness_distance_per_unit: number;
+  fitness_distance_traveled_max: number;
+  fitness_regression_penalty: number;
+  use_neural_net: boolean;
+  neural_mode: 'hybrid' | 'pure';
+  neural_hidden_size: number;
+  neural_activation: string;
+  weight_mutation_rate: number;
+  weight_mutation_magnitude: number;
+  weight_mutation_decay: 'off' | 'linear' | 'exponential';
+  neural_output_bias: number;
+  fitness_efficiency_penalty: number;
+  neural_dead_zone: number;
+  frame_storage_mode: 'none' | 'all' | 'sparse';
+  frame_rate: number;
+  sparse_top_count: number;
+  sparse_bottom_count: number;
+}
+
+export interface ApiFitnessBreakdown {
+  pellet_points: number;
+  progress: number;
+  net_displacement: number;
+  distance_traveled: number;
+  regression_penalty: number;
+  efficiency_penalty: number;
+}
+
+export interface ApiSimulationResult {
+  genome_id: string;
+  fitness: number;
+  pellets_collected: number;
+  disqualified: boolean;
+  disqualified_reason: string | null;
+  fitness_breakdown: ApiFitnessBreakdown | null;
+  net_displacement: number;
+  distance_traveled: number;
+  total_activation: number;
+  frame_count: number;
+  frames: number[][] | null;
+}
+
+export interface ApiBatchSimulationResponse {
+  results: ApiSimulationResult[];
+  total_time_ms: number;
+  creatures_per_second: number;
+}
+
+export interface ApiRun {
+  id: string;
+  name: string;
+  config: Record<string, unknown>;
+  generation_count: number;
+  current_generation: number;
+  best_fitness: number;
+  best_creature_id: string | null;
+  best_creature_generation: number | null;
+  longest_survivor_id: string | null;
+  longest_survivor_streak: number;
+  longest_survivor_generation: number | null;
+  status: 'idle' | 'running' | 'paused' | 'complete';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiGeneration {
+  run_id: string;
+  generation: number;
+  best_fitness: number;
+  avg_fitness: number;
+  worst_fitness: number;
+  median_fitness: number;
+  creature_types: Record<string, number>;
+  simulation_time_ms: number;
+}
+
+export interface ApiCreature {
+  id: string;
+  run_id: string;
+  generation: number;
+  genome: Record<string, unknown>;
+  fitness: number;
+  pellets_collected: number;
+  disqualified: boolean;
+  disqualified_reason: string | null;
+  survival_streak: number;
+  is_elite: boolean;
+  parent_ids: string[];
+}
+
+export interface ApiGeneticsGenerateRequest {
+  count: number;
+  constraints?: Record<string, unknown>;
+  config?: Partial<ApiSimulationConfig>;
+}
+
+export interface ApiGeneticsEvolveRequest {
+  genomes: Record<string, unknown>[];
+  fitnesses: number[];
+  config?: Partial<ApiSimulationConfig>;
+}
+
+// -------------------------------------------------------------------
+// Conversion helpers
+// -------------------------------------------------------------------
+
+/** Convert frontend SimulationConfig (camelCase) to API format (snake_case) */
+export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
+  return {
+    gravity: config.gravity,
+    ground_friction: config.groundFriction,
+    time_step: config.timeStep,
+    simulation_duration: config.simulationDuration,
+    population_size: config.populationSize,
+    cull_percentage: config.cullPercentage,
+    mutation_rate: config.mutationRate,
+    mutation_magnitude: config.mutationMagnitude,
+    crossover_rate: config.crossoverRate,
+    elite_count: config.eliteCount,
+    use_mutation: config.useMutation,
+    use_crossover: config.useCrossover,
+    min_nodes: config.minNodes,
+    max_nodes: config.maxNodes,
+    max_muscles: config.maxMuscles,
+    max_allowed_frequency: config.maxAllowedFrequency,
+    pellet_count: config.pelletCount,
+    arena_size: config.arenaSize,
+    fitness_pellet_points: config.fitnessPelletPoints,
+    fitness_progress_max: config.fitnessProgressMax,
+    fitness_net_displacement_max: config.fitnessNetDisplacementMax,
+    fitness_distance_per_unit: config.fitnessDistancePerUnit,
+    fitness_distance_traveled_max: config.fitnessDistanceTraveledMax,
+    fitness_regression_penalty: config.fitnessRegressionPenalty,
+    use_neural_net: config.useNeuralNet,
+    neural_mode: config.neuralMode,
+    neural_hidden_size: config.neuralHiddenSize,
+    neural_activation: config.neuralActivation,
+    weight_mutation_rate: config.weightMutationRate,
+    weight_mutation_magnitude: config.weightMutationMagnitude,
+    weight_mutation_decay: config.weightMutationDecay,
+    neural_output_bias: config.neuralOutputBias,
+    fitness_efficiency_penalty: config.fitnessEfficiencyPenalty,
+    neural_dead_zone: config.neuralDeadZone,
+    frame_storage_mode: 'all', // Always store frames when using UI
+    frame_rate: 15,
+    sparse_top_count: 10,
+    sparse_bottom_count: 10,
+  };
+}
+
+/** Convert API SimulationConfig (snake_case) to frontend format (camelCase) */
+export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfig> {
+  return {
+    gravity: api.gravity,
+    groundFriction: api.ground_friction,
+    timeStep: api.time_step,
+    simulationDuration: api.simulation_duration,
+    populationSize: api.population_size,
+    cullPercentage: api.cull_percentage,
+    mutationRate: api.mutation_rate,
+    mutationMagnitude: api.mutation_magnitude,
+    crossoverRate: api.crossover_rate,
+    eliteCount: api.elite_count,
+    useMutation: api.use_mutation,
+    useCrossover: api.use_crossover,
+    minNodes: api.min_nodes,
+    maxNodes: api.max_nodes,
+    maxMuscles: api.max_muscles,
+    maxAllowedFrequency: api.max_allowed_frequency,
+    pelletCount: api.pellet_count,
+    arenaSize: api.arena_size,
+    fitnessPelletPoints: api.fitness_pellet_points,
+    fitnessProgressMax: api.fitness_progress_max,
+    fitnessNetDisplacementMax: api.fitness_net_displacement_max,
+    fitnessDistancePerUnit: api.fitness_distance_per_unit,
+    fitnessDistanceTraveledMax: api.fitness_distance_traveled_max,
+    fitnessRegressionPenalty: api.fitness_regression_penalty,
+    useNeuralNet: api.use_neural_net,
+    neuralMode: api.neural_mode,
+    neuralHiddenSize: api.neural_hidden_size,
+    neuralActivation: api.neural_activation as SimulationConfig['neuralActivation'],
+    weightMutationRate: api.weight_mutation_rate,
+    weightMutationMagnitude: api.weight_mutation_magnitude,
+    weightMutationDecay: api.weight_mutation_decay,
+    neuralOutputBias: api.neural_output_bias,
+    fitnessEfficiencyPenalty: api.fitness_efficiency_penalty,
+    neuralDeadZone: api.neural_dead_zone,
+  };
+}
+
+/** Convert genome to API format (ensure snake_case for nested objects) */
+export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
+  // Convert NeuralGenomeData (flat weights) to API format (separate matrices)
+  let neuralGenome = null;
+  if (genome.neuralGenome) {
+    const { topology, weights } = genome.neuralGenome;
+    const { inputSize, hiddenSize, outputSize } = topology;
+
+    // Reconstruct separate matrices from flat weights
+    // Order: weights_ih, biases_h, weights_ho, biases_o
+    const ihSize = inputSize * hiddenSize;
+    const hoSize = hiddenSize * outputSize;
+
+    neuralGenome = {
+      input_size: inputSize,
+      hidden_size: hiddenSize,
+      output_size: outputSize,
+      weights_ih: weights.slice(0, ihSize),
+      biases_h: weights.slice(ihSize, ihSize + hiddenSize),
+      weights_ho: weights.slice(ihSize + hiddenSize, ihSize + hiddenSize + hoSize),
+      biases_o: weights.slice(ihSize + hiddenSize + hoSize),
+    };
+  }
+
+  return {
+    id: genome.id,
+    generation: genome.generation,
+    survival_streak: genome.survivalStreak,
+    parent_ids: genome.parentIds,
+    nodes: genome.nodes.map(node => ({
+      id: node.id,
+      position: node.position,
+      size: node.size,
+      friction: node.friction,
+    })),
+    muscles: genome.muscles.map(muscle => ({
+      id: muscle.id,
+      node_a: muscle.nodeA,
+      node_b: muscle.nodeB,
+      rest_length: muscle.restLength,
+      stiffness: muscle.stiffness,
+      damping: muscle.damping,
+      frequency: muscle.frequency,
+      amplitude: muscle.amplitude,
+      phase: muscle.phase,
+      direction_bias: muscle.directionBias ?? { x: 1, y: 0, z: 0 },
+      bias_strength: muscle.biasStrength,
+      velocity_bias: muscle.velocityBias ?? { x: 0, y: 0, z: 0 },
+      velocity_strength: muscle.velocityStrength,
+      distance_bias: muscle.distanceBias,
+      distance_strength: muscle.distanceStrength,
+    })),
+    global_frequency_multiplier: genome.globalFrequencyMultiplier,
+    controller_type: genome.controllerType,
+    neural_genome: neuralGenome,
+    color: genome.color,
+  };
+}
+
+/** Convert API genome to frontend format */
+export function fromApiGenome(api: Record<string, unknown>): CreatureGenome {
+  const nodes = (api.nodes as Array<Record<string, unknown>>).map(node => ({
+    id: node.id as string,
+    position: node.position as { x: number; y: number; z: number },
+    size: node.size as number,
+    friction: node.friction as number,
+  }));
+
+  const muscles = (api.muscles as Array<Record<string, unknown>>).map(muscle => ({
+    id: muscle.id as string,
+    nodeA: (muscle.node_a ?? muscle.nodeA) as string,
+    nodeB: (muscle.node_b ?? muscle.nodeB) as string,
+    restLength: (muscle.rest_length ?? muscle.restLength) as number,
+    stiffness: muscle.stiffness as number,
+    damping: muscle.damping as number,
+    frequency: muscle.frequency as number,
+    amplitude: muscle.amplitude as number,
+    phase: muscle.phase as number,
+    directionBias: (muscle.direction_bias ?? muscle.directionBias ?? { x: 1, y: 0, z: 0 }) as { x: number; y: number; z: number },
+    biasStrength: (muscle.bias_strength ?? muscle.biasStrength ?? 0) as number,
+    velocityBias: (muscle.velocity_bias ?? muscle.velocityBias ?? { x: 0, y: 0, z: 0 }) as { x: number; y: number; z: number },
+    velocityStrength: (muscle.velocity_strength ?? muscle.velocityStrength ?? 0) as number,
+    distanceBias: (muscle.distance_bias ?? muscle.distanceBias ?? 0) as number,
+    distanceStrength: (muscle.distance_strength ?? muscle.distanceStrength ?? 0) as number,
+  }));
+
+  // Convert API neural genome (separate matrices) to frontend format (flat weights)
+  const neuralGenomeData = api.neural_genome ?? api.neuralGenome;
+  let neuralGenome = undefined;
+  if (neuralGenomeData) {
+    const ng = neuralGenomeData as Record<string, unknown>;
+    const inputSize = ng.input_size as number;
+    const hiddenSize = ng.hidden_size as number;
+    const outputSize = ng.output_size as number;
+    const weightsIH = ng.weights_ih as number[];
+    const biasesH = ng.biases_h as number[];
+    const weightsHO = ng.weights_ho as number[];
+    const biasesO = ng.biases_o as number[];
+
+    // Flatten into single array: weights_ih, biases_h, weights_ho, biases_o
+    const weights = [...weightsIH, ...biasesH, ...weightsHO, ...biasesO];
+
+    neuralGenome = {
+      weights,
+      topology: { inputSize, hiddenSize, outputSize },
+      activation: 'tanh' as const,  // Default activation
+    };
+  }
+
+  return {
+    id: api.id as string,
+    generation: (api.generation ?? 0) as number,
+    survivalStreak: (api.survival_streak ?? api.survivalStreak ?? 0) as number,
+    parentIds: (api.parent_ids ?? api.parentIds ?? []) as string[],
+    nodes,
+    muscles,
+    globalFrequencyMultiplier: (api.global_frequency_multiplier ?? api.globalFrequencyMultiplier ?? 1.0) as number,
+    controllerType: (api.controller_type ?? api.controllerType ?? 'oscillator') as 'oscillator' | 'neural',
+    neuralGenome,
+    color: (api.color ?? { h: 0.5, s: 0.7, l: 0.5 }) as { h: number; s: number; l: number },
+  };
+}
+
+// -------------------------------------------------------------------
+// API Client
+// -------------------------------------------------------------------
+
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public body?: unknown
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+async function fetchJson<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      body = await response.text();
+    }
+    throw new ApiError(
+      `API error: ${response.status} ${response.statusText}`,
+      response.status,
+      body
+    );
+  }
+
+  // Handle 204 No Content
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+
+// -------------------------------------------------------------------
+// Simulation API
+// -------------------------------------------------------------------
+
+export async function simulateBatch(
+  genomes: CreatureGenome[],
+  config: SimulationConfig
+): Promise<ApiBatchSimulationResponse> {
+  const apiGenomes = genomes.map(toApiGenome);
+  const apiConfig = toApiConfig(config);
+
+  return fetchJson<ApiBatchSimulationResponse>('/api/simulation/batch', {
+    method: 'POST',
+    body: JSON.stringify({
+      genomes: apiGenomes,
+      config: apiConfig,
+    }),
+  });
+}
+
+// -------------------------------------------------------------------
+// Genetics API
+// -------------------------------------------------------------------
+
+export async function generateGenomes(
+  count: number,
+  config: SimulationConfig
+): Promise<CreatureGenome[]> {
+  const response = await fetchJson<{ genomes: Record<string, unknown>[] }>(
+    '/api/genetics/generate',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        count,
+        config: toApiConfig(config),
+      }),
+    }
+  );
+
+  return response.genomes.map(fromApiGenome);
+}
+
+export async function evolveGenomes(
+  genomes: CreatureGenome[],
+  fitnesses: number[],
+  config: SimulationConfig
+): Promise<CreatureGenome[]> {
+  const response = await fetchJson<{ genomes: Record<string, unknown>[] }>(
+    '/api/genetics/evolve',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        genomes: genomes.map(toApiGenome),
+        fitnesses,
+        config: toApiConfig(config),
+      }),
+    }
+  );
+
+  return response.genomes.map(fromApiGenome);
+}
+
+// -------------------------------------------------------------------
+// Runs API
+// -------------------------------------------------------------------
+
+export async function listRuns(): Promise<ApiRun[]> {
+  return fetchJson<ApiRun[]>('/api/runs');
+}
+
+export async function createRun(
+  name: string,
+  config: SimulationConfig
+): Promise<ApiRun> {
+  return fetchJson<ApiRun>('/api/runs', {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      config: toApiConfig(config),
+    }),
+  });
+}
+
+export async function getRun(runId: string): Promise<ApiRun> {
+  return fetchJson<ApiRun>(`/api/runs/${runId}`);
+}
+
+export async function updateRun(
+  runId: string,
+  updates: { name?: string; status?: string }
+): Promise<ApiRun> {
+  return fetchJson<ApiRun>(`/api/runs/${runId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteRun(runId: string): Promise<void> {
+  await fetchJson<void>(`/api/runs/${runId}`, { method: 'DELETE' });
+}
+
+export async function forkRun(
+  runId: string,
+  upToGeneration: number,
+  name: string
+): Promise<ApiRun> {
+  return fetchJson<ApiRun>(`/api/runs/${runId}/fork`, {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      up_to_generation: upToGeneration,
+    }),
+  });
+}
+
+// -------------------------------------------------------------------
+// Generations API
+// -------------------------------------------------------------------
+
+export async function listGenerations(runId: string): Promise<ApiGeneration[]> {
+  return fetchJson<ApiGeneration[]>(`/api/runs/${runId}/generations`);
+}
+
+export async function getGeneration(
+  runId: string,
+  generation: number
+): Promise<{ generation: ApiGeneration; creatures: ApiCreature[] }> {
+  return fetchJson<{ generation: ApiGeneration; creatures: ApiCreature[] }>(
+    `/api/runs/${runId}/generations/${generation}`
+  );
+}
+
+/** Input for saving a creature result */
+export interface CreatureResultCreate {
+  genome: Record<string, unknown>;
+  fitness: number;
+  pellets_collected: number;
+  disqualified: boolean;
+  disqualified_reason: string | null;
+  frames: number[][] | null;
+  pellet_data: { position: { x: number; y: number; z: number }; collectedAtFrame: number | null }[] | null;
+}
+
+/** Input for saving a generation */
+export interface GenerationCreate {
+  generation: number;
+  creatures: CreatureResultCreate[];
+  simulation_time_ms: number;
+}
+
+export async function saveGeneration(
+  runId: string,
+  generationNumber: number,
+  creatures: CreatureResultCreate[],
+  simulationTimeMs: number = 0
+): Promise<{ status: string; run_id: string; generation: number; creature_count: number }> {
+  return fetchJson(`/api/runs/${runId}/generations`, {
+    method: 'POST',
+    body: JSON.stringify({
+      generation: generationNumber,
+      creatures,
+      simulation_time_ms: simulationTimeMs,
+    }),
+  });
+}
+
+// -------------------------------------------------------------------
+// Creatures API
+// -------------------------------------------------------------------
+
+export async function getCreature(creatureId: string): Promise<ApiCreature> {
+  return fetchJson<ApiCreature>(`/api/creatures/${creatureId}`);
+}
+
+export async function getCreatureFrames(
+  creatureId: string
+): Promise<{ frames_data: number[][]; frame_count: number; frame_rate: number }> {
+  return fetchJson(`/api/creatures/${creatureId}/frames`);
+}
+
+// -------------------------------------------------------------------
+// Health check
+// -------------------------------------------------------------------
+
+export async function healthCheck(): Promise<boolean> {
+  try {
+    await fetchJson('/api/health');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// -------------------------------------------------------------------
+// Connection state
+// -------------------------------------------------------------------
+
+let _isConnected = false;
+let _connectionCheckPromise: Promise<boolean> | null = null;
+
+export async function checkConnection(): Promise<boolean> {
+  if (_connectionCheckPromise) {
+    return _connectionCheckPromise;
+  }
+
+  _connectionCheckPromise = healthCheck().then(result => {
+    _isConnected = result;
+    _connectionCheckPromise = null;
+    return result;
+  });
+
+  return _connectionCheckPromise;
+}
+
+export function isConnected(): boolean {
+  return _isConnected;
+}

@@ -62,6 +62,10 @@ class PelletBatch:
     # Total pellets collected per creature [B]
     total_collected: torch.Tensor
 
+    # Last pellet angle per creature for opposite-half spawning [B]
+    # None/NaN indicates first pellet (random angle)
+    last_pellet_angles: torch.Tensor
+
 
 # =============================================================================
 # Creature XZ Radius Calculation
@@ -131,11 +135,12 @@ def generate_pellet_positions(
     batch: CreatureBatch,
     pellet_indices: torch.Tensor,
     creature_xz_radii: torch.Tensor,
+    last_angles: Optional[torch.Tensor] = None,
     arena_size: float = 50.0,
     seed: Optional[int] = None,
-) -> torch.Tensor:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Generate pellet positions for each creature.
+    Generate pellet positions for each creature with opposite-half spawning.
 
     Pellets spawn at progressive distances from creature's edge:
     - Pellet 0: 7-8 units from edge
@@ -144,21 +149,25 @@ def generate_pellet_positions(
 
     Height increases with pellet index.
 
+    Opposite-half spawning: After first pellet, spawn in opposite 180° arc
+    (previous angle + PI ± 90°).
+
     Args:
         batch: CreatureBatch with current positions
         pellet_indices: [B] current pellet index per creature
         creature_xz_radii: [B] XZ radius of each creature
+        last_angles: [B] last pellet angle per creature (NaN for first pellet)
         arena_size: Arena boundary size
         seed: Optional random seed for reproducibility
 
     Returns:
-        [B, 3] pellet positions
+        Tuple of ([B, 3] pellet positions, [B] new angles)
     """
     B = batch.batch_size
     device = batch.device
 
     if B == 0:
-        return torch.zeros(0, 3, device=device)
+        return torch.zeros(0, 3, device=device), torch.zeros(0, device=device)
 
     # Get creature centers of mass
     com = get_center_of_mass(batch)  # [B, 3]
@@ -167,8 +176,24 @@ def generate_pellet_positions(
     if seed is not None:
         torch.manual_seed(seed)
 
-    # Generate random angles [B]
-    angles = torch.rand(B, device=device) * 2 * math.pi
+    # Generate angles with opposite-half logic
+    # First pellet (index 0 or no last angle): random angle
+    # Subsequent pellets: opposite 180° arc (lastAngle + PI ± 90°)
+    random_angles = torch.rand(B, device=device) * 2 * math.pi
+
+    if last_angles is not None:
+        # Check if this is first pellet (pellet_indices == 0 or last_angles is NaN)
+        is_first = (pellet_indices == 0) | torch.isnan(last_angles)
+
+        # For subsequent pellets: opposite center + random offset in ±90° range
+        opposite_center = last_angles + math.pi
+        offset = (torch.rand(B, device=device) - 0.5) * math.pi  # ±90°
+        opposite_angles = opposite_center + offset
+
+        # Use random for first, opposite for subsequent
+        angles = torch.where(is_first, random_angles, opposite_angles)
+    else:
+        angles = random_angles
 
     # Calculate distance from edge based on pellet index
     # Pellet 0: 7-8, Pellet 1-2: 8-9, Pellet 3+: 9-10
@@ -201,7 +226,7 @@ def generate_pellet_positions(
     # Stack into [B, 3]
     positions = torch.stack([px, py, pz], dim=1)
 
-    return positions
+    return positions, angles
 
 
 @torch.no_grad()
@@ -232,9 +257,12 @@ def initialize_pellets(
     # Initial pellet indices (all 0)
     pellet_indices = torch.zeros(B, dtype=torch.long, device=device)
 
-    # Generate first pellet positions
-    positions = generate_pellet_positions(
-        batch, pellet_indices, creature_radii, arena_size, seed
+    # Initialize last angles as NaN (first pellet will use random angle)
+    last_angles = torch.full((B,), float('nan'), device=device)
+
+    # Generate first pellet positions (with opposite-half spawning)
+    positions, new_angles = generate_pellet_positions(
+        batch, pellet_indices, creature_radii, last_angles, arena_size, seed
     )
 
     # Calculate initial distances (XZ ground distance from edge to pellet)
@@ -249,6 +277,7 @@ def initialize_pellets(
         pellet_indices=pellet_indices,
         collected=torch.zeros(B, dtype=torch.bool, device=device),
         total_collected=torch.zeros(B, dtype=torch.long, device=device),
+        last_pellet_angles=new_angles,
     )
 
 
@@ -312,17 +341,16 @@ def compute_3d_distances(
 def check_pellet_collisions(
     batch: CreatureBatch,
     pellets: PelletBatch,
-    collection_radius: float = 0.75,
 ) -> torch.Tensor:
     """
     Check which creatures have collected their current pellet.
 
     Collection is based on 3D distance from any node to pellet center.
+    Collection radius is variable: node.size * 0.5 + 0.35 (matches TypeScript).
 
     Args:
         batch: CreatureBatch with current positions
         pellets: PelletBatch with pellet positions
-        collection_radius: Distance threshold for collection
 
     Returns:
         [B] boolean tensor - True where pellet was collected
@@ -341,16 +369,18 @@ def check_pellet_collisions(
     diff = batch.positions - pellet_pos_expanded  # [B, N, 3]
     node_to_pellet_dist = torch.norm(diff, dim=2)  # [B, N]
 
-    # Mask out invalid nodes
-    node_to_pellet_dist = torch.where(
-        batch.node_mask > 0.5,
-        node_to_pellet_dist,
-        torch.full_like(node_to_pellet_dist, float('inf'))
-    )
+    # Variable collection radius per node: node.size * 0.5 + 0.35 (matches TypeScript)
+    # sizes: [B, N] - node sizes (diameter), so radius = size * 0.5
+    collection_radii = batch.sizes * 0.5 + 0.35  # [B, N]
 
-    # Check if any node is within collection radius
-    min_dist, _ = node_to_pellet_dist.min(dim=1)  # [B]
-    collected = min_dist < collection_radius
+    # Check if each node is within its collection radius
+    within_radius = node_to_pellet_dist < collection_radii  # [B, N]
+
+    # Mask out invalid nodes
+    within_radius = within_radius & (batch.node_mask > 0.5)
+
+    # Check if any node collected
+    collected = within_radius.any(dim=1)  # [B]
 
     return collected
 
@@ -365,6 +395,7 @@ def update_pellets(
     Update pellet state after collision check.
 
     Spawns new pellets for creatures that collected their current pellet.
+    Uses opposite-half spawning for subsequent pellets.
     Modifies pellets in-place.
 
     Args:
@@ -387,9 +418,10 @@ def update_pellets(
         # Calculate creature radii
         creature_radii = calculate_creature_xz_radius(batch)
 
-        # Generate new positions for collectors
-        new_positions = generate_pellet_positions(
-            batch, pellets.pellet_indices, creature_radii, arena_size
+        # Generate new positions for collectors (with opposite-half spawning)
+        new_positions, new_angles = generate_pellet_positions(
+            batch, pellets.pellet_indices, creature_radii,
+            pellets.last_pellet_angles, arena_size
         )
 
         # Update positions for collectors only
@@ -397,6 +429,13 @@ def update_pellets(
             newly_collected.unsqueeze(1).expand(-1, 3),
             new_positions,
             pellets.positions
+        )
+
+        # Update last angles for collectors
+        pellets.last_pellet_angles = torch.where(
+            newly_collected,
+            new_angles,
+            pellets.last_pellet_angles
         )
 
         # Reset collected flag and update initial distance for collectors
@@ -531,15 +570,21 @@ class FitnessState:
     # Creature XZ radii [B]
     creature_radii: torch.Tensor
 
+    # Closest edge distance to current pellet (for regression penalty) [B]
+    closest_edge_distance: torch.Tensor
+
 
 @torch.no_grad()
-def initialize_fitness_state(batch: CreatureBatch) -> FitnessState:
+def initialize_fitness_state(batch: CreatureBatch, pellets: PelletBatch) -> FitnessState:
     """Initialize fitness tracking state."""
     B = batch.batch_size
     device = batch.device
 
     com = get_center_of_mass(batch)
     creature_radii = calculate_creature_xz_radius(batch)
+
+    # Initialize closest edge distance to initial pellet distance
+    initial_edge_dist = compute_edge_distances(com, creature_radii, pellets.positions)
 
     return FitnessState(
         device=device,
@@ -550,6 +595,7 @@ def initialize_fitness_state(batch: CreatureBatch) -> FitnessState:
         total_activation=torch.zeros(B, device=device),
         disqualified=torch.zeros(B, dtype=torch.bool, device=device),
         creature_radii=creature_radii,
+        closest_edge_distance=initial_edge_dist,
     )
 
 
@@ -557,12 +603,13 @@ def initialize_fitness_state(batch: CreatureBatch) -> FitnessState:
 def update_fitness_state(
     batch: CreatureBatch,
     state: FitnessState,
+    pellets: PelletBatch,
     config: FitnessConfig = FitnessConfig(),
 ) -> None:
     """
     Update fitness state after a physics step.
 
-    Updates distance traveled and checks for disqualification.
+    Updates distance traveled, closest edge distance, and checks for disqualification.
     Modifies state in-place.
     """
     com = get_center_of_mass(batch)
@@ -576,9 +623,36 @@ def update_fitness_state(
     # Update previous COM
     state.previous_com = com.clone()
 
+    # Update closest edge distance (for regression penalty)
+    current_edge_dist = compute_edge_distances(com, state.creature_radii, pellets.positions)
+    state.closest_edge_distance = torch.minimum(state.closest_edge_distance, current_edge_dist)
+
     # Check for disqualification
     newly_disqualified = check_disqualifications(batch, config)
     state.disqualified = state.disqualified | newly_disqualified
+
+
+@torch.no_grad()
+def reset_closest_distance_on_collection(
+    state: FitnessState,
+    newly_collected: torch.Tensor,
+    new_initial_distances: torch.Tensor,
+) -> None:
+    """
+    Reset closest edge distance when a pellet is collected.
+
+    Should be called after update_pellets when creatures collect pellets.
+
+    Args:
+        state: FitnessState to update
+        newly_collected: [B] boolean tensor of creatures that just collected
+        new_initial_distances: [B] initial distances to new pellets
+    """
+    state.closest_edge_distance = torch.where(
+        newly_collected,
+        new_initial_distances,
+        state.closest_edge_distance
+    )
 
 
 @torch.no_grad()
@@ -595,9 +669,10 @@ def calculate_fitness(
     Fitness components:
     - pellet_points per collected pellet
     - 0-progress_max for progress toward current pellet
-    - 0-net_displacement_max for net XZ displacement
+    - 0-net_displacement_max for net XZ displacement (only after settling period)
     - 0-distance_traveled_max for total XZ distance
     - -efficiency_penalty * total_activation
+    - -regression_penalty for moving away from pellet (after first collection)
 
     Args:
         batch: CreatureBatch with current positions
@@ -632,13 +707,28 @@ def calculate_fitness(
     progress = torch.clamp(progress, 0, 1)
     progress_fitness = progress * config.progress_max
 
-    # 3. Net displacement bonus (XZ only)
+    # 3. Regression penalty (only after first pellet collected)
+    # Penalty when creature moves away from its closest approach to current pellet
+    # Matches TypeScript: penalty scales with regression distance, max when regression = 50% of initial
+    has_collected = pellets.total_collected > 0
+    regression_dist = current_edge_dist - state.closest_edge_distance
+    regression_dist = torch.clamp(regression_dist, min=0)  # Only penalize moving away
+    # Full penalty when regression equals half the initial distance
+    regression_ratio = regression_dist / (pellets.initial_distances * 0.5).clamp(min=0.01)
+    regression_ratio = torch.clamp(regression_ratio, 0, 1)
+    regression_penalty = torch.where(
+        has_collected,
+        regression_ratio * config.regression_penalty,
+        torch.zeros_like(regression_ratio)
+    )
+
+    # 4. Net displacement bonus (XZ only) - only after settling period (0.5s)
     dx = com[:, 0] - state.initial_com[:, 0]
     dz = com[:, 2] - state.initial_com[:, 2]
     net_displacement = torch.sqrt(dx**2 + dz**2)
 
-    # Rate-based bonus
-    if simulation_time > 0:
+    # Rate-based bonus - only apply after settling period (matches TypeScript)
+    if simulation_time > 0.5:
         displacement_rate = net_displacement / simulation_time
         displacement_ratio = displacement_rate / config.target_displacement_rate
         displacement_ratio = torch.clamp(displacement_ratio, 0, 1)
@@ -646,15 +736,22 @@ def calculate_fitness(
     else:
         displacement_fitness = torch.zeros(B, device=device)
 
-    # 4. Distance traveled bonus (XZ only)
+    # 5. Distance traveled bonus (XZ only)
     distance_fitness = state.distance_traveled * config.distance_per_unit
     distance_fitness = torch.clamp(distance_fitness, 0, config.distance_traveled_max)
 
-    # 5. Efficiency penalty
+    # 6. Efficiency penalty
     efficiency_cost = state.total_activation * config.efficiency_penalty
 
     # Total fitness
-    fitness = pellet_fitness + progress_fitness + displacement_fitness + distance_fitness - efficiency_cost
+    fitness = (
+        pellet_fitness
+        + progress_fitness
+        + displacement_fitness
+        + distance_fitness
+        - efficiency_cost
+        - regression_penalty
+    )
 
     # Zero out disqualified creatures
     fitness = torch.where(state.disqualified, torch.zeros_like(fitness), fitness)

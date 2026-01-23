@@ -1,15 +1,166 @@
 from typing import Annotated
+import statistics
+import uuid
+import zlib
+import json
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Creature, Generation, Run
+from app.models import Creature, CreatureFrame, Generation, Run
 from app.schemas.generation import GenerationRead
 
 router = APIRouter()
+
+
+# =============================================================================
+# Schemas for saving generations
+# =============================================================================
+
+
+class CreatureResultCreate(BaseModel):
+    """Input schema for a single creature's simulation result."""
+    genome: dict
+    fitness: float
+    pellets_collected: int = 0
+    disqualified: bool = False
+    disqualified_reason: str | None = None
+    frames: list[list[float]] | None = None  # Compact frame format
+    pellet_data: list[dict] | None = None
+
+
+class GenerationCreate(BaseModel):
+    """Input schema for saving a complete generation."""
+    generation: int
+    creatures: list[CreatureResultCreate]
+    simulation_time_ms: int = 0
+
+
+# =============================================================================
+# POST endpoint for saving generations
+# =============================================================================
+
+
+@router.post("")
+async def save_generation(
+    run_id: str,
+    data: GenerationCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Save a complete generation with all creatures to the database.
+
+    This is the primary endpoint for frontend to persist simulation results.
+    """
+    # Verify run exists
+    run_result = await db.execute(select(Run).where(Run.id == run_id))
+    run = run_result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Calculate fitness statistics
+    fitness_values = [c.fitness for c in data.creatures if not c.disqualified]
+    if not fitness_values:
+        fitness_values = [0.0]
+
+    sorted_fitness = sorted(fitness_values, reverse=True)
+    best_fitness = sorted_fitness[0]
+    worst_fitness = sorted_fitness[-1]
+    avg_fitness = statistics.mean(fitness_values)
+    median_fitness = statistics.median(fitness_values)
+
+    # Calculate creature type distribution (node count -> count)
+    creature_types = {}
+    for c in data.creatures:
+        node_count = len(c.genome.get("nodes", []))
+        creature_types[str(node_count)] = creature_types.get(str(node_count), 0) + 1
+
+    # Check if generation already exists
+    existing = await db.execute(
+        select(Generation)
+        .where(Generation.run_id == run_id, Generation.generation == data.generation)
+    )
+    if existing.scalar_one_or_none():
+        # Delete existing generation (will cascade to creatures)
+        await db.execute(
+            select(Generation)
+            .where(Generation.run_id == run_id, Generation.generation == data.generation)
+        )
+        gen_to_delete = await db.execute(
+            select(Generation)
+            .where(Generation.run_id == run_id, Generation.generation == data.generation)
+        )
+        gen = gen_to_delete.scalar_one_or_none()
+        if gen:
+            await db.delete(gen)
+            await db.flush()
+
+    # Create generation record
+    generation = Generation(
+        run_id=run_id,
+        generation=data.generation,
+        best_fitness=best_fitness,
+        avg_fitness=avg_fitness,
+        worst_fitness=worst_fitness,
+        median_fitness=median_fitness,
+        creature_types=creature_types,
+        simulation_time_ms=data.simulation_time_ms,
+    )
+    db.add(generation)
+    await db.flush()
+
+    # Create creature records
+    for c in data.creatures:
+        creature_id = str(uuid.uuid4())
+
+        creature = Creature(
+            id=creature_id,
+            run_id=run_id,
+            generation=data.generation,
+            genome=c.genome,
+            fitness=c.fitness,
+            pellets_collected=c.pellets_collected,
+            disqualified=c.disqualified,
+            disqualified_reason=c.disqualified_reason,
+        )
+        db.add(creature)
+
+        # Save frames if provided
+        if c.frames and len(c.frames) > 0:
+            # Compress frames as JSON -> bytes -> zlib
+            frames_json = json.dumps(c.frames)
+            frames_compressed = zlib.compress(frames_json.encode('utf-8'))
+
+            # Compress pellet data if provided
+            pellet_compressed = None
+            if c.pellet_data:
+                pellet_json = json.dumps(c.pellet_data)
+                pellet_compressed = zlib.compress(pellet_json.encode('utf-8'))
+
+            frame_record = CreatureFrame(
+                creature_id=creature_id,
+                frames_data=frames_compressed,
+                frame_count=len(c.frames),
+                frame_rate=15,  # Default frame rate
+                pellet_frames=pellet_compressed,
+            )
+            db.add(frame_record)
+
+    # Update run's generation count
+    run.generation_count = max(run.generation_count, data.generation + 1)
+
+    await db.commit()
+
+    return {
+        "status": "saved",
+        "run_id": run_id,
+        "generation": data.generation,
+        "creature_count": len(data.creatures),
+    }
 
 
 @router.get("", response_model=list[GenerationRead])

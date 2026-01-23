@@ -381,17 +381,17 @@ class TestFitnessCalculation:
         # Initialize pellets and fitness state
         fitness_config = FitnessConfig()
         pellet_batch = initialize_pellets(batch)
-        fitness_state = initialize_fitness_state(batch)
+        fitness_state = initialize_fitness_state(batch, pellet_batch)
 
         # Run simulation
-        pellet_positions = pellet_batch.positions[:, 0]  # First pellet
+        pellet_positions = pellet_batch.positions
         result = simulate_with_pellets(batch, pellet_positions, num_steps=600)
 
         # Update batch positions to final state for fitness calculation
         batch.positions = result['final_positions']
 
         # Update fitness state (modifies in-place)
-        update_fitness_state(batch, fitness_state, fitness_config)
+        update_fitness_state(batch, fitness_state, pellet_batch, fitness_config)
 
         # Calculate fitness with proper arguments
         simulation_time = 600 * TIME_STEP  # 10 seconds

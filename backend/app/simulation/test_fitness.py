@@ -182,9 +182,10 @@ class TestPelletGeneration:
         radii = calculate_creature_xz_radius(batch)
         indices = torch.zeros(1, dtype=torch.long)
 
-        positions = generate_pellet_positions(batch, indices, radii, seed=42)
+        positions, angles = generate_pellet_positions(batch, indices, radii, seed=42)
 
         assert positions.shape == (1, 3)
+        assert angles.shape == (1,)
 
     def test_pellet_distance_from_creature(self):
         """Pellet should spawn at appropriate distance from creature edge."""
@@ -193,7 +194,7 @@ class TestPelletGeneration:
         radii = calculate_creature_xz_radius(batch)
         indices = torch.zeros(1, dtype=torch.long)
 
-        positions = generate_pellet_positions(batch, indices, radii, seed=42)
+        positions, _ = generate_pellet_positions(batch, indices, radii, seed=42)
 
         # Get creature COM
         com = get_center_of_mass(batch)
@@ -219,7 +220,7 @@ class TestPelletGeneration:
         heights = []
         for idx in range(5):
             indices = torch.tensor([idx], dtype=torch.long)
-            positions = generate_pellet_positions(batch, indices, radii, seed=42+idx)
+            positions, _ = generate_pellet_positions(batch, indices, radii, seed=42+idx)
             heights.append(positions[0, 1].item())
 
         # Heights should increase
@@ -239,6 +240,8 @@ class TestPelletGeneration:
         assert not pellets.collected[0].item()
         assert pellets.total_collected[0].item() == 0
         assert pellets.initial_distances[0].item() > 0
+        # Last pellet angles should be set (not NaN after first spawn)
+        assert not torch.isnan(pellets.last_pellet_angles[0])
 
 
 # =============================================================================
@@ -310,7 +313,9 @@ class TestPelletCollision:
         # Move pellet to very close to first node
         pellets.positions[0] = batch.positions[0, 0].clone()
 
-        collected = check_pellet_collisions(batch, pellets, collection_radius=0.5)
+        # Collection radius is now based on node size: size*0.5 + 0.35
+        # For size 0.5: 0.25 + 0.35 = 0.6
+        collected = check_pellet_collisions(batch, pellets)
 
         assert collected[0].item()
 
@@ -453,22 +458,26 @@ class TestFitnessState:
         """Initialize fitness state should set up tracking."""
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
+        pellets = initialize_pellets(batch, seed=42)
 
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
 
         assert state.batch_size == 1
         assert state.distance_traveled[0].item() == 0
         assert not state.disqualified[0].item()
+        # Closest edge distance should be initialized
+        assert state.closest_edge_distance[0].item() > 0
 
     def test_update_fitness_state_tracks_distance(self):
         """Update should track distance traveled."""
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
-        state = initialize_fitness_state(batch)
+        pellets = initialize_pellets(batch, seed=42)
+        state = initialize_fitness_state(batch, pellets)
 
         # Move creature
         batch.positions[0, :, 0] += 5.0  # Move in X
-        update_fitness_state(batch, state)
+        update_fitness_state(batch, state, pellets)
 
         # Distance should increase
         assert state.distance_traveled[0].item() > 0
@@ -487,7 +496,7 @@ class TestFitnessCalculation:
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
 
         fitness = calculate_fitness(batch, pellets, state, simulation_time=0.0)
 
@@ -499,7 +508,7 @@ class TestFitnessCalculation:
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
 
         # Get initial fitness
         initial_fitness = calculate_fitness(batch, pellets, state, simulation_time=1.0)
@@ -511,7 +520,7 @@ class TestFitnessCalculation:
         batch.positions[0, :, 2] += direction[1] * 3.0
 
         # Update state
-        update_fitness_state(batch, state)
+        update_fitness_state(batch, state, pellets)
 
         # Get new fitness
         new_fitness = calculate_fitness(batch, pellets, state, simulation_time=1.0)
@@ -523,7 +532,7 @@ class TestFitnessCalculation:
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
         config = FitnessConfig(pellet_points=100.0)
 
         # Collect pellet
@@ -539,7 +548,7 @@ class TestFitnessCalculation:
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
 
         # Collect a pellet first
         pellets.total_collected[0] = 3
@@ -550,6 +559,57 @@ class TestFitnessCalculation:
         fitness = calculate_fitness(batch, pellets, state, simulation_time=1.0)
 
         assert fitness[0].item() == 0
+
+    def test_regression_penalty_after_collection(self):
+        """Should penalize moving away from pellet after collecting one."""
+        genome = make_simple_creature()
+        batch = creature_genomes_to_batch([genome])
+        pellets = initialize_pellets(batch, seed=42)
+        state = initialize_fitness_state(batch, pellets)
+        config = FitnessConfig(regression_penalty=20.0)
+
+        # Simulate collecting first pellet (total > 0 enables regression penalty)
+        pellets.total_collected[0] = 1
+
+        # Move toward pellet first to set closest distance
+        direction = pellets.positions[0, [0, 2]] - get_center_of_mass(batch)[0, [0, 2]]
+        direction = direction / torch.norm(direction)
+        batch.positions[0, :, 0] += direction[0] * 2.0
+        batch.positions[0, :, 2] += direction[1] * 2.0
+        update_fitness_state(batch, state, pellets)
+
+        fitness_at_closest = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
+
+        # Now move away from pellet
+        batch.positions[0, :, 0] -= direction[0] * 3.0
+        batch.positions[0, :, 2] -= direction[1] * 3.0
+        update_fitness_state(batch, state, pellets)
+
+        fitness_after_regression = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
+
+        # Fitness should be lower due to regression penalty
+        assert fitness_after_regression[0].item() < fitness_at_closest[0].item()
+
+    def test_displacement_bonus_only_after_settling(self):
+        """Displacement bonus should only apply after 0.5s settling period."""
+        genome = make_simple_creature()
+        batch = creature_genomes_to_batch([genome])
+        pellets = initialize_pellets(batch, seed=42)
+        state = initialize_fitness_state(batch, pellets)
+        config = FitnessConfig(net_displacement_max=15.0)
+
+        # Move creature significantly
+        batch.positions[0, :, 0] += 10.0
+        update_fitness_state(batch, state, pellets)
+
+        # Fitness at t=0.3 (before settling)
+        fitness_early = calculate_fitness(batch, pellets, state, simulation_time=0.3, config=config)
+
+        # Fitness at t=1.0 (after settling)
+        fitness_late = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
+
+        # Later fitness should include displacement bonus
+        assert fitness_late[0].item() > fitness_early[0].item()
 
 
 # =============================================================================
@@ -576,7 +636,7 @@ class TestEdgeCases:
         """Empty batch should return empty fitness."""
         batch = creature_genomes_to_batch([])
         pellets = initialize_pellets(batch)
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
         fitness = calculate_fitness(batch, pellets, state, simulation_time=1.0)
         assert fitness.shape == (0,)
 
@@ -585,7 +645,7 @@ class TestEdgeCases:
         genomes = [make_simple_creature("g1"), make_simple_creature("g2")]
         batch = creature_genomes_to_batch(genomes)
         pellets = initialize_pellets(batch, seed=42)
-        state = initialize_fitness_state(batch)
+        state = initialize_fitness_state(batch, pellets)
 
         # Collect pellet for first creature only
         pellets.total_collected[0] = 1
