@@ -185,57 +185,41 @@ export class RemoteStorage {
     });
   }
 
-  async loadGeneration(runId: string, gen: number, config?: SimulationConfig): Promise<CreatureSimulationResult[] | null> {
+  async loadGeneration(runId: string, gen: number, _config?: SimulationConfig): Promise<CreatureSimulationResult[] | null> {
     try {
       const { creatures } = await Api.getGeneration(runId, gen);
 
-      const simConfig = config || DEFAULT_CONFIG;
-
       // Convert API creatures to CreatureSimulationResult
-      const results: CreatureSimulationResult[] = await Promise.all(
-        creatures.map(async (c) => {
-          const genome = Api.fromApiGenome(c.genome);
+      // NOTE: Frames are NOT loaded here - they are loaded lazily when replay modal opens
+      // This avoids N+1 queries (100 individual frame requests)
+      const results: CreatureSimulationResult[] = creatures.map((c) => {
+        const genome = Api.fromApiGenome(c.genome);
 
-          // Try to load frames if available
-          let frames: SimulationFrame[] = [];
-          let pellets: PelletData[] = [];
+        // Store creature ID in genome for later frame loading
+        genome._apiCreatureId = c.id;
 
-          try {
-            const framesData = await Api.getCreatureFrames(c.id);
-            if (framesData.frames_data && framesData.frames_data.length > 0) {
-              frames = this.expandFrames(framesData.frames_data, genome);
-            }
-          } catch {
-            // Frames not available, create empty
-          }
+        // Create dummy pellet data
+        const pellets: PelletData[] = Array.from({ length: c.pellets_collected }, (_, i) => ({
+          id: `pellet_${i}`,
+          position: { x: 0, y: 0, z: 0 },
+          collectedAtFrame: null,
+          spawnedAtFrame: 0,
+          initialDistance: 5
+        }));
 
-          // Create dummy pellet data (backend doesn't store full pellet history yet)
-          pellets = Array.from({ length: c.pellets_collected }, (_, i) => ({
-            id: `pellet_${i}`,
-            position: { x: 0, y: 0, z: 0 },
-            collectedAtFrame: null,
-            spawnedAtFrame: 0,
-            initialDistance: 5
-          }));
-
-          const fitnessOverTime = frames.length > 0
-            ? recalculateFitnessOverTime(frames, pellets, simConfig, c.disqualified_reason)
-            : [];
-
-          return {
-            genome,
-            frames,
-            finalFitness: c.fitness,
-            pelletsCollected: c.pellets_collected,
-            distanceTraveled: 0,
-            netDisplacement: 0,
-            closestPelletDistance: 0,
-            pellets,
-            fitnessOverTime,
-            disqualified: c.disqualified_reason as DisqualificationReason
-          };
-        })
-      );
+        return {
+          genome,
+          frames: [], // Empty - loaded on demand via loadCreatureFrames
+          finalFitness: c.fitness,
+          pelletsCollected: c.pellets_collected,
+          distanceTraveled: 0,
+          netDisplacement: 0,
+          closestPelletDistance: 0,
+          pellets,
+          fitnessOverTime: [], // Calculated when frames are loaded
+          disqualified: c.disqualified_reason as DisqualificationReason
+        };
+      });
 
       return results;
     } catch (error) {
@@ -244,10 +228,116 @@ export class RemoteStorage {
     }
   }
 
+  /**
+   * Load frames for a specific creature (on-demand, for replay)
+   */
+  async loadCreatureFrames(
+    creatureId: string,
+    genome: { nodes: { id: string }[] },
+    pelletsCollected: number,
+    config: SimulationConfig,
+    disqualified: string | null
+  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[] }> {
+    try {
+      const framesData = await Api.getCreatureFrames(creatureId);
+      if (!framesData.frames_data || framesData.frames_data.length === 0) {
+        return { frames: [], fitnessOverTime: [] };
+      }
+
+      const frames = this.expandFrames(framesData.frames_data, genome);
+
+      // Create pellet data for fitness calculation
+      const pellets: PelletData[] = Array.from({ length: pelletsCollected }, (_, i) => ({
+        id: `pellet_${i}`,
+        position: { x: 0, y: 0, z: 0 },
+        collectedAtFrame: null,
+        spawnedAtFrame: 0,
+        initialDistance: 5
+      }));
+
+      const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, config, disqualified);
+
+      return { frames, fitnessOverTime };
+    } catch (error) {
+      console.error('[RemoteStorage] Failed to load creature frames:', error);
+      return { frames: [], fitnessOverTime: [] };
+    }
+  }
+
   async getRun(runId: string): Promise<SavedRun | null> {
     try {
-      const apiRun = await Api.getRun(runId);
-      return apiRunToSavedRun(apiRun);
+      // Fetch run data and fitness history in parallel
+      const [apiRun, fitnessHistory, creatureTypesHistory] = await Promise.all([
+        Api.getRun(runId),
+        Api.getFitnessHistory(runId).catch(() => []),
+        Api.getCreatureTypesHistory(runId).catch(() => []),
+      ]);
+
+      const run = apiRunToSavedRun(apiRun);
+
+      // Add fitness history from API
+      run.fitnessHistory = fitnessHistory.map(entry => ({
+        generation: entry.generation,
+        best: entry.best,
+        average: entry.avg,
+        worst: entry.worst,
+      }));
+
+      // Add creature type history from API
+      run.creatureTypeHistory = creatureTypesHistory.map(entry => ({
+        generation: entry.generation,
+        nodeCountDistribution: Object.entries(entry.types).map(([nodeCount, count]) => [
+          parseInt(nodeCount),
+          count,
+        ]) as [number, number][],
+      }));
+
+      // Fetch best creature if available
+      if (apiRun.best_creature_id) {
+        try {
+          const bestCreature = await Api.getCreature(apiRun.best_creature_id);
+          const genome = Api.fromApiGenome(bestCreature.genome);
+          genome._apiCreatureId = bestCreature.id;
+          run.bestCreature = {
+            result: {
+              genome,
+              fitness: bestCreature.fitness,
+              pellets: bestCreature.pellets_collected,
+              disqualified: bestCreature.disqualified_reason,
+              frames: [], // Loaded lazily
+              pelletData: [],
+            },
+            generation: apiRun.best_creature_generation ?? 0,
+          };
+        } catch (e) {
+          console.warn('[RemoteStorage] Failed to fetch best creature:', e);
+        }
+      }
+
+      // Fetch longest survivor if available
+      if (apiRun.longest_survivor_id) {
+        try {
+          const longestSurvivor = await Api.getCreature(apiRun.longest_survivor_id);
+          const genome = Api.fromApiGenome(longestSurvivor.genome);
+          genome._apiCreatureId = longestSurvivor.id;
+          run.longestSurvivor = {
+            result: {
+              genome,
+              fitness: longestSurvivor.fitness,
+              pellets: longestSurvivor.pellets_collected,
+              disqualified: longestSurvivor.disqualified_reason,
+              frames: [], // Loaded lazily
+              pelletData: [],
+            },
+            generations: apiRun.longest_survivor_streak,
+            diedAtGeneration: apiRun.longest_survivor_generation ?? 0,
+          };
+        } catch (e) {
+          console.warn('[RemoteStorage] Failed to fetch longest survivor:', e);
+        }
+      }
+
+      return run;
     } catch {
       return null;
     }
@@ -256,6 +346,7 @@ export class RemoteStorage {
   async getAllRuns(): Promise<SavedRun[]> {
     try {
       const apiRuns = await Api.listRuns();
+      // For list view, we don't need full fitness history
       return apiRuns.map(apiRunToSavedRun);
     } catch (error) {
       console.error('[RemoteStorage] Failed to list runs:', error);

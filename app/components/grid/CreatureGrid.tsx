@@ -136,7 +136,9 @@ export function CreatureGrid() {
 
   const handleCardClick = (result: CreatureSimulationResult) => {
     // Don't allow replay for disqualified creatures
-    if (result.frames.length > 0 && !result.disqualified) {
+    // Allow click if frames are available OR if we can load them lazily (has API creature ID)
+    const hasFramesOrCanLoad = result.frames.length > 0 || result.genome._apiCreatureId;
+    if (hasFramesOrCanLoad && !result.disqualified) {
       setReplayResult(result);
     }
   };

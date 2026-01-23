@@ -6,8 +6,9 @@
  */
 
 import { RemoteStorage } from '../storage/RemoteStorage';
-import type { CreatureSimulationResult } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult, SimulationFrame } from '../simulation/BatchSimulator';
 import type { SimulationConfig, FitnessHistoryEntry } from '../types/simulation';
+import type { CreatureGenome } from '../types/genome';
 import type { SavedRun, CompactCreatureResult } from '../storage/types';
 
 export interface CreatureTypeHistoryEntry {
@@ -175,6 +176,20 @@ export function compactCreatureResult(
   result: CreatureSimulationResult
 ): CompactCreatureResult {
   return storage.compactCreatureResult(result);
+}
+
+/**
+ * Load frames for a specific creature (on-demand, for replay)
+ * This is called lazily when opening the replay modal, not when loading generations.
+ */
+export async function loadCreatureFrames(
+  creatureId: string,
+  genome: CreatureGenome,
+  pelletsCollected: number,
+  config: SimulationConfig,
+  disqualified: string | null
+): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[] }> {
+  return storage.loadCreatureFrames(creatureId, genome, pelletsCollected, config, disqualified);
 }
 
 /**

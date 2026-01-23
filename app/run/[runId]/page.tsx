@@ -6,6 +6,7 @@ import { useEvolutionStore } from '../../stores/evolutionStore';
 import { useSimulation } from '../../hooks/useSimulation';
 import { GridView } from '../../components/grid';
 import { Notification } from '../../components/ui/Notification';
+import * as StorageService from '../../../src/services/StorageService';
 
 /**
  * Dynamic route page for loading a specific run.
@@ -27,6 +28,17 @@ export default function RunPage() {
   useEffect(() => {
     if (!runId) {
       setError('No run ID provided');
+      setLoading(false);
+      return;
+    }
+
+    // Check if data is already loaded for this run (e.g., after startSimulation)
+    const currentRunId = StorageService.getCurrentRunId();
+    const simulationResults = useEvolutionStore.getState().simulationResults;
+
+    if (currentRunId === runId && simulationResults.length > 0) {
+      // Data already in memory from startSimulation, no need to reload
+      console.log('[RunPage] Data already in memory, skipping reload');
       setLoading(false);
       return;
     }

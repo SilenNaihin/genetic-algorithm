@@ -586,6 +586,31 @@ export async function getCreatureFrames(
 }
 
 // -------------------------------------------------------------------
+// Fitness History API
+// -------------------------------------------------------------------
+
+export interface ApiFitnessHistoryEntry {
+  generation: number;
+  best: number;
+  avg: number;
+  worst: number;
+  median: number;
+}
+
+export async function getFitnessHistory(runId: string): Promise<ApiFitnessHistoryEntry[]> {
+  return fetchJson<ApiFitnessHistoryEntry[]>(`/api/runs/${runId}/generations/fitness-history`);
+}
+
+export interface ApiCreatureTypesEntry {
+  generation: number;
+  types: Record<string, number>;
+}
+
+export async function getCreatureTypesHistory(runId: string): Promise<ApiCreatureTypesEntry[]> {
+  return fetchJson<ApiCreatureTypesEntry[]>(`/api/runs/${runId}/generations/creature-types-history`);
+}
+
+// -------------------------------------------------------------------
 // Health check
 // -------------------------------------------------------------------
 

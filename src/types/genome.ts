@@ -71,6 +71,9 @@ export interface CreatureGenome {
 
   // Visual
   color: HSL;
+
+  // Internal: API creature ID for lazy frame loading (not saved to storage)
+  _apiCreatureId?: string;
 }
 
 // Creature constraints configuration

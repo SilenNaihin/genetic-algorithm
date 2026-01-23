@@ -9,6 +9,7 @@ import { NeuralVisualizer } from '../../../src/ui/NeuralVisualizer';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, NEURAL_INPUT_SIZE_PURE } from '../../../src/neural';
 import * as StorageService from '../../../src/services/StorageService';
 import type { CreatureGenome } from '../../../src/types';
+import type { CreatureSimulationResult } from '../../../src/simulation/BatchSimulator';
 
 // Sensor names for neural info display
 const SENSOR_NAMES = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist', 'time'];
@@ -60,21 +61,71 @@ export function ReplayModal() {
   const [familyTreeLoading, setFamilyTreeLoading] = useState(false);
   const startTimeRef = useRef<number>(0);
 
-  const isOpen = replayResult !== null;
-  const totalFrames = replayResult?.frames.length ?? 0;
-  const totalDuration = replayResult?.frames[totalFrames - 1]?.time ?? 0;
+  // Lazy frame loading state
+  const [framesLoading, setFramesLoading] = useState(false);
+  const [loadedResult, setLoadedResult] = useState<CreatureSimulationResult | null>(null);
 
-  // Initialize renderer when modal opens
+  const isOpen = replayResult !== null;
+
+  // Load frames lazily when modal opens with empty frames
   useEffect(() => {
-    if (!isOpen || !containerRef.current) return;
+    if (!replayResult) {
+      setLoadedResult(null);
+      return;
+    }
+
+    // If frames are already loaded, use them directly
+    if (replayResult.frames.length > 0) {
+      setLoadedResult(replayResult);
+      return;
+    }
+
+    // Need to load frames from backend
+    const creatureId = replayResult.genome._apiCreatureId;
+    if (!creatureId) {
+      // No API creature ID - this is a fresh simulation result, use as is
+      setLoadedResult(replayResult);
+      return;
+    }
+
+    // Load frames lazily
+    setFramesLoading(true);
+    setLoadedResult(null);
+
+    StorageService.loadCreatureFrames(
+      creatureId,
+      replayResult.genome,
+      replayResult.pelletsCollected,
+      config,
+      replayResult.disqualified
+    ).then(({ frames, fitnessOverTime }) => {
+      setLoadedResult({
+        ...replayResult,
+        frames,
+        fitnessOverTime,
+      });
+      setFramesLoading(false);
+    }).catch((error) => {
+      console.error('[ReplayModal] Failed to load frames:', error);
+      setLoadedResult(replayResult); // Use result without frames
+      setFramesLoading(false);
+    });
+  }, [replayResult, config]);
+
+  const totalFrames = loadedResult?.frames.length ?? 0;
+  const totalDuration = loadedResult?.frames[totalFrames - 1]?.time ?? 0;
+
+  // Initialize renderer when modal opens and frames are loaded
+  useEffect(() => {
+    if (!isOpen || !containerRef.current || !loadedResult) return;
 
     // Create renderer
     const renderer = new ReplayRenderer(containerRef.current);
     rendererRef.current = renderer;
 
-    // Load result
-    if (replayResult) {
-      renderer.loadResult(replayResult);
+    // Load result only when frames are available
+    if (loadedResult.frames.length > 0) {
+      renderer.loadResult(loadedResult);
       setCurrentFrame(0);
       setIsPlaying(true);
       setSpeed(1);
@@ -89,13 +140,13 @@ export function ReplayModal() {
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [isOpen, replayResult]);
+  }, [isOpen, loadedResult]);
 
   // Initialize neural visualizer
   useEffect(() => {
-    if (!isOpen || !replayResult || !neuralVizContainerRef.current) return;
+    if (!isOpen || !loadedResult || !neuralVizContainerRef.current) return;
 
-    const genome = replayResult.genome;
+    const genome = loadedResult.genome;
 
     // Dispose existing visualizer
     if (neuralVisualizerRef.current) {
@@ -133,7 +184,7 @@ export function ReplayModal() {
         neuralVisualizerRef.current = null;
       }
     };
-  }, [isOpen, replayResult]);
+  }, [isOpen, loadedResult]);
 
   // Build family tree
   const buildFamilyTree = useCallback(async (genome: CreatureGenome) => {
@@ -198,16 +249,16 @@ export function ReplayModal() {
 
   // Rebuild family tree when lineage mode changes
   useEffect(() => {
-    if (isOpen && replayResult) {
-      buildFamilyTree(replayResult.genome);
+    if (isOpen && loadedResult) {
+      buildFamilyTree(loadedResult.genome);
     }
-  }, [isOpen, replayResult, lineageMode, buildFamilyTree]);
+  }, [isOpen, loadedResult, lineageMode, buildFamilyTree]);
 
   // Animation loop - uses simulation time like vanilla app
   useEffect(() => {
-    if (!isOpen || !isPlaying || !replayResult || !rendererRef.current) return;
+    if (!isOpen || !isPlaying || !loadedResult || !rendererRef.current) return;
 
-    const frames = replayResult.frames;
+    const frames = loadedResult.frames;
     if (frames.length === 0) return;
 
     const totalDurationMs = frames[frames.length - 1].time * 1000;
@@ -237,18 +288,18 @@ export function ReplayModal() {
 
       // Update state and render
       setCurrentFrame(frameIndex);
-      const fitness = replayResult.fitnessOverTime[frameIndex] || 0;
+      const fitness = loadedResult.fitnessOverTime[frameIndex] || 0;
       setCurrentFitness(fitness);
       rendererRef.current?.renderFrame(frames[frameIndex], frameIndex);
 
       // Update neural visualization if creature has neural genome
-      const genome = replayResult.genome;
+      const genome = loadedResult.genome;
       if (neuralVisualizerRef.current && genome.neuralGenome && genome.controllerType === 'neural') {
         const frame = frames[frameIndex];
         const com = frame.centerOfMass;
 
         // Find active pellet at this frame
-        const activePelletData = replayResult.pellets.find((p) =>
+        const activePelletData = loadedResult.pellets.find((p) =>
           p.spawnedAtFrame <= frameIndex &&
           (p.collectedAtFrame === null || frameIndex < p.collectedAtFrame)
         );
@@ -301,7 +352,7 @@ export function ReplayModal() {
         animationRef.current = null;
       }
     };
-  }, [isOpen, isPlaying, replayResult, speed]);
+  }, [isOpen, isPlaying, loadedResult, speed]);
 
   const handleClose = () => {
     setReplayResult(null);
@@ -315,17 +366,17 @@ export function ReplayModal() {
 
   const handleSpeedChange = (newSpeed: number) => {
     // Preserve current position when changing speed
-    if (replayResult && replayResult.frames.length > 0) {
-      const currentTime = replayResult.frames[currentFrame]?.time || 0;
+    if (loadedResult && loadedResult.frames.length > 0) {
+      const currentTime = loadedResult.frames[currentFrame]?.time || 0;
       startTimeRef.current = performance.now() - (currentTime * 1000 / newSpeed);
     }
     setSpeed(newSpeed);
   };
 
   const handleTogglePlay = () => {
-    if (!isPlaying && replayResult && replayResult.frames.length > 0) {
+    if (!isPlaying && loadedResult && loadedResult.frames.length > 0) {
       // Resume from current position
-      const currentTime = replayResult.frames[currentFrame]?.time || 0;
+      const currentTime = loadedResult.frames[currentFrame]?.time || 0;
       startTimeRef.current = performance.now() - (currentTime * 1000 / speed);
     }
     setIsPlaying(!isPlaying);
@@ -340,15 +391,33 @@ export function ReplayModal() {
 
   if (!replayResult) return null;
 
-  const genome = replayResult.genome;
+  // Show loading state while frames are being fetched
+  if (framesLoading || !loadedResult) {
+    return (
+      <Modal isOpen={isOpen} onClose={() => setReplayResult(null)} title="Simulation Replay" maxWidth="600px">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '300px',
+          color: 'var(--text-muted)',
+          fontSize: '16px',
+        }}>
+          Loading replay data...
+        </div>
+      </Modal>
+    );
+  }
+
+  const genome = loadedResult.genome;
   const hasNeuralGenome = genome.neuralGenome && genome.controllerType === 'neural';
 
   // Calculate max fitness from fitnessOverTime for progress bar scaling
-  const maxFitness = Math.max(...(replayResult.fitnessOverTime || [0]), 0.1);
+  const maxFitness = Math.max(...(loadedResult.fitnessOverTime || [0]), 0.1);
   const fitnessProgress = Math.min(100, (currentFitness / maxFitness) * 100);
 
   // Get current time from frame
-  const currentTime = replayResult.frames[currentFrame]?.time || 0;
+  const currentTime = loadedResult.frames[currentFrame]?.time || 0;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Simulation Replay" maxWidth="1100px">
@@ -449,7 +518,7 @@ export function ReplayModal() {
               Gen {genome.generation} | Nodes: <strong>{genome.nodes.length}</strong> | Muscles:{' '}
               <strong>{genome.muscles.length}</strong> | Pellets:{' '}
               <strong>
-                {replayResult.pelletsCollected}/{replayResult.pellets.length}
+                {loadedResult.pelletsCollected}/{loadedResult.pellets.length}
               </strong>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useEvolutionStore } from '../../stores/evolutionStore';
 import { ControlPanel } from './ControlPanel';
 import { StatsPanel } from './StatsPanel';
@@ -19,8 +20,18 @@ import { GenerationJumpModal } from '../modals/GenerationJumpModal';
 export function GridView() {
   const simulationProgress = useEvolutionStore((s) => s.simulationProgress);
 
-  // Show progress bar only when simulation is actively running (has progress)
-  const isSimulationRunning = simulationProgress !== null;
+  // Only show progress bar after a delay to avoid flashing for instant operations
+  const [showProgress, setShowProgress] = useState(false);
+
+  useEffect(() => {
+    if (simulationProgress !== null) {
+      // Show progress bar after 50ms delay (avoid flash for very fast operations)
+      const timer = setTimeout(() => setShowProgress(true), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setShowProgress(false);
+    }
+  }, [simulationProgress]);
 
   // Calculate progress percentage
   const progressPercent = simulationProgress
@@ -47,8 +58,8 @@ export function GridView() {
       {/* Control Panel - Bottom Left (fixed) */}
       <ControlPanel />
 
-      {/* Progress Bar - shown during active simulation */}
-      {isSimulationRunning && (
+      {/* Progress Bar - shown during active simulation (with delay to avoid flash) */}
+      {showProgress && simulationProgress && (
         <div
           className="progress-container glass"
           style={{

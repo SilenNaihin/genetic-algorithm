@@ -213,9 +213,11 @@ def generate_pellet_positions(
     px = com[:, 0] + torch.cos(angles) * total_dist
     pz = com[:, 2] + torch.sin(angles) * total_dist
 
-    # Height increases with pellet index
-    base_height = 0.3
-    height_increment = 0.4
+    # Height increases with pellet index, with random variation
+    # Base height: 0.5-1.0 (always above ground)
+    # Additional height per pellet collected: 0.3
+    base_height = 0.5 + torch.rand(B, device=device) * 0.5  # Random 0.5-1.0
+    height_increment = 0.3
     py = base_height + pellet_indices.float() * height_increment
 
     # Clamp to arena bounds

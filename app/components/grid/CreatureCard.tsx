@@ -86,7 +86,10 @@ export function CreatureCard({
   };
 
   const handleClick = () => {
-    if (!isDisqualified && result.frames.length > 0) {
+    // Allow click if not disqualified - frames will be loaded lazily in ReplayModal
+    // Also allow if frames already available (fresh simulation)
+    const hasFramesOrCanLoad = result.frames.length > 0 || result.genome._apiCreatureId;
+    if (!isDisqualified && hasFramesOrCanLoad) {
       onClick?.();
     }
   };

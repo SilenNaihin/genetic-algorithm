@@ -113,9 +113,18 @@ async def save_generation(
     db.add(generation)
     await db.flush()
 
+    # Track best creature and longest survivor for this generation
+    gen_best_creature_id = None
+    gen_best_fitness = run.best_fitness or 0.0
+    gen_longest_survivor_id = None
+    gen_longest_streak = run.longest_survivor_streak or 0
+
     # Create creature records
     for c in data.creatures:
         creature_id = str(uuid.uuid4())
+
+        # Get survival streak from genome
+        survival_streak = c.genome.get("survival_streak", c.genome.get("survivalStreak", 0))
 
         creature = Creature(
             id=creature_id,
@@ -126,8 +135,19 @@ async def save_generation(
             pellets_collected=c.pellets_collected,
             disqualified=c.disqualified,
             disqualified_reason=c.disqualified_reason,
+            survival_streak=survival_streak,
         )
         db.add(creature)
+
+        # Track best creature (only non-disqualified)
+        if not c.disqualified and c.fitness > gen_best_fitness:
+            gen_best_fitness = c.fitness
+            gen_best_creature_id = creature_id
+
+        # Track longest survivor
+        if survival_streak > gen_longest_streak:
+            gen_longest_streak = survival_streak
+            gen_longest_survivor_id = creature_id
 
         # Save frames if provided
         if c.frames and len(c.frames) > 0:
@@ -150,8 +170,18 @@ async def save_generation(
             )
             db.add(frame_record)
 
-    # Update run's generation count
+    # Update run's generation count and best creature/longest survivor
     run.generation_count = max(run.generation_count, data.generation + 1)
+
+    if gen_best_creature_id:
+        run.best_fitness = gen_best_fitness
+        run.best_creature_id = gen_best_creature_id
+        run.best_creature_generation = data.generation
+
+    if gen_longest_survivor_id:
+        run.longest_survivor_streak = gen_longest_streak
+        run.longest_survivor_id = gen_longest_survivor_id
+        run.longest_survivor_generation = data.generation
 
     await db.commit()
 
@@ -211,6 +241,57 @@ async def list_generations(
         response.append(GenerationRead(**gen_dict))
 
     return response
+
+
+# NOTE: These routes MUST be defined BEFORE /{generation} to avoid path conflicts
+@router.get("/fitness-history")
+async def get_fitness_history(
+    run_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get fitness history for graphing."""
+    result = await db.execute(
+        select(
+            Generation.generation,
+            Generation.best_fitness,
+            Generation.avg_fitness,
+            Generation.worst_fitness,
+            Generation.median_fitness,
+        )
+        .where(Generation.run_id == run_id)
+        .order_by(Generation.generation)
+    )
+    rows = result.all()
+
+    return [
+        {
+            "generation": row.generation,
+            "best": row.best_fitness,
+            "avg": row.avg_fitness,
+            "worst": row.worst_fitness,
+            "median": row.median_fitness,
+        }
+        for row in rows
+    ]
+
+
+@router.get("/creature-types-history")
+async def get_creature_types_history(
+    run_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get creature type distribution history for graphing."""
+    result = await db.execute(
+        select(Generation.generation, Generation.creature_types)
+        .where(Generation.run_id == run_id)
+        .order_by(Generation.generation)
+    )
+    rows = result.all()
+
+    return [
+        {"generation": row.generation, "types": row.creature_types}
+        for row in rows
+    ]
 
 
 @router.get("/{generation}", response_model=GenerationRead)
@@ -284,53 +365,3 @@ async def get_generation_creatures(
         response.append(creature_dict)
 
     return response
-
-
-@router.get("/fitness-history")
-async def get_fitness_history(
-    run_id: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Get fitness history for graphing."""
-    result = await db.execute(
-        select(
-            Generation.generation,
-            Generation.best_fitness,
-            Generation.avg_fitness,
-            Generation.worst_fitness,
-            Generation.median_fitness,
-        )
-        .where(Generation.run_id == run_id)
-        .order_by(Generation.generation)
-    )
-    rows = result.all()
-
-    return [
-        {
-            "generation": row.generation,
-            "best": row.best_fitness,
-            "avg": row.avg_fitness,
-            "worst": row.worst_fitness,
-            "median": row.median_fitness,
-        }
-        for row in rows
-    ]
-
-
-@router.get("/creature-types-history")
-async def get_creature_types_history(
-    run_id: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Get creature type distribution history for graphing."""
-    result = await db.execute(
-        select(Generation.generation, Generation.creature_types)
-        .where(Generation.run_id == run_id)
-        .order_by(Generation.generation)
-    )
-    rows = result.all()
-
-    return [
-        {"generation": row.generation, "types": row.creature_types}
-        for row in rows
-    ]

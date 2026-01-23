@@ -270,7 +270,8 @@ export function StatsPanel() {
           </div>
           <div
             onClick={() => {
-              if (longestSurvivingCreature.frames.length > 0 && !longestSurvivingCreature.disqualified) {
+              const hasFramesOrCanLoad = longestSurvivingCreature.frames.length > 0 || longestSurvivingCreature.genome._apiCreatureId;
+              if (hasFramesOrCanLoad && !longestSurvivingCreature.disqualified) {
                 setReplayResult(longestSurvivingCreature);
               }
             }}
@@ -346,7 +347,8 @@ export function StatsPanel() {
           </div>
           <div
             onClick={() => {
-              if (bestCreatureEver.frames.length > 0 && !bestCreatureEver.disqualified) {
+              const hasFramesOrCanLoad = bestCreatureEver.frames.length > 0 || bestCreatureEver.genome._apiCreatureId;
+              if (hasFramesOrCanLoad && !bestCreatureEver.disqualified) {
                 setReplayResult(bestCreatureEver);
               }
             }}

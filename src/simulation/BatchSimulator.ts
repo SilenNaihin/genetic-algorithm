@@ -54,10 +54,12 @@ function generatePelletPosition(
   creaturePosition: Vector3,
   creatureXZRadius: number  // XZ-only radius (ground footprint)
 ): Vector3 {
-  // Height increases with pellet index
-  const baseHeight = 0.3;
-  const heightIncrement = 0.4;
-  const height = pelletIndex === 0 ? baseHeight : baseHeight + pelletIndex * heightIncrement;
+  // Height increases with pellet index, with random variation
+  // Base height: 0.5-1.0 (always above ground)
+  // Additional height per pellet collected: 0.3
+  const baseHeight = 0.5 + Math.random() * 0.5;  // Random 0.5-1.0
+  const heightIncrement = 0.3;
+  const height = baseHeight + pelletIndex * heightIncrement;
 
   // Progressive distance FROM CREATURE'S EDGE (not center):
   // +4 buffer added to account for full muscle extension (chain of muscles can extend far)
