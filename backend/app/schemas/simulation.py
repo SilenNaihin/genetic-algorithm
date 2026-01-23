@@ -1,17 +1,96 @@
+"""
+API schemas for simulation endpoints.
+
+Matches the internal PyTorch simulation config (app/simulation/config.py)
+while providing Pydantic validation for API requests.
+"""
+
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.schemas.genome import CreatureGenome
 
 
 class SimulationConfig(BaseModel):
-    """Configuration for running a simulation."""
+    """
+    Configuration for running a simulation.
 
-    duration: float = Field(default=8.0, ge=1.0, le=60.0)
+    Matches TypeScript SimulationConfig interface.
+    All fields have sensible defaults so clients can omit most of them.
+    """
+
+    # Physics
+    gravity: float = Field(default=-9.8, ge=-30.0, le=-1.0)
+    ground_friction: float = Field(default=0.5, ge=0.3, le=1.0)
+    time_step: float = Field(default=1/60, ge=0.001, le=0.1)
+    simulation_duration: float = Field(default=10.0, ge=1.0, le=60.0)
+
+    # Evolution (not used in simulation, but included for parity)
+    population_size: int = Field(default=100, ge=10, le=10000)
+    cull_percentage: float = Field(default=0.5, ge=0.1, le=0.9)
+    mutation_rate: float = Field(default=0.1, ge=0.0, le=1.0)
+    mutation_magnitude: float = Field(default=0.3, ge=0.0, le=1.0)
+    crossover_rate: float = Field(default=0.5, ge=0.0, le=1.0)
+    elite_count: int = Field(default=5, ge=0, le=100)
+    use_mutation: bool = True
+    use_crossover: bool = True
+
+    # Creature constraints
+    min_nodes: int = Field(default=3, ge=2, le=20)
+    max_nodes: int = Field(default=8, ge=2, le=20)
+    max_muscles: int = Field(default=15, ge=1, le=50)
+    max_allowed_frequency: float = Field(default=3.0, ge=0.5, le=10.0)
+
+    # Environment
+    pellet_count: int = Field(default=3, ge=0, le=50)
+    arena_size: float = Field(default=10.0, ge=5.0, le=100.0)
+
+    # Fitness function weights
+    fitness_pellet_points: float = Field(default=100.0, ge=0.0)
+    fitness_progress_max: float = Field(default=80.0, ge=0.0)
+    fitness_net_displacement_max: float = Field(default=15.0, ge=0.0)
+    fitness_distance_per_unit: float = Field(default=3.0, ge=0.0)
+    fitness_distance_traveled_max: float = Field(default=15.0, ge=0.0)
+    fitness_regression_penalty: float = Field(default=20.0, ge=0.0)
+
+    # Neural network settings
+    use_neural_net: bool = True
+    neural_mode: Literal['hybrid', 'pure'] = 'hybrid'
+    neural_hidden_size: int = Field(default=8, ge=1, le=64)
+    neural_activation: str = Field(default='tanh')
+    weight_mutation_rate: float = Field(default=0.1, ge=0.0, le=1.0)
+    weight_mutation_magnitude: float = Field(default=0.3, ge=0.0, le=2.0)
+    weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'off'
+    neural_output_bias: float = Field(default=-0.5, ge=-2.0, le=0.0)
+    fitness_efficiency_penalty: float = Field(default=0.5, ge=0.0, le=5.0)
+    neural_dead_zone: float = Field(default=0.1, ge=0.0, le=1.0)
+
+    # Disqualification thresholds
+    position_threshold: float = Field(default=50.0, ge=10.0)
+    height_threshold: float = Field(default=30.0, ge=5.0)
+
+    # Internal settings
+    pellet_collection_radius: float = Field(default=0.75, ge=0.1, le=5.0)
+    max_pellet_distance: float = Field(default=20.0, ge=5.0, le=100.0)
+
+    # Frame recording
+    record_frames: bool = False
     frame_rate: int = Field(default=15, ge=1, le=60)
-    record_frames: bool = True
-    pellet_count: int = Field(default=5, ge=0, le=50)
-    ground_size: float = Field(default=30.0, ge=10.0, le=100.0)
-    max_allowed_frequency: float = Field(default=3.0, ge=1.0, le=10.0)
+
+    class Config:
+        extra = 'ignore'  # Ignore unknown fields for forward compatibility
+
+
+class FitnessBreakdown(BaseModel):
+    """Detailed breakdown of fitness components."""
+
+    pellet_points: float = 0.0
+    progress: float = 0.0
+    net_displacement: float = 0.0
+    distance_traveled: float = 0.0
+    regression_penalty: float = 0.0
+    efficiency_penalty: float = 0.0
 
 
 class SimulationResult(BaseModel):
@@ -23,9 +102,17 @@ class SimulationResult(BaseModel):
     disqualified: bool
     disqualified_reason: str | None = None
 
+    # Fitness breakdown (optional, for detailed analysis)
+    fitness_breakdown: FitnessBreakdown | None = None
+
+    # Movement metrics
+    net_displacement: float = 0.0
+    distance_traveled: float = 0.0
+    total_activation: float = 0.0  # For neural network efficiency
+
     # Frame data (only if record_frames=True)
     frame_count: int = 0
-    # Stored as compressed binary separately
+    frames: list | None = None  # Flattened frame data if requested
 
 
 class BatchSimulationRequest(BaseModel):

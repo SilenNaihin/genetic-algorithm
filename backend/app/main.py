@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import creatures, evolution, generations, runs, simulation
+from app.api import creatures, evolution, generations, genetics, runs, simulation
 from app.core.config import settings
 from app.core.database import engine, Base
 
@@ -41,6 +41,7 @@ app.include_router(generations.router, prefix="/api/runs/{run_id}/generations", 
 app.include_router(creatures.router, prefix="/api/creatures", tags=["creatures"])
 app.include_router(simulation.router, prefix="/api/simulation", tags=["simulation"])
 app.include_router(evolution.router, prefix="/api/evolution", tags=["evolution"])
+app.include_router(genetics.router, prefix="/api/genetics", tags=["genetics"])
 
 
 @app.get("/health")

@@ -209,23 +209,23 @@ def creature_genomes_to_batch(
             spring_phase[b, num_muscles] = muscle.get("phase", 0.0)
             spring_mask[b, num_muscles] = 1.0
 
-            # Direction bias (v1)
-            dir_bias = muscle.get("directionBias", muscle.get("direction_bias", {"x": 0, "y": 1, "z": 0}))
-            direction_bias[b, num_muscles, 0] = dir_bias.get("x", 0)
-            direction_bias[b, num_muscles, 1] = dir_bias.get("y", 1)
-            direction_bias[b, num_muscles, 2] = dir_bias.get("z", 0)
-            bias_strength[b, num_muscles] = muscle.get("biasStrength", muscle.get("bias_strength", 0))
+            # Direction bias (v1) - handle None values
+            dir_bias = muscle.get("directionBias") or muscle.get("direction_bias") or {"x": 0, "y": 1, "z": 0}
+            direction_bias[b, num_muscles, 0] = dir_bias.get("x", 0) if isinstance(dir_bias, dict) else 0
+            direction_bias[b, num_muscles, 1] = dir_bias.get("y", 1) if isinstance(dir_bias, dict) else 1
+            direction_bias[b, num_muscles, 2] = dir_bias.get("z", 0) if isinstance(dir_bias, dict) else 0
+            bias_strength[b, num_muscles] = muscle.get("biasStrength") or muscle.get("bias_strength") or 0
 
-            # Velocity sensing (v2)
-            vel_bias = muscle.get("velocityBias", muscle.get("velocity_bias", {"x": 0, "y": 1, "z": 0}))
-            velocity_bias[b, num_muscles, 0] = vel_bias.get("x", 0)
-            velocity_bias[b, num_muscles, 1] = vel_bias.get("y", 1)
-            velocity_bias[b, num_muscles, 2] = vel_bias.get("z", 0)
-            velocity_strength[b, num_muscles] = muscle.get("velocityStrength", muscle.get("velocity_strength", 0))
+            # Velocity sensing (v2) - handle None values
+            vel_bias = muscle.get("velocityBias") or muscle.get("velocity_bias") or {"x": 0, "y": 1, "z": 0}
+            velocity_bias[b, num_muscles, 0] = vel_bias.get("x", 0) if isinstance(vel_bias, dict) else 0
+            velocity_bias[b, num_muscles, 1] = vel_bias.get("y", 1) if isinstance(vel_bias, dict) else 1
+            velocity_bias[b, num_muscles, 2] = vel_bias.get("z", 0) if isinstance(vel_bias, dict) else 0
+            velocity_strength[b, num_muscles] = muscle.get("velocityStrength") or muscle.get("velocity_strength") or 0
 
-            # Distance awareness (v2)
-            distance_bias[b, num_muscles] = muscle.get("distanceBias", muscle.get("distance_bias", 0))
-            distance_strength[b, num_muscles] = muscle.get("distanceStrength", muscle.get("distance_strength", 0))
+            # Distance awareness (v2) - handle None values
+            distance_bias[b, num_muscles] = muscle.get("distanceBias") or muscle.get("distance_bias") or 0
+            distance_strength[b, num_muscles] = muscle.get("distanceStrength") or muscle.get("distance_strength") or 0
 
             num_muscles += 1
 

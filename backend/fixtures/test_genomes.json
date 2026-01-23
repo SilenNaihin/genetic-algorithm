@@ -1,0 +1,501 @@
+{
+  "description": "Test genomes for PyTorch physics validation against TypeScript/Cannon-ES",
+  "version": "1.0",
+  "genomes": [
+    {
+      "name": "simple_two_node",
+      "description": "Minimal creature with 2 nodes and 1 muscle - tests basic spring physics",
+      "genome": {
+        "id": "test_simple_two_node",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.3, "friction": 0.5, "position": {"x": 0.0, "y": 1.0, "z": 0.0}},
+          {"id": "n1", "size": 0.3, "friction": 0.5, "position": {"x": 1.0, "y": 1.0, "z": 0.0}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 1.0, "stiffness": 100.0, "damping": 1.0,
+            "frequency": 1.0, "amplitude": 0.3, "phase": 0.0,
+            "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.5, "s": 0.7, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Should oscillate horizontally, stay near origin"
+      }
+    },
+    {
+      "name": "triangle_crawler",
+      "description": "3-node triangle with oscillating muscles - classic crawler pattern",
+      "genome": {
+        "id": "test_triangle_crawler",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.4, "friction": 0.7, "position": {"x": 0.0, "y": 0.8, "z": 0.0}},
+          {"id": "n1", "size": 0.4, "friction": 0.7, "position": {"x": 1.0, "y": 0.8, "z": 0.0}},
+          {"id": "n2", "size": 0.3, "friction": 0.5, "position": {"x": 0.5, "y": 1.5, "z": 0.5}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 1.0, "stiffness": 150.0, "damping": 0.8,
+            "frequency": 1.5, "amplitude": 0.25, "phase": 0.0,
+            "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.3,
+            "velocityBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.2,
+            "distanceBias": 0.5, "distanceStrength": 0.2
+          },
+          {
+            "id": "m1", "nodeA": "n1", "nodeB": "n2",
+            "restLength": 0.9, "stiffness": 150.0, "damping": 0.8,
+            "frequency": 1.5, "amplitude": 0.25, "phase": 2.094,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.3,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "velocityStrength": 0.2,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m2", "nodeA": "n0", "nodeB": "n2",
+            "restLength": 0.9, "stiffness": 150.0, "damping": 0.8,
+            "frequency": 1.5, "amplitude": 0.25, "phase": 4.189,
+            "directionBias": {"x": -1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.3,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.2,
+            "distanceBias": -0.5, "distanceStrength": 0.2
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.3, "s": 0.8, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Should crawl in some direction due to phased oscillation"
+      }
+    },
+    {
+      "name": "high_frequency_jumper",
+      "description": "Fast oscillating creature that should jump/bounce",
+      "genome": {
+        "id": "test_high_freq_jumper",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.5, "friction": 0.3, "position": {"x": 0.0, "y": 0.6, "z": 0.0}},
+          {"id": "n1", "size": 0.5, "friction": 0.3, "position": {"x": 0.8, "y": 0.6, "z": 0.0}},
+          {"id": "n2", "size": 0.3, "friction": 0.3, "position": {"x": 0.4, "y": 1.5, "z": 0.0}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 0.8, "stiffness": 200.0, "damping": 0.5,
+            "frequency": 2.8, "amplitude": 0.35, "phase": 0.0,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3,
+            "distanceBias": 0.8, "distanceStrength": 0.3
+          },
+          {
+            "id": "m1", "nodeA": "n0", "nodeB": "n2",
+            "restLength": 1.0, "stiffness": 200.0, "damping": 0.5,
+            "frequency": 2.8, "amplitude": 0.35, "phase": 1.57,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3,
+            "distanceBias": 0.8, "distanceStrength": 0.3
+          },
+          {
+            "id": "m2", "nodeA": "n1", "nodeB": "n2",
+            "restLength": 1.0, "stiffness": 200.0, "damping": 0.5,
+            "frequency": 2.8, "amplitude": 0.35, "phase": 3.14,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3,
+            "distanceBias": 0.8, "distanceStrength": 0.3
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.1, "s": 0.9, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Should show vertical movement/bouncing behavior"
+      }
+    },
+    {
+      "name": "direction_biased_tracker",
+      "description": "Creature with strong direction bias - should move toward pellet",
+      "genome": {
+        "id": "test_direction_tracker",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.35, "friction": 0.6, "position": {"x": -0.5, "y": 0.7, "z": 0.0}},
+          {"id": "n1", "size": 0.35, "friction": 0.6, "position": {"x": 0.5, "y": 0.7, "z": 0.0}},
+          {"id": "n2", "size": 0.35, "friction": 0.6, "position": {"x": 0.0, "y": 0.7, "z": 0.7}},
+          {"id": "n3", "size": 0.25, "friction": 0.4, "position": {"x": 0.0, "y": 1.5, "z": 0.2}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 1.0, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.2, "amplitude": 0.2, "phase": 0.0,
+            "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.7,
+            "velocityBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.4,
+            "distanceBias": 0.6, "distanceStrength": 0.3
+          },
+          {
+            "id": "m1", "nodeA": "n1", "nodeB": "n2",
+            "restLength": 0.9, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.2, "amplitude": 0.2, "phase": 1.047,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "biasStrength": 0.7,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "velocityStrength": 0.4,
+            "distanceBias": 0.6, "distanceStrength": 0.3
+          },
+          {
+            "id": "m2", "nodeA": "n0", "nodeB": "n2",
+            "restLength": 0.9, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.2, "amplitude": 0.2, "phase": 2.094,
+            "directionBias": {"x": -1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.7,
+            "velocityBias": {"x": -1.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.4,
+            "distanceBias": 0.6, "distanceStrength": 0.3
+          },
+          {
+            "id": "m3", "nodeA": "n0", "nodeB": "n3",
+            "restLength": 0.9, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.2, "amplitude": 0.2, "phase": 3.14,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.5,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3,
+            "distanceBias": 0.3, "distanceStrength": 0.2
+          },
+          {
+            "id": "m4", "nodeA": "n1", "nodeB": "n3",
+            "restLength": 0.9, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.2, "amplitude": 0.2, "phase": 4.189,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.5,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3,
+            "distanceBias": 0.3, "distanceStrength": 0.2
+          },
+          {
+            "id": "m5", "nodeA": "n2", "nodeB": "n3",
+            "restLength": 0.85, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.2, "amplitude": 0.2, "phase": 5.236,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.5,
+            "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3,
+            "distanceBias": 0.3, "distanceStrength": 0.2
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.6, "s": 0.7, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Should respond to pellet direction with muscle modulation"
+      }
+    },
+    {
+      "name": "complex_8_node",
+      "description": "Maximum complexity creature - 8 nodes, many muscles",
+      "genome": {
+        "id": "test_complex_8_node",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.3, "friction": 0.5, "position": {"x": -1.0, "y": 0.6, "z": -0.5}},
+          {"id": "n1", "size": 0.3, "friction": 0.5, "position": {"x": 1.0, "y": 0.6, "z": -0.5}},
+          {"id": "n2", "size": 0.3, "friction": 0.5, "position": {"x": -1.0, "y": 0.6, "z": 0.5}},
+          {"id": "n3", "size": 0.3, "friction": 0.5, "position": {"x": 1.0, "y": 0.6, "z": 0.5}},
+          {"id": "n4", "size": 0.25, "friction": 0.4, "position": {"x": -0.5, "y": 1.3, "z": 0.0}},
+          {"id": "n5", "size": 0.25, "friction": 0.4, "position": {"x": 0.5, "y": 1.3, "z": 0.0}},
+          {"id": "n6", "size": 0.2, "friction": 0.3, "position": {"x": 0.0, "y": 1.8, "z": -0.3}},
+          {"id": "n7", "size": 0.2, "friction": 0.3, "position": {"x": 0.0, "y": 1.8, "z": 0.3}}
+        ],
+        "muscles": [
+          {"id": "m0", "nodeA": "n0", "nodeB": "n1", "restLength": 2.0, "stiffness": 100.0, "damping": 0.6, "frequency": 1.0, "amplitude": 0.2, "phase": 0.0, "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.3, "velocityBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.2, "distanceBias": 0.3, "distanceStrength": 0.2},
+          {"id": "m1", "nodeA": "n2", "nodeB": "n3", "restLength": 2.0, "stiffness": 100.0, "damping": 0.6, "frequency": 1.0, "amplitude": 0.2, "phase": 1.57, "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.3, "velocityBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.2, "distanceBias": 0.3, "distanceStrength": 0.2},
+          {"id": "m2", "nodeA": "n0", "nodeB": "n2", "restLength": 1.0, "stiffness": 100.0, "damping": 0.6, "frequency": 1.2, "amplitude": 0.2, "phase": 0.5, "directionBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "biasStrength": 0.3, "velocityBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "velocityStrength": 0.2, "distanceBias": 0.0, "distanceStrength": 0.0},
+          {"id": "m3", "nodeA": "n1", "nodeB": "n3", "restLength": 1.0, "stiffness": 100.0, "damping": 0.6, "frequency": 1.2, "amplitude": 0.2, "phase": 2.07, "directionBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "biasStrength": 0.3, "velocityBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "velocityStrength": 0.2, "distanceBias": 0.0, "distanceStrength": 0.0},
+          {"id": "m4", "nodeA": "n0", "nodeB": "n4", "restLength": 0.9, "stiffness": 120.0, "damping": 0.5, "frequency": 1.5, "amplitude": 0.25, "phase": 0.0, "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4, "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3, "distanceBias": 0.5, "distanceStrength": 0.25},
+          {"id": "m5", "nodeA": "n1", "nodeB": "n5", "restLength": 0.9, "stiffness": 120.0, "damping": 0.5, "frequency": 1.5, "amplitude": 0.25, "phase": 1.57, "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4, "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3, "distanceBias": 0.5, "distanceStrength": 0.25},
+          {"id": "m6", "nodeA": "n2", "nodeB": "n4", "restLength": 0.9, "stiffness": 120.0, "damping": 0.5, "frequency": 1.5, "amplitude": 0.25, "phase": 3.14, "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4, "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3, "distanceBias": 0.5, "distanceStrength": 0.25},
+          {"id": "m7", "nodeA": "n3", "nodeB": "n5", "restLength": 0.9, "stiffness": 120.0, "damping": 0.5, "frequency": 1.5, "amplitude": 0.25, "phase": 4.71, "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.4, "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.3, "distanceBias": 0.5, "distanceStrength": 0.25},
+          {"id": "m8", "nodeA": "n4", "nodeB": "n5", "restLength": 1.0, "stiffness": 100.0, "damping": 0.6, "frequency": 1.0, "amplitude": 0.2, "phase": 0.8, "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.3, "velocityBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.2, "distanceBias": 0.0, "distanceStrength": 0.0},
+          {"id": "m9", "nodeA": "n4", "nodeB": "n6", "restLength": 0.6, "stiffness": 80.0, "damping": 0.4, "frequency": 2.0, "amplitude": 0.15, "phase": 0.0, "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.2, "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.1, "distanceBias": 0.2, "distanceStrength": 0.1},
+          {"id": "m10", "nodeA": "n5", "nodeB": "n7", "restLength": 0.6, "stiffness": 80.0, "damping": 0.4, "frequency": 2.0, "amplitude": 0.15, "phase": 1.57, "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.2, "velocityBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "velocityStrength": 0.1, "distanceBias": 0.2, "distanceStrength": 0.1},
+          {"id": "m11", "nodeA": "n6", "nodeB": "n7", "restLength": 0.6, "stiffness": 80.0, "damping": 0.4, "frequency": 1.8, "amplitude": 0.15, "phase": 0.5, "directionBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "biasStrength": 0.2, "velocityBias": {"x": 0.0, "y": 0.0, "z": 1.0}, "velocityStrength": 0.1, "distanceBias": 0.0, "distanceStrength": 0.0},
+          {"id": "m12", "nodeA": "n0", "nodeB": "n3", "restLength": 2.24, "stiffness": 80.0, "damping": 0.5, "frequency": 0.8, "amplitude": 0.1, "phase": 0.0, "directionBias": {"x": 0.7, "y": 0.0, "z": 0.7}, "biasStrength": 0.2, "velocityBias": {"x": 0.7, "y": 0.0, "z": 0.7}, "velocityStrength": 0.1, "distanceBias": 0.0, "distanceStrength": 0.0},
+          {"id": "m13", "nodeA": "n1", "nodeB": "n2", "restLength": 2.24, "stiffness": 80.0, "damping": 0.5, "frequency": 0.8, "amplitude": 0.1, "phase": 1.57, "directionBias": {"x": -0.7, "y": 0.0, "z": 0.7}, "biasStrength": 0.2, "velocityBias": {"x": -0.7, "y": 0.0, "z": 0.7}, "velocityStrength": 0.1, "distanceBias": 0.0, "distanceStrength": 0.0}
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.8, "s": 0.6, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Complex creature - tests batching with max node/muscle counts"
+      }
+    },
+    {
+      "name": "neural_hybrid_basic",
+      "description": "Simple creature with hybrid neural control",
+      "genome": {
+        "id": "test_neural_hybrid",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.35, "friction": 0.5, "position": {"x": -0.5, "y": 0.8, "z": 0.0}},
+          {"id": "n1", "size": 0.35, "friction": 0.5, "position": {"x": 0.5, "y": 0.8, "z": 0.0}},
+          {"id": "n2", "size": 0.3, "friction": 0.5, "position": {"x": 0.0, "y": 1.4, "z": 0.0}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 1.0, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.0, "amplitude": 0.25, "phase": 0.0,
+            "directionBias": {"x": 1.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m1", "nodeA": "n1", "nodeB": "n2",
+            "restLength": 0.8, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.0, "amplitude": 0.25, "phase": 2.094,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m2", "nodeA": "n0", "nodeB": "n2",
+            "restLength": 0.8, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.0, "amplitude": 0.25, "phase": 4.189,
+            "directionBias": {"x": 0.0, "y": 1.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "neural",
+        "neuralGenome": {
+          "weights": [0.1, -0.2, 0.15, -0.1, 0.25, -0.15, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, -0.15, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, -0.15, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, -0.15, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, -0.1, 0.05, 0.15, -0.05, 0.1, -0.1, 0.05, 0.1, -0.1, 0.05, 0.15, -0.05, 0.1, -0.1, 0.05, 0.1, -0.1, 0.05, 0.15, -0.05, 0.1, -0.1, 0.05, -0.5, -0.5, -0.5],
+          "topology": {
+            "inputSize": 8,
+            "hiddenSize": 8,
+            "outputSize": 3
+          },
+          "activation": "tanh"
+        },
+        "color": {"h": 0.9, "s": 0.7, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Tests neural network hybrid mode integration"
+      }
+    },
+    {
+      "name": "neural_pure_basic",
+      "description": "Simple creature with pure neural control (no oscillator)",
+      "genome": {
+        "id": "test_neural_pure",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.35, "friction": 0.5, "position": {"x": -0.5, "y": 0.8, "z": 0.0}},
+          {"id": "n1", "size": 0.35, "friction": 0.5, "position": {"x": 0.5, "y": 0.8, "z": 0.0}},
+          {"id": "n2", "size": 0.3, "friction": 0.5, "position": {"x": 0.0, "y": 1.4, "z": 0.0}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 1.0, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.0, "amplitude": 0.25, "phase": 0.0,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m1", "nodeA": "n1", "nodeB": "n2",
+            "restLength": 0.8, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.0, "amplitude": 0.25, "phase": 0.0,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m2", "nodeA": "n0", "nodeB": "n2",
+            "restLength": 0.8, "stiffness": 120.0, "damping": 0.7,
+            "frequency": 1.0, "amplitude": 0.25, "phase": 0.0,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "neural",
+        "neuralGenome": {
+          "weights": [0.3, -0.2, 0.15, -0.1, 0.25, -0.15, 0.2, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, -0.15, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.2, -0.15, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, -0.1, 0.15, -0.2, 0.1, -0.15, 0.2, -0.1, 0.15, -0.2, 0.1, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, -0.1, 0.15, 0.25, -0.05, 0.1, -0.1, 0.15, 0.2, -0.1, 0.15, 0.25, -0.05, 0.1, -0.1, 0.15, 0.2, -0.1, 0.15, 0.25, -0.5, -0.5, -0.5],
+          "topology": {
+            "inputSize": 7,
+            "hiddenSize": 8,
+            "outputSize": 3
+          },
+          "activation": "tanh"
+        },
+        "color": {"h": 0.0, "s": 0.8, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Tests neural network pure mode (no base oscillation)"
+      }
+    },
+    {
+      "name": "edge_case_single_node",
+      "description": "Edge case: Single node (should just fall and stay)",
+      "genome": {
+        "id": "test_single_node",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.5, "friction": 0.5, "position": {"x": 0.0, "y": 2.0, "z": 0.0}}
+        ],
+        "muscles": [],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.5, "s": 0.5, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Single node - should fall and stay on ground"
+      }
+    },
+    {
+      "name": "stiff_spring_test",
+      "description": "Very stiff springs - tests numerical stability",
+      "genome": {
+        "id": "test_stiff_springs",
+        "generation": 0,
+        "survivalStreak": 0,
+        "parentIds": [],
+        "nodes": [
+          {"id": "n0", "size": 0.3, "friction": 0.5, "position": {"x": 0.0, "y": 1.0, "z": 0.0}},
+          {"id": "n1", "size": 0.3, "friction": 0.5, "position": {"x": 0.5, "y": 1.0, "z": 0.0}},
+          {"id": "n2", "size": 0.3, "friction": 0.5, "position": {"x": 0.25, "y": 1.4, "z": 0.0}}
+        ],
+        "muscles": [
+          {
+            "id": "m0", "nodeA": "n0", "nodeB": "n1",
+            "restLength": 0.5, "stiffness": 500.0, "damping": 2.0,
+            "frequency": 1.0, "amplitude": 0.1, "phase": 0.0,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m1", "nodeA": "n1", "nodeB": "n2",
+            "restLength": 0.45, "stiffness": 500.0, "damping": 2.0,
+            "frequency": 1.0, "amplitude": 0.1, "phase": 2.094,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          },
+          {
+            "id": "m2", "nodeA": "n0", "nodeB": "n2",
+            "restLength": 0.45, "stiffness": 500.0, "damping": 2.0,
+            "frequency": 1.0, "amplitude": 0.1, "phase": 4.189,
+            "directionBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "biasStrength": 0.0,
+            "velocityBias": {"x": 0.0, "y": 0.0, "z": 0.0}, "velocityStrength": 0.0,
+            "distanceBias": 0.0, "distanceStrength": 0.0
+          }
+        ],
+        "globalFrequencyMultiplier": 1.0,
+        "controllerType": "oscillator",
+        "color": {"h": 0.2, "s": 0.6, "l": 0.5}
+      },
+      "expected": {
+        "notes": "Tests numerical stability with stiff springs"
+      }
+    }
+  ],
+  "test_configs": {
+    "default": {
+      "gravity": -9.8,
+      "groundFriction": 0.5,
+      "timeStep": 0.016666666666666666,
+      "simulationDuration": 10,
+      "populationSize": 100,
+      "cullPercentage": 0.5,
+      "mutationRate": 0.1,
+      "mutationMagnitude": 0.3,
+      "crossoverRate": 0.5,
+      "eliteCount": 5,
+      "useMutation": true,
+      "useCrossover": true,
+      "minNodes": 3,
+      "maxNodes": 8,
+      "maxMuscles": 15,
+      "maxAllowedFrequency": 3.0,
+      "pelletCount": 3,
+      "arenaSize": 10,
+      "fitnessPelletPoints": 100,
+      "fitnessProgressMax": 80,
+      "fitnessNetDisplacementMax": 15,
+      "fitnessDistancePerUnit": 3,
+      "fitnessDistanceTraveledMax": 15,
+      "fitnessRegressionPenalty": 20,
+      "useNeuralNet": false,
+      "neuralMode": "hybrid",
+      "neuralHiddenSize": 8,
+      "neuralActivation": "tanh",
+      "weightMutationRate": 0.1,
+      "weightMutationMagnitude": 0.3,
+      "weightMutationDecay": "off",
+      "neuralOutputBias": -0.5,
+      "fitnessEfficiencyPenalty": 0.5,
+      "neuralDeadZone": 0.1
+    },
+    "neural_hybrid": {
+      "gravity": -9.8,
+      "groundFriction": 0.5,
+      "timeStep": 0.016666666666666666,
+      "simulationDuration": 10,
+      "useNeuralNet": true,
+      "neuralMode": "hybrid",
+      "neuralHiddenSize": 8,
+      "neuralActivation": "tanh",
+      "neuralOutputBias": -0.5,
+      "fitnessEfficiencyPenalty": 0.5,
+      "neuralDeadZone": 0.1
+    },
+    "neural_pure": {
+      "gravity": -9.8,
+      "groundFriction": 0.5,
+      "timeStep": 0.016666666666666666,
+      "simulationDuration": 10,
+      "useNeuralNet": true,
+      "neuralMode": "pure",
+      "neuralHiddenSize": 8,
+      "neuralActivation": "tanh",
+      "neuralOutputBias": -0.5,
+      "fitnessEfficiencyPenalty": 0.5,
+      "neuralDeadZone": 0.1
+    }
+  },
+  "pellet_configs": [
+    {
+      "name": "single_pellet_forward",
+      "positions": [{"x": 5.0, "y": 0.5, "z": 0.0}]
+    },
+    {
+      "name": "three_pellets_progressive",
+      "positions": [
+        {"x": 3.0, "y": 0.5, "z": 0.0},
+        {"x": 6.0, "y": 0.5, "z": 2.0},
+        {"x": 9.0, "y": 0.5, "z": -1.0}
+      ]
+    }
+  ]
+}
