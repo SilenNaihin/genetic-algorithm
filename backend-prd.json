@@ -331,20 +331,20 @@
         {
           "id": "9.1",
           "name": "Create TypeScript API client",
-          "status": "pending",
-          "details": "Typed fetch wrapper for all backend endpoints."
+          "status": "completed",
+          "details": "Created src/services/ApiClient.ts with typed fetch wrapper. Handles camelCase/snake_case conversion, NeuralGenome format conversion, error handling."
         },
         {
           "id": "9.2",
           "name": "Update StorageService",
-          "status": "pending",
-          "details": "Replace IndexedDB with API calls."
+          "status": "completed",
+          "details": "Added RemoteStorage class using API. StorageService now supports local (IndexedDB) or remote (API) modes. Use setStorageMode('remote') or tryUseRemoteStorage()."
         },
         {
           "id": "9.3",
           "name": "Update SimulationService",
-          "status": "pending",
-          "details": "Call backend for simulation instead of local Cannon-ES."
+          "status": "completed",
+          "details": "Added dual-mode simulation: local (Cannon-ES) or remote (backend PyTorch). Use setSimulationMode('remote') or tryUseRemoteSimulation() to switch. Falls back to local on error."
         },
         {
           "id": "9.4",
@@ -427,8 +427,8 @@
       ]
     }
   ],
-  "current_phase": 8,
-  "current_item": "8.3",
+  "current_phase": 9,
+  "current_item": "9.4",
   "notes": {
     "physics_approach": "Custom spring physics in PyTorch tensors. Not using PyBullet because we need batched simulation across 1000+ creatures, which requires custom tensor ops.",
     "cpu_gpu_agnostic": "All code uses torch tensors. Device selection at runtime: cuda if available, else cpu. Same code path.",

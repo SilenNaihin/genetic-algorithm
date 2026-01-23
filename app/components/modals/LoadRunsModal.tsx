@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEvolutionStore } from '../../stores/evolutionStore';
 import { Modal } from '../common/Modal';
 import * as StorageService from '../../../src/services/StorageService';
-import type { SavedRun } from '../../../src/storage/RunStorage';
+import type { SavedRun } from '../../../src/storage/types';
 
 /**
  * Modal for loading saved evolution runs.

@@ -528,9 +528,13 @@ export async function getGeneration(
   runId: string,
   generation: number
 ): Promise<{ generation: ApiGeneration; creatures: ApiCreature[] }> {
-  return fetchJson<{ generation: ApiGeneration; creatures: ApiCreature[] }>(
-    `/api/runs/${runId}/generations/${generation}`
-  );
+  // Fetch generation metadata and creatures in parallel
+  const [genData, creatures] = await Promise.all([
+    fetchJson<ApiGeneration>(`/api/runs/${runId}/generations/${generation}`),
+    fetchJson<ApiCreature[]>(`/api/runs/${runId}/generations/${generation}/creatures`),
+  ]);
+
+  return { generation: genData, creatures };
 }
 
 /** Input for saving a creature result */

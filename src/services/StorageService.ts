@@ -1,99 +1,33 @@
 /**
  * Storage Service
  *
- * Abstraction layer over storage that supports both:
- * - Local: IndexedDB (RunStorage) - works offline
- * - Remote: Backend API (RemoteStorage) - requires backend
- *
- * Use setStorageMode('remote') to switch to backend storage.
- * Default is 'local' for backward compatibility.
+ * Uses the backend PostgreSQL API for all storage.
+ * Backend must be running for the application to work.
  */
 
-import { RunStorage, type SavedRun, type CompactCreatureResult } from '../storage/RunStorage';
 import { RemoteStorage } from '../storage/RemoteStorage';
 import type { CreatureSimulationResult } from '../simulation/BatchSimulator';
 import type { SimulationConfig, FitnessHistoryEntry } from '../types/simulation';
-
-export type StorageMode = 'local' | 'remote';
+import type { SavedRun, CompactCreatureResult } from '../storage/types';
 
 export interface CreatureTypeHistoryEntry {
   generation: number;
   nodeCountDistribution: Map<number, number>;
 }
 
-// Storage implementations
-const localStorage = new RunStorage();
-let remoteStorage: RemoteStorage | null = null;
-
-// Current mode
-let currentMode: StorageMode = 'local';
+// Single storage instance - always remote
+const storage = new RemoteStorage();
 let isInitialized = false;
 
 /**
- * Get the current storage mode
- */
-export function getStorageMode(): StorageMode {
-  return currentMode;
-}
-
-/**
- * Set the storage mode
- * @param mode 'local' for IndexedDB, 'remote' for backend API
- */
-export async function setStorageMode(mode: StorageMode): Promise<void> {
-  if (mode === currentMode && isInitialized) return;
-
-  currentMode = mode;
-  isInitialized = false;
-
-  if (mode === 'remote') {
-    if (!remoteStorage) {
-      remoteStorage = new RemoteStorage();
-    }
-    await remoteStorage.init();
-  } else {
-    await localStorage.init();
-  }
-
-  isInitialized = true;
-}
-
-/**
- * Get the active storage instance
- */
-function getStorage(): RunStorage | RemoteStorage {
-  if (currentMode === 'remote' && remoteStorage) {
-    return remoteStorage;
-  }
-  return localStorage;
-}
-
-/**
- * Initialize storage (IndexedDB or Remote)
- * Automatically tries to use backend if available.
+ * Initialize storage (connects to backend)
  */
 export async function initStorage(): Promise<void> {
   if (isInitialized) return;
 
-  // Auto-detect backend on first init (tryUseRemoteStorage sets isInitialized)
-  if (currentMode === 'local') {
-    const usedRemote = await tryUseRemoteStorage();
-    if (usedRemote) {
-      // Remote storage already initialized by tryUseRemoteStorage
-      return;
-    }
-  }
-
-  if (currentMode === 'remote') {
-    if (!remoteStorage) {
-      remoteStorage = new RemoteStorage();
-    }
-    await remoteStorage.init();
-  } else {
-    await localStorage.init();
-  }
-
+  await storage.init();
   isInitialized = true;
+  console.log('[Storage] Connected to backend PostgreSQL storage');
 }
 
 /**
@@ -101,21 +35,21 @@ export async function initStorage(): Promise<void> {
  */
 export async function createRun(config: SimulationConfig): Promise<string> {
   await initStorage();
-  return getStorage().createRun(config);
+  return storage.createRun(config);
 }
 
 /**
  * Get current run ID
  */
 export function getCurrentRunId(): string | null {
-  return getStorage().getCurrentRunId();
+  return storage.getCurrentRunId();
 }
 
 /**
  * Set current run ID
  */
 export function setCurrentRunId(id: string | null): void {
-  getStorage().setCurrentRunId(id);
+  storage.setCurrentRunId(id);
 }
 
 /**
@@ -125,7 +59,7 @@ export async function saveGeneration(
   generation: number,
   results: CreatureSimulationResult[]
 ): Promise<void> {
-  await getStorage().saveGeneration(generation, results);
+  await storage.saveGeneration(generation, results);
 }
 
 /**
@@ -136,35 +70,35 @@ export async function loadGeneration(
   generation: number,
   config?: SimulationConfig
 ): Promise<CreatureSimulationResult[] | null> {
-  return getStorage().loadGeneration(runId, generation, config);
+  return storage.loadGeneration(runId, generation, config);
 }
 
 /**
  * Get a single run by ID
  */
 export async function getRun(runId: string): Promise<SavedRun | null> {
-  return getStorage().getRun(runId);
+  return storage.getRun(runId);
 }
 
 /**
  * Get all saved runs
  */
 export async function getAllRuns(): Promise<SavedRun[]> {
-  return getStorage().getAllRuns();
+  return storage.getAllRuns();
 }
 
 /**
  * Delete a run
  */
 export async function deleteRun(runId: string): Promise<void> {
-  await getStorage().deleteRun(runId);
+  await storage.deleteRun(runId);
 }
 
 /**
  * Update run name
  */
 export async function updateRunName(runId: string, name: string): Promise<void> {
-  await getStorage().updateRunName(runId, name);
+  await storage.updateRunName(runId, name);
 }
 
 /**
@@ -173,7 +107,7 @@ export async function updateRunName(runId: string, name: string): Promise<void> 
 export async function updateFitnessHistory(
   fitnessHistory: FitnessHistoryEntry[]
 ): Promise<void> {
-  await getStorage().updateFitnessHistory(fitnessHistory);
+  await storage.updateFitnessHistory(fitnessHistory);
 }
 
 /**
@@ -182,7 +116,7 @@ export async function updateFitnessHistory(
 export async function updateCreatureTypeHistory(
   history: CreatureTypeHistoryEntry[]
 ): Promise<void> {
-  await getStorage().updateCreatureTypeHistory(history);
+  await storage.updateCreatureTypeHistory(history);
 }
 
 /**
@@ -192,7 +126,7 @@ export async function updateBestCreature(
   creature: CreatureSimulationResult,
   generation: number
 ): Promise<void> {
-  await getStorage().updateBestCreature(creature, generation);
+  await storage.updateBestCreature(creature, generation);
 }
 
 /**
@@ -203,14 +137,14 @@ export async function updateLongestSurvivor(
   generations: number,
   diedAtGeneration: number
 ): Promise<void> {
-  await getStorage().updateLongestSurvivor(creature, generations, diedAtGeneration);
+  await storage.updateLongestSurvivor(creature, generations, diedAtGeneration);
 }
 
 /**
  * Get max generation for a run
  */
 export async function getMaxGeneration(runId: string): Promise<number> {
-  return getStorage().getMaxGeneration(runId);
+  return storage.getMaxGeneration(runId);
 }
 
 /**
@@ -221,7 +155,7 @@ export async function forkRun(
   upToGeneration: number,
   newName?: string
 ): Promise<string> {
-  return getStorage().forkRun(sourceRunId, upToGeneration, newName);
+  return storage.forkRun(sourceRunId, upToGeneration, newName);
 }
 
 /**
@@ -231,7 +165,7 @@ export function expandCreatureResult(
   compact: CompactCreatureResult,
   config: SimulationConfig
 ): CreatureSimulationResult {
-  return getStorage().expandCreatureResult(compact, config);
+  return storage.expandCreatureResult(compact, config);
 }
 
 /**
@@ -240,24 +174,12 @@ export function expandCreatureResult(
 export function compactCreatureResult(
   result: CreatureSimulationResult
 ): CompactCreatureResult {
-  return getStorage().compactCreatureResult(result);
+  return storage.compactCreatureResult(result);
 }
 
 /**
- * Check if backend is available and switch to remote mode
+ * Check if storage is initialized
  */
-export async function tryUseRemoteStorage(): Promise<boolean> {
-  try {
-    const { checkConnection } = await import('./ApiClient');
-    const connected = await checkConnection();
-    if (connected) {
-      await setStorageMode('remote');
-      console.log('[Storage] Using remote backend storage');
-      return true;
-    }
-  } catch {
-    // Backend not available
-  }
-  console.log('[Storage] Using local IndexedDB storage');
-  return false;
+export function isStorageInitialized(): boolean {
+  return isInitialized;
 }

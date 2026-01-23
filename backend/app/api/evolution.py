@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models import Creature, CreatureFrame, Generation, Run
 from app.schemas.genome import CreatureGenome
-from app.schemas.run import RunConfig
+from app.schemas.simulation import SimulationConfig
 from app.services.genetics import GeneticsService
 from app.services.simulator import SimulatorService
 
@@ -32,7 +32,7 @@ async def run_generation(
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    config = RunConfig(**run.config)
+    config = SimulationConfig(**run.config)
     current_gen = run.current_generation
 
     # Get genomes for this generation
@@ -40,7 +40,11 @@ async def run_generation(
         # Generate initial population
         genomes = genetics.generate_initial_population(
             size=config.population_size,
-            constraints=config.genome_constraints.model_dump(),
+            constraints={
+                "min_nodes": config.min_nodes,
+                "max_nodes": config.max_nodes,
+                "max_muscles": config.max_muscles,
+            },
         )
     else:
         # Get previous generation creatures
@@ -69,7 +73,7 @@ async def run_generation(
             "record_frames": True,
             "frame_rate": 15,
             "pellet_count": config.pellet_count,
-            "ground_size": config.ground_size,
+            "arena_size": config.arena_size,
             "max_allowed_frequency": config.max_allowed_frequency,
         },
     )

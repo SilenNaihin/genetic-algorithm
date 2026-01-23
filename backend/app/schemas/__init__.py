@@ -6,12 +6,11 @@ from app.schemas.genome import (
     NodeGene,
     CreatureGenome,
 )
-from app.schemas.run import RunConfig, RunCreate, RunRead, RunUpdate
+from app.schemas.run import RunCreate, RunRead, RunUpdate
 from app.schemas.simulation import SimulationConfig, SimulationResult
 
 __all__ = [
     # Run
-    "RunConfig",
     "RunCreate",
     "RunRead",
     "RunUpdate",

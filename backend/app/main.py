@@ -45,6 +45,7 @@ app.include_router(genetics.router, prefix="/api/genetics", tags=["genetics"])
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "version": "0.1.0"}

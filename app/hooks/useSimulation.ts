@@ -414,7 +414,7 @@ export function useSimulation() {
       setSortAnimationTriggered(false);
     }
 
-    // Record history - must be sequential to avoid race condition on IndexedDB writes
+    // Record history - must be sequential to avoid race conditions on storage writes
     await recordFitnessHistory(results, currentGen, history);
     await recordCreatureTypeHistory(results, currentGen);
     updateBestCreature(results, currentGen);

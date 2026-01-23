@@ -3,5 +3,5 @@
   "entry": ["app/**/*.tsx", "src/**/*.ts"],
   "project": ["app/**/*.{ts,tsx}", "src/**/*.ts"],
   "ignore": ["src/**/*.test.ts", "src/__tests__/**"],
-  "ignoreDependencies": ["happy-dom"]
+  "ignoreDependencies": ["tailwindcss", "autoprefixer"]
 }

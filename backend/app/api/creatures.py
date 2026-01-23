@@ -99,6 +99,38 @@ async def get_creature_with_frames(
     )
 
 
+@router.get("/{creature_id}/frames")
+async def get_creature_frames(
+    creature_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get frame data for a creature (for replay)."""
+    result = await db.execute(
+        select(Creature)
+        .where(Creature.id == creature_id)
+        .options(selectinload(Creature.frames))
+    )
+    creature = result.scalar_one_or_none()
+    if not creature:
+        raise HTTPException(status_code=404, detail="Creature not found")
+
+    if not creature.frames:
+        raise HTTPException(status_code=404, detail="No frames available for this creature")
+
+    # Decompress and parse frame data
+    try:
+        frames_raw = zlib.decompress(creature.frames.frames_data)
+        frames_data = json.loads(frames_raw)
+
+        return {
+            "frames_data": frames_data,
+            "frame_count": creature.frames.frame_count,
+            "frame_rate": creature.frames.frame_rate,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error decompressing frames: {e}")
+
+
 @router.get("/run/{run_id}/best")
 async def get_best_creature(
     run_id: str,

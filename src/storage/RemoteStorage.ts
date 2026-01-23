@@ -10,8 +10,8 @@ import * as Api from '../services/ApiClient';
 import type { CreatureSimulationResult, PelletData, SimulationFrame } from '../simulation/BatchSimulator';
 import type { SimulationConfig, FitnessHistoryEntry, Vector3 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
-import type { SavedRun, CompactCreatureResult } from './RunStorage';
-import { recalculateFitnessOverTime } from './RunStorage';
+import type { SavedRun, CompactCreatureResult } from './types';
+import { recalculateFitnessOverTime } from './types';
 import type { DisqualificationReason } from '../simulation/BatchSimulator';
 
 /**
