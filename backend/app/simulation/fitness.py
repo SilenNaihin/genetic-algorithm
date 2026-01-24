@@ -294,6 +294,9 @@ def compute_edge_distances(
     """
     Compute XZ ground distance from creature edge to target.
 
+    Uses COM-based calculation (treats creature as circle).
+    For more accurate per-node distance, use compute_closest_edge_distance.
+
     Args:
         com: [B, 3] creature center of mass
         creature_radii: [B] XZ radius of each creature
@@ -312,6 +315,58 @@ def compute_edge_distances(
 
     # Clamp to >= 0 (can't be negative)
     return torch.clamp(dist_from_edge, min=0)
+
+
+@torch.no_grad()
+def compute_closest_edge_distance(
+    batch: CreatureBatch,
+    target_positions: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Compute XZ ground distance from creature's closest node edge to target.
+
+    This finds the actual closest approach of any node to the target,
+    accounting for irregular creature shapes.
+
+    Args:
+        batch: CreatureBatch with current positions and sizes
+        target_positions: [B, 3] target positions
+
+    Returns:
+        [B] ground distances from closest node edge to target (clamped to >= 0)
+    """
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        return torch.zeros(0, device=device)
+
+    # positions: [B, N, 3], target_positions: [B, 3]
+    # Expand target for broadcasting: [B, 1, 3]
+    target_expanded = target_positions.unsqueeze(1)
+
+    # XZ distance from each node to target
+    dx = batch.positions[:, :, 0] - target_expanded[:, :, 0]  # [B, N]
+    dz = batch.positions[:, :, 2] - target_expanded[:, :, 2]  # [B, N]
+    node_to_target_dist = torch.sqrt(dx**2 + dz**2)  # [B, N]
+
+    # Distance from each node's EDGE to target (subtract node radius)
+    node_radii = batch.sizes * 0.5  # [B, N] - sizes is diameter, so radius = size/2
+    edge_to_target_dist = node_to_target_dist - node_radii  # [B, N]
+
+    # Mask out invalid nodes with a large value
+    large_value = 1e6
+    edge_to_target_dist = torch.where(
+        batch.node_mask > 0.5,
+        edge_to_target_dist,
+        torch.full_like(edge_to_target_dist, large_value)
+    )
+
+    # Get minimum distance (closest node edge)
+    min_dist, _ = edge_to_target_dist.min(dim=1)  # [B]
+
+    # Clamp to >= 0
+    return torch.clamp(min_dist, min=0)
 
 
 @torch.no_grad()
@@ -627,7 +682,9 @@ def update_fitness_state(
     state.previous_com = com.clone()
 
     # Update closest edge distance (for regression penalty)
-    current_edge_dist = compute_edge_distances(com, state.creature_radii, pellets.positions)
+    # Recalculate creature radii dynamically to reflect current shape
+    current_creature_radii = calculate_creature_xz_radius(batch)
+    current_edge_dist = compute_edge_distances(com, current_creature_radii, pellets.positions)
     state.closest_edge_distance = torch.minimum(state.closest_edge_distance, current_edge_dist)
 
     # Check for disqualification
@@ -701,8 +758,11 @@ def calculate_fitness(
     pellet_fitness = pellets.total_collected.float() * config.pellet_points
 
     # 2. Progress toward current pellet (0-progress_max)
+    # Recalculate creature radii dynamically to reflect current shape
+    # This ensures progress is measured from the actual creature edge (furthest node)
+    current_creature_radii = calculate_creature_xz_radius(batch)
     current_edge_dist = compute_edge_distances(
-        com, state.creature_radii, pellets.positions
+        com, current_creature_radii, pellets.positions
     )
     # Progress = (initial - current) / initial, clamped to [0, 1]
     progress = (pellets.initial_distances - current_edge_dist) / pellets.initial_distances.clamp(min=0.01)

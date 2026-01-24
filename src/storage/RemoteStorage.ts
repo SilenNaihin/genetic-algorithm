@@ -10,7 +10,6 @@ import type { CreatureSimulationResult, PelletData, SimulationFrame, Disqualific
 import type { SimulationConfig, Vector3 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 import type { SavedRun, CompactCreatureResult } from './types';
-import { recalculateFitnessOverTime } from './types';
 
 /**
  * Convert API run to SavedRun format
@@ -102,7 +101,7 @@ export class RemoteStorage {
     });
   }
 
-  expandCreatureResult(r: CompactCreatureResult, config: SimulationConfig): CreatureSimulationResult {
+  expandCreatureResult(r: CompactCreatureResult, _config: SimulationConfig): CreatureSimulationResult {
     const frames = this.expandFrames(r.frames, r.genome);
     const pellets: PelletData[] = r.pelletData.map((p, i) => ({
       id: `pellet_${i}`,
@@ -111,7 +110,9 @@ export class RemoteStorage {
       spawnedAtFrame: 0,
       initialDistance: 5
     }));
-    const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, config, r.disqualified);
+    // Frontend does NOT recalculate fitness - all fitness calculations are backend-owned
+    // fitnessOverTime should come from backend; empty for legacy data without stored fitness
+    const fitnessOverTime: number[] = [];
 
     return {
       genome: r.genome,
@@ -206,8 +207,8 @@ export class RemoteStorage {
     creatureId: string,
     genome: { nodes: { id: string }[] },
     pelletsCollected: number,
-    config: SimulationConfig,
-    disqualified: string | null,
+    _config: SimulationConfig,
+    _disqualified: string | null,
     realPellets?: PelletData[],
     realFitnessOverTime?: number[]
   ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[] }> {
@@ -255,19 +256,24 @@ export class RemoteStorage {
         }));
       }
 
-      // Use real fitnessOverTime if provided and matches frame count
+      // Use backend fitness_over_time if available (preferred - accurate from simulation)
+      if (framesData.fitness_over_time && framesData.fitness_over_time.length > 0) {
+        console.log('[RemoteStorage] Using fitness_over_time from backend API:', framesData.fitness_over_time.length, 'entries');
+        return { frames, fitnessOverTime: framesData.fitness_over_time, pellets };
+      }
+
+      // Fallback: use real fitnessOverTime if provided and matches frame count
       if (realFitnessOverTime && realFitnessOverTime.length > 0) {
         if (realFitnessOverTime.length === frames.length) {
-          console.log('[RemoteStorage] Using real fitnessOverTime from backend');
+          console.log('[RemoteStorage] Using real fitnessOverTime from caller');
           return { frames, fitnessOverTime: realFitnessOverTime, pellets };
-        } else {
-          console.warn(`[RemoteStorage] fitnessOverTime length mismatch: ${realFitnessOverTime.length} vs ${frames.length} frames, recalculating`);
         }
       }
 
-      const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, config, disqualified);
-
-      return { frames, fitnessOverTime, pellets };
+      // No backend fitness_over_time available (legacy data) - return empty
+      // Frontend does NOT recalculate - all fitness calculations are backend-owned
+      console.log('[RemoteStorage] No backend fitness_over_time available (legacy data)');
+      return { frames, fitnessOverTime: [], pellets };
     } catch (error) {
       console.error('[RemoteStorage] Failed to load creature frames:', error);
       return { frames: [], fitnessOverTime: [], pellets: [] };

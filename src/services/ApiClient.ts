@@ -526,6 +526,7 @@ export async function getCreatureFrames(
     spawned_at_frame: number;
     initial_distance: number;
   }> | null;
+  fitness_over_time: number[] | null;
 }> {
   return fetchJson(`/api/creatures/${creatureId}/frames`);
 }

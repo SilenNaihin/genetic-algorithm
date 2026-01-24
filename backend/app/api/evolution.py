@@ -284,6 +284,11 @@ async def run_generation(
                     })
                 pellet_data = zlib.compress(json.dumps(pellet_frames).encode())
 
+            # Store fitness over time (from backend simulation)
+            fitness_over_time_data = None
+            if sim_result.get("fitness_over_time"):
+                fitness_over_time_data = zlib.compress(json.dumps(sim_result["fitness_over_time"]).encode())
+
             creature_frame = CreatureFrame(
                 creature_id=creature_id,
                 generation=current_gen,
@@ -291,6 +296,7 @@ async def run_generation(
                 frame_count=sim_result.get("frame_count", 0),
                 frame_rate=15,
                 pellet_frames=pellet_data,
+                fitness_over_time=fitness_over_time_data,
             )
             db.add(creature_frame)
 

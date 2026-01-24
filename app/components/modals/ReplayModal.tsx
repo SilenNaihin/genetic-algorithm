@@ -876,10 +876,10 @@ function FamilyTreeDisplay({
     // Get reproduction type from first parent (how this creature was created)
     const firstParentRepType = knownParents[0]?.creature.reproductionType;
     const relType =
-      isRoot && knownParents.length > 0
+      knownParents.length > 0
         ? firstParentRepType === 'crossover'
-          ? '(crossover from)'
-          : '(mutated from)'
+          ? '(crossover)'
+          : '(mutated)'
         : null;
 
     const unseenParents = knownParents.filter((p) => !seenIds.has(p.creature.id));

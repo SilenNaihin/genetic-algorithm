@@ -133,6 +133,9 @@ class CreatureFrame(Base):
     # Pellet positions at each frame (optional, for replay)
     pellet_frames: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
+    # Fitness values per frame (compressed JSON array)
+    fitness_over_time: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
     # Composite foreign key
     __table_args__ = (
         ForeignKeyConstraint(
