@@ -651,19 +651,24 @@ class TestSimulationConfigAccepted:
 
 def make_api_genome(creature_id: str, num_nodes: int = 3, num_muscles: int = 3) -> dict:
     """Create a test genome in API format."""
+    radius = 0.5
     nodes = []
     for i in range(num_nodes):
         angle = i * (2 * math.pi / num_nodes)
         nodes.append({
             "id": f"n{i}",
             "position": {
-                "x": math.cos(angle) * 0.5,
-                "y": 0.5,
-                "z": math.sin(angle) * 0.5
+                "x": math.cos(angle) * radius,
+                "y": 1.0,  # Higher up to avoid ground collision
+                "z": math.sin(angle) * radius
             },
-            "size": 0.5,
+            "size": 0.4,  # Slightly smaller nodes
             "friction": 0.5
         })
+
+    # Calculate actual distance between adjacent nodes
+    angle_between = 2 * math.pi / num_nodes
+    actual_distance = 2 * radius * math.sin(angle_between / 2)
 
     muscles = []
     for i in range(min(num_muscles, num_nodes)):
@@ -671,11 +676,11 @@ def make_api_genome(creature_id: str, num_nodes: int = 3, num_muscles: int = 3) 
             "id": f"m{i}",
             "nodeA": f"n{i}",
             "nodeB": f"n{(i + 1) % num_nodes}",
-            "restLength": 1.0,
-            "stiffness": 500,
-            "damping": 10,
+            "restLength": actual_distance,  # Match actual node distance
+            "stiffness": 100,  # Same as working tests
+            "damping": 1.0,  # Same as working tests
             "frequency": 1.0,
-            "amplitude": 0.2,
+            "amplitude": 0.3,  # Same as working tests
             "phase": i * (2 * math.pi / num_muscles)
         })
 

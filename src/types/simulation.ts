@@ -75,7 +75,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   groundFriction: 0.5,
   timeStep: 1 / 30,
   physicsFPS: 30,
-  simulationDuration: 10,
+  simulationDuration: 20,
 
   populationSize: 100,
   cullPercentage: 0.5,
