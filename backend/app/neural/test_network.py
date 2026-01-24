@@ -288,6 +288,7 @@ class TestForwardPass:
             input_size=8,
             hidden_size=8,
             max_muscles=10,
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
         network.bias_o = torch.full((5, 10), -0.5)
 
@@ -305,6 +306,7 @@ class TestForwardPass:
             hidden_size=4,
             max_muscles=5,
             activation='tanh',
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
 
         # Set weights to produce known hidden values
@@ -327,6 +329,7 @@ class TestForwardPass:
             hidden_size=4,
             max_muscles=5,
             activation='relu',
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
 
         # Identity weights
@@ -348,6 +351,7 @@ class TestForwardPass:
             hidden_size=2,
             max_muscles=3,
             activation='sigmoid',
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
 
         network.weights_ih = torch.eye(2).unsqueeze(0)
@@ -373,6 +377,7 @@ class TestDeadZone:
             input_size=7,
             hidden_size=8,
             max_muscles=10,
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
         # Set output bias to produce small tanh values
         network.bias_o = torch.full((3, 10), 0.05)
@@ -389,6 +394,7 @@ class TestDeadZone:
             input_size=7,
             hidden_size=8,
             max_muscles=10,
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
         # Set output bias to produce large tanh values
         network.bias_o = torch.full((2, 10), 1.0)
@@ -570,6 +576,7 @@ class TestWeightExport:
             num_muscles=[output_size] * 3,
             config=config,
             max_muscles=output_size,
+            device='cpu',  # Use CPU for tests that check tensor values
         )
 
         # Export weights from first creature as structured format
@@ -579,6 +586,7 @@ class TestWeightExport:
             neural_genomes=[genome],
             num_muscles=[output_size],
             config=config,
+            device='cpu',
             max_muscles=output_size,
         )
 
@@ -622,9 +630,8 @@ class TestDeviceCompatibility:
             max_muscles=10,
         )
 
-        # Should default to cuda if available, else cpu
-        expected = 'cuda' if torch.cuda.is_available() else 'cpu'
-        assert network.device == expected
+        # Should default to CPU (MPS has too much overhead for typical workloads)
+        assert network.device == 'cpu'
 
     def test_explicit_cpu(self):
         network = BatchedNeuralNetwork(
@@ -751,6 +758,7 @@ class TestEdgeCases:
             input_size=8,
             hidden_size=8,
             max_muscles=10,
+            device='cpu',  # Use CPU for tests that directly set tensors
         )
 
         # Set extreme weights

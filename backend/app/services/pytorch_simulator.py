@@ -10,6 +10,8 @@ from typing import Any
 
 import torch
 
+from app.core.device import get_best_device
+
 from app.schemas.simulation import (
     SimulationConfig as ApiSimulationConfig,
     SimulationResult,
@@ -57,13 +59,7 @@ class PyTorchSimulator:
     def __init__(self, device: torch.device | None = None):
         """Initialize simulator with optional device override."""
         if device is None:
-            # Prefer CUDA > MPS (Apple Silicon) > CPU
-            if torch.cuda.is_available():
-                device = torch.device("cuda")
-            elif torch.backends.mps.is_available():
-                device = torch.device("mps")
-            else:
-                device = torch.device("cpu")
+            device = get_best_device()
         self.device = device
 
     def simulate_batch(
@@ -136,6 +132,7 @@ class PyTorchSimulator:
                 neural_genomes=neural_genomes,
                 num_muscles=num_muscles,
                 config=nn_config,
+                device=self.device,
             )
 
             # Calculate frame interval based on physics FPS and desired frame rate

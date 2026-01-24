@@ -12,6 +12,8 @@ import torch
 from typing import Literal, Optional
 from dataclasses import dataclass
 
+from app.core.device import get_device_str
+
 # Constants matching TypeScript
 DEFAULT_OUTPUT_BIAS = 0.0
 NEURAL_INPUT_SIZE_PURE = 7
@@ -71,7 +73,7 @@ class BatchedNeuralNetwork:
         device: Optional[str] = None,
     ):
         if device is None:
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            device = get_device_str()
 
         self.batch_size = batch_size
         self.input_size = input_size
@@ -124,6 +126,10 @@ class BatchedNeuralNetwork:
         Returns:
             outputs: [B, max_muscles] neural network outputs in [-1, 1] range
         """
+        # Ensure inputs are on the same device as network weights
+        if inputs.device != self.weights_ih.device:
+            inputs = inputs.to(self.weights_ih.device)
+
         # Hidden layer: h = activation(x @ W_ih + b_h)
         # [B, input_size] @ [B, input_size, hidden_size] -> [B, hidden_size]
         hidden = torch.einsum('bi,bih->bh', inputs, self.weights_ih) + self.bias_h
