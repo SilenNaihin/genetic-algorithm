@@ -348,6 +348,7 @@ export function fromApiGenome(api: Record<string, unknown>): CreatureGenome {
     nodeCount: (a.nodeCount ?? a.node_count) as number,
     muscleCount: (a.muscleCount ?? a.muscle_count) as number,
     color: (a.color ?? { h: 0.5, s: 0.7, l: 0.5 }) as { h: number; s: number; l: number },
+    reproductionType: (a.reproductionType ?? a.reproduction_type) as 'crossover' | 'mutation' | undefined,
   }));
 
   return {
