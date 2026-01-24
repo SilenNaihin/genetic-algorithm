@@ -13,6 +13,7 @@
  */
 
 import type { NeuralGenomeData, NeuralTopology } from '../neural';
+import { getActivation } from '../neural';
 
 /**
  * Weight matrices extracted from flat genome weights array.
@@ -23,6 +24,13 @@ interface WeightMatrices {
   biasH: number[];
   weightsHO: number[][];  // hidden -> output
   biasO: number[];
+}
+
+/** Forward pass result for visualization */
+interface ForwardResult {
+  inputs: number[];
+  hidden: number[];
+  outputs: number[];
 }
 
 /**
@@ -66,6 +74,42 @@ function extractWeightMatrices(weights: number[], topology: NeuralTopology): Wei
   return { weightsIH, biasH, weightsHO, biasO };
 }
 
+/**
+ * Simple forward pass for visualization fallback.
+ * Used when stored activations from simulation aren't available.
+ */
+function forwardPass(
+  inputs: number[],
+  weights: WeightMatrices,
+  topology: NeuralTopology,
+  activation: (x: number) => number
+): ForwardResult {
+  const { hiddenSize, outputSize } = topology;
+  const { weightsIH, biasH, weightsHO, biasO } = weights;
+
+  // Hidden layer
+  const hidden: number[] = new Array(hiddenSize);
+  for (let j = 0; j < hiddenSize; j++) {
+    let sum = biasH[j];
+    for (let i = 0; i < inputs.length; i++) {
+      sum += inputs[i] * weightsIH[i][j];
+    }
+    hidden[j] = activation(sum);
+  }
+
+  // Output layer (always tanh for [-1, 1] range)
+  const outputs: number[] = new Array(outputSize);
+  for (let j = 0; j < outputSize; j++) {
+    let sum = biasO[j];
+    for (let i = 0; i < hiddenSize; i++) {
+      sum += hidden[i] * weightsHO[i][j];
+    }
+    outputs[j] = Math.tanh(sum);
+  }
+
+  return { inputs: [...inputs], hidden, outputs };
+}
+
 export interface NeuralVisualizerOptions {
   width: number;
   height: number;
@@ -80,20 +124,14 @@ const DEFAULT_OPTIONS: NeuralVisualizerOptions = {
   showWeights: true
 };
 
-/** Stored activations for visualization */
-interface ActivationState {
-  inputs: number[];
-  hidden: number[];
-  outputs: number[];
-}
-
 export class NeuralVisualizer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private options: NeuralVisualizerOptions;
   private weights: WeightMatrices | null = null;
   private topology: NeuralTopology | null = null;
-  private activations: ActivationState | null = null;
+  private activationFn: ((x: number) => number) | null = null;
+  private lastResult: ForwardResult | null = null;
   private muscleNames: string[] = [];
 
   constructor(container: HTMLElement, options: Partial<NeuralVisualizerOptions> = {}) {
@@ -120,37 +158,57 @@ export class NeuralVisualizer {
 
   /**
    * Set the neural genome to visualize.
-   * Extracts weight matrices directly from genome data (no network instantiation).
+   * Extracts weights directly from genome data - no NeuralNetwork class needed.
    */
   setGenome(genome: NeuralGenomeData | undefined, muscleNames: string[]): void {
     if (!genome) {
       this.weights = null;
       this.topology = null;
+      this.activationFn = null;
       this.muscleNames = [];
       this.render();
       return;
     }
 
+    // Extract weights directly from genome data
     this.weights = extractWeightMatrices(genome.weights, genome.topology);
     this.topology = genome.topology;
+    this.activationFn = getActivation(genome.activation);
     this.muscleNames = muscleNames;
-    this.activations = null;
+    this.lastResult = null;
     this.render();
   }
 
   /**
+   * Update activations with new sensor inputs (recomputes forward pass locally).
+   * @deprecated Use setStoredActivations for accurate display from simulation.
+   * This fallback is only used when stored activations aren't available.
+   */
+  updateActivations(sensorInputs: number[]): void {
+    if (!this.weights || !this.topology || !this.activationFn) return;
+
+    try {
+      this.lastResult = forwardPass(sensorInputs, this.weights, this.topology, this.activationFn);
+      this.render();
+    } catch (e) {
+      console.warn('Failed to compute neural activations:', e);
+    }
+  }
+
+  /**
    * Set stored activations directly from simulation data.
-   * This displays the actual muscle outputs from simulation.
+   * This displays the actual muscle outputs from simulation rather than recomputing.
    * @param outputs - Muscle activation values from simulation (one per muscle)
    */
   setStoredActivations(outputs: number[]): void {
     if (!this.topology) return;
 
-    // We only have output activations from simulation
-    // Input/hidden values not stored, use placeholders for visualization
-    this.activations = {
-      inputs: new Array(this.topology.inputSize).fill(0),
-      hidden: new Array(this.topology.hiddenSize).fill(0),
+    // Create a ForwardResult-like object with the stored outputs
+    // We don't have the exact hidden/input values from simulation,
+    // so we'll show outputs directly and use placeholder values for visualization
+    this.lastResult = {
+      inputs: new Array(this.topology.inputSize).fill(0),  // Not stored, use placeholder
+      hidden: new Array(this.topology.hiddenSize).fill(0), // Not stored, use placeholder
       outputs: outputs.slice(0, this.topology.outputSize),
     };
     this.render();
@@ -162,7 +220,8 @@ export class NeuralVisualizer {
   clear(): void {
     this.weights = null;
     this.topology = null;
-    this.activations = null;
+    this.activationFn = null;
+    this.lastResult = null;
     this.render();
   }
 
@@ -202,13 +261,14 @@ export class NeuralVisualizer {
     const hiddenY = this.getNodeYPositions(hiddenSize, height, padding);
     const outputY = this.getNodeYPositions(outputSize, height, padding);
 
-    // Get activations (or use defaults if not set yet)
-    const inputs = this.activations?.inputs || new Array(inputSize).fill(0);
-    const hidden = this.activations?.hidden || new Array(hiddenSize).fill(0);
-    const outputs = this.activations?.outputs || new Array(outputSize).fill(0);
+    // Get activations (or use defaults if not computed yet)
+    const inputs = this.lastResult?.inputs || new Array(inputSize).fill(0);
+    const hidden = this.lastResult?.hidden || new Array(hiddenSize).fill(0);
+    const outputs = this.lastResult?.outputs || new Array(outputSize).fill(0);
 
     // Draw connections first (so they're behind nodes)
-    if (this.options.showWeights && this.weights) {
+    // Draw if we have weights (to show actual connection strengths) or topology (for structure)
+    if (this.options.showWeights && (this.weights || this.topology)) {
       this.drawConnections(ctx, layerX, inputY, hiddenY, outputY, inputs, hidden, outputs);
     }
 
@@ -243,12 +303,14 @@ export class NeuralVisualizer {
     _hidden: number[],
     outputs: number[]
   ): void {
-    if (!this.weights) return;
+    // Use extracted weights if available, otherwise use uniform weight visualization
+    const weights = this.weights;
 
     // Draw input -> hidden connections
     for (let i = 0; i < inputY.length; i++) {
       for (let h = 0; h < hiddenY.length; h++) {
-        const weight = Math.abs(this.weights.weightsIH[i]?.[h] ?? 0);
+        // Use actual weight magnitude if available, otherwise show structure with uniform weight
+        const weight = weights ? Math.abs(weights.weightsIH[i]?.[h] ?? 0) : 0.3;
         this.drawConnection(ctx, layerX[0], inputY[i], layerX[1], hiddenY[h], weight);
       }
     }
@@ -256,9 +318,10 @@ export class NeuralVisualizer {
     // Draw hidden -> output connections - highlight based on output activation
     for (let h = 0; h < hiddenY.length; h++) {
       for (let o = 0; o < outputY.length; o++) {
-        // Blend weight magnitude with output activation for dynamic visualization
-        const baseWeight = Math.abs(this.weights.weightsHO[h]?.[o] ?? 0);
+        // Use actual weight magnitude, modulated by output activation for visual feedback
+        const baseWeight = weights ? Math.abs(weights.weightsHO[h]?.[o] ?? 0) : 0.3;
         const outputMag = Math.abs(outputs[o] || 0);
+        // Blend weight with output activation for dynamic visualization
         const activation = baseWeight * 0.5 + outputMag * 0.5;
         this.drawConnection(ctx, layerX[1], hiddenY[h], layerX[2], outputY[o], activation);
       }
