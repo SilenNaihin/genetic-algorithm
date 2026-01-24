@@ -52,32 +52,32 @@ export class CreatureCardRenderer {
     const creature = createCreatureMesh(result.genome);
     this.sharedScene.add(creature);
 
-    // Calculate bounds and center
-    const box = new THREE.Box3().setFromObject(creature);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-
     const targetSize = 2;
-    const scaleFactor = maxDim > 0 ? targetSize / maxDim : 1;
-    creature.scale.setScalar(scaleFactor);
-
-    box.setFromObject(creature);
-    box.getCenter(center);
-    creature.position.sub(center);
-    creature.position.y += 0.3;
-
-    // Apply final frame positions if available
     const finalFrame = result.frames[result.frames.length - 1];
-    if (finalFrame) {
-      const nodeMeshes = creature.userData.nodeMeshes as Map<string, THREE.Mesh>;
+    const nodeMeshes = creature.userData.nodeMeshes as Map<string, THREE.Mesh>;
 
+    if (finalFrame) {
+      // Calculate bounds from FINAL FRAME positions (not initial genome)
+      // This ensures correct scaling after physics simulation
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
       let cx = 0, cy = 0, cz = 0, count = 0;
+
       for (const [, pos] of finalFrame.nodePositions) {
+        minX = Math.min(minX, pos.x); maxX = Math.max(maxX, pos.x);
+        minY = Math.min(minY, pos.y); maxY = Math.max(maxY, pos.y);
+        minZ = Math.min(minZ, pos.z); maxZ = Math.max(maxZ, pos.z);
         cx += pos.x; cy += pos.y; cz += pos.z; count++;
       }
       if (count > 0) { cx /= count; cy /= count; cz /= count; }
 
+      const sizeX = maxX - minX;
+      const sizeY = maxY - minY;
+      const sizeZ = maxZ - minZ;
+      const maxDim = Math.max(sizeX, sizeY, sizeZ, 0.1); // Min 0.1 to avoid division issues
+      const scaleFactor = targetSize / maxDim;
+
+      // Apply final frame positions with correct scaling
       for (const [nodeId, pos] of finalFrame.nodePositions) {
         const mesh = nodeMeshes.get(nodeId);
         if (mesh) {
@@ -88,6 +88,8 @@ export class CreatureCardRenderer {
           );
         }
       }
+
+      // Update muscles to match node positions
       for (const child of creature.children) {
         if (child.userData.nodeA) {
           const nodeA = nodeMeshes.get(child.userData.nodeA);
@@ -95,6 +97,19 @@ export class CreatureCardRenderer {
           if (nodeA && nodeB) updateMuscleMesh(child as THREE.Mesh, nodeA.position, nodeB.position);
         }
       }
+    } else {
+      // No frames - use initial genome positions
+      const box = new THREE.Box3().setFromObject(creature);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 0.1);
+      const scaleFactor = targetSize / maxDim;
+
+      creature.scale.setScalar(scaleFactor);
+      box.setFromObject(creature);
+      box.getCenter(center);
+      creature.position.sub(center);
+      creature.position.y += 0.3;
     }
 
     // Render
