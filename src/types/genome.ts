@@ -87,6 +87,8 @@ export interface CreatureGenome {
 
   // Internal: API creature ID for lazy frame loading (not saved to storage)
   _apiCreatureId?: string;
+  // Internal: Generation of best performance (for loading correct frames)
+  _bestPerformanceGeneration?: number;
 }
 
 // Creature constraints configuration

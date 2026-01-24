@@ -205,7 +205,7 @@ export class RemoteStorage {
    */
   async loadCreatureFrames(
     creatureId: string,
-    genome: { nodes: { id: string }[] },
+    genome: { nodes: { id: string }[]; _bestPerformanceGeneration?: number },
     pelletsCollected: number,
     _config: SimulationConfig,
     _disqualified: string | null,
@@ -213,8 +213,10 @@ export class RemoteStorage {
     realFitnessOverTime?: number[]
   ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[] }> {
     try {
-      console.log('[RemoteStorage] Fetching frames for creature:', creatureId);
-      const framesData = await Api.getCreatureFrames(creatureId);
+      // Use best performance generation if available (for best/longest survivor replays)
+      const generation = genome._bestPerformanceGeneration;
+      console.log('[RemoteStorage] Fetching frames for creature:', creatureId, 'generation:', generation);
+      const framesData = await Api.getCreatureFrames(creatureId, generation);
       console.log('[RemoteStorage] API response:', {
         hasFramesData: !!framesData.frames_data,
         framesDataLength: framesData.frames_data?.length,
@@ -308,12 +310,14 @@ export class RemoteStorage {
         ]) as [number, number][],
       }));
 
-      // Fetch best creature if available
+      // Fetch best creature if available - use dedicated endpoint for best performance
       if (apiRun.best_creature_id) {
         try {
-          const bestCreature = await Api.getCreature(apiRun.best_creature_id);
+          const bestCreature = await Api.getBestCreatureForRun(apiRun.id);
           const genome = Api.fromApiGenome(bestCreature.genome);
           genome._apiCreatureId = bestCreature.id;
+          // Store the generation of best performance for frame loading
+          genome._bestPerformanceGeneration = bestCreature.generation;
           run.bestCreature = {
             result: {
               genome,
@@ -323,19 +327,21 @@ export class RemoteStorage {
               frames: [], // Loaded lazily
               pelletData: [],
             },
-            generation: apiRun.best_creature_generation ?? 0,
+            generation: bestCreature.generation,
           };
         } catch (e) {
           console.warn('[RemoteStorage] Failed to fetch best creature:', e);
         }
       }
 
-      // Fetch longest survivor if available
+      // Fetch longest survivor if available - use dedicated endpoint for best performance
       if (apiRun.longest_survivor_id) {
         try {
-          const longestSurvivor = await Api.getCreature(apiRun.longest_survivor_id);
+          const longestSurvivor = await Api.getLongestSurvivorForRun(apiRun.id);
           const genome = Api.fromApiGenome(longestSurvivor.genome);
           genome._apiCreatureId = longestSurvivor.id;
+          // Store the generation of best performance for frame loading
+          genome._bestPerformanceGeneration = longestSurvivor.generation;
           run.longestSurvivor = {
             result: {
               genome,

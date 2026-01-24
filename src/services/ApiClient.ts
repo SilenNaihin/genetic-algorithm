@@ -511,12 +511,32 @@ export async function getGeneration(
 // Creatures API
 // -------------------------------------------------------------------
 
-export async function getCreature(creatureId: string): Promise<ApiCreature> {
-  return fetchJson<ApiCreature>(`/api/creatures/${creatureId}`);
+export async function getCreature(creatureId: string, generation?: number): Promise<ApiCreature> {
+  const url = generation !== undefined
+    ? `/api/creatures/${creatureId}?generation=${generation}`
+    : `/api/creatures/${creatureId}`;
+  return fetchJson<ApiCreature>(url);
+}
+
+/**
+ * Get the best creature for a run (highest fitness ever achieved).
+ * Returns the creature with its best performance data.
+ */
+export async function getBestCreatureForRun(runId: string): Promise<ApiCreature> {
+  return fetchJson<ApiCreature>(`/api/creatures/run/${runId}/best`);
+}
+
+/**
+ * Get the longest surviving creature for a run.
+ * Returns the creature with its best performance data (not death generation).
+ */
+export async function getLongestSurvivorForRun(runId: string): Promise<ApiCreature> {
+  return fetchJson<ApiCreature>(`/api/creatures/run/${runId}/longest-survivor`);
 }
 
 export async function getCreatureFrames(
-  creatureId: string
+  creatureId: string,
+  generation?: number
 ): Promise<{
   frames_data: number[][];
   frame_count: number;
@@ -528,8 +548,12 @@ export async function getCreatureFrames(
     initial_distance: number;
   }> | null;
   fitness_over_time: number[] | null;
+  generation: number;
 }> {
-  return fetchJson(`/api/creatures/${creatureId}/frames`);
+  const url = generation !== undefined
+    ? `/api/creatures/${creatureId}/frames?generation=${generation}`
+    : `/api/creatures/${creatureId}/frames`;
+  return fetchJson(url);
 }
 
 export interface AncestorInfo {
