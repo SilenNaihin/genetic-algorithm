@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useEvolutionStore } from '../../stores/evolutionStore';
+import { useEvolutionStore, useIsAutoRunning } from '../../stores/evolutionStore';
 import { ControlPanel } from './ControlPanel';
 import { StatsPanel } from './StatsPanel';
 import { StepIndicator } from './StepIndicator';
@@ -19,20 +18,9 @@ import { GenerationJumpModal } from '../modals/GenerationJumpModal';
  */
 export function GridView() {
   const simulationProgress = useEvolutionStore((s) => s.simulationProgress);
+  const isAutoRunning = useIsAutoRunning();
 
-  // Only show progress bar after a delay to avoid flashing for instant operations
-  const [showProgress, setShowProgress] = useState(false);
-
-  useEffect(() => {
-    if (simulationProgress !== null) {
-      // Show progress immediately - no delay
-      setShowProgress(true);
-    } else {
-      setShowProgress(false);
-    }
-  }, [simulationProgress]);
-
-  // Calculate progress percentage
+  // Calculate progress percentage for step-by-step mode
   const progressPercent = simulationProgress
     ? Math.round((simulationProgress.completed / simulationProgress.total) * 100)
     : 0;
@@ -57,8 +45,29 @@ export function GridView() {
       {/* Control Panel - Bottom Left (fixed) */}
       <ControlPanel />
 
-      {/* Progress Bar - shown during active simulation (with delay to avoid flash) */}
-      {showProgress && simulationProgress && (
+      {/* Simple "Simulating..." indicator for autoRun (1x/10x/100x) */}
+      {isAutoRunning && !simulationProgress && (
+        <div
+          className="glass"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            zIndex: 50,
+            padding: '12px 20px',
+            borderRadius: '8px',
+          }}
+        >
+          <div style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
+            Simulating...
+          </div>
+        </div>
+      )}
+
+      {/* Full progress bar for step-by-step simulation */}
+      {simulationProgress && (
         <div
           className="progress-container glass"
           style={{

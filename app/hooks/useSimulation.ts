@@ -237,6 +237,19 @@ export function useSimulation() {
     const survivors = sortedResults.slice(0, survivorCount);
     const deadCreatures = sortedResults.slice(survivorCount);
 
+    // Check if any dying creature is the new longest survivor
+    // (We track creatures when they DIE, not while alive)
+    for (const dead of deadCreatures) {
+      const streak = dead.genome.survivalStreak || 0;
+      if (streak > 0) {
+        const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
+        if (streak > currentLongestGens) {
+          setLongestSurvivor(dead, streak, currentGen + 1); // Dies at next generation
+          StorageService.updateLongestSurvivor(dead, streak, currentGen + 1);
+        }
+      }
+    }
+
     // Grid position helper
     const GRID_COLS = 10;
     const CARD_SIZE = 80;
@@ -455,32 +468,112 @@ export function useSimulation() {
 
   /**
    * Auto-run for a specific number of generations
-   * Uses fast mode to skip animations for better performance
+   * Does all work silently and updates UI once at the end
    */
   const autoRun = useCallback(
     async (generations: number) => {
       if (SimState.isAutoRunning()) return;
 
+      const population = SimState.getPopulation();
+      if (!population) return;
+
       SimState.setAutoRunning(true);
       setIsAutoRunning(true);
 
       try {
+        let currentGen = useEvolutionStore.getState().generation;
+        const currentConfig = useEvolutionStore.getState().config;
+        let history = useEvolutionStore.getState().fitnessHistory;
+
+        // Track previous results for detecting dying creatures
+        let previousResults = useEvolutionStore.getState().simulationResults;
+
         for (let i = 0; i < generations; i++) {
           if (!SimState.isAutoRunning()) break;
 
-          // Mutate (fast mode - no animations)
-          setEvolutionStep('mutate');
-          await runMutateStep(true);
+          // Check for dying creatures that might be longest survivors
+          // (before evolution removes them)
+          if (previousResults.length > 0) {
+            // Find creatures that will die (sorted by fitness, bottom cullPercentage%)
+            const sortedPrev = [...previousResults].sort((a, b) => {
+              const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
+              const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
+              return bFit - aFit;
+            });
+            const survivorCount = Math.floor(sortedPrev.length * (1 - currentConfig.cullPercentage));
+            const dyingCreatures = sortedPrev.slice(survivorCount);
 
-          if (!SimState.isAutoRunning()) break;
+            for (const dead of dyingCreatures) {
+              const streak = dead.genome.survivalStreak || 0;
+              if (streak > 0) {
+                const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
+                if (streak > currentLongestGens) {
+                  setLongestSurvivor(dead, streak, currentGen + 1);
+                  StorageService.updateLongestSurvivor(dead, streak, currentGen + 1);
+                }
+              }
+            }
+          }
 
-          // Simulate
-          await runSimulateStep();
+          // 1. Evolve population (mutate/crossover) - silent
+          const newGenomes = await SimulationService.evolvePopulation(population, currentGen);
+          currentGen += 1;
 
-          if (!SimState.isAutoRunning()) break;
+          // 2. Simulate all creatures - silent (no progress callback)
+          const results = await SimulationService.runSimulation(newGenomes, currentConfig);
 
-          // Sort (fast mode - no animations)
-          await runSortStep(true);
+          // 3. Update population fitness
+          SimulationService.updatePopulationFitness(population, results);
+
+          // Save for next iteration's dying creature check
+          previousResults = results;
+
+          // 4. Record history and save to storage
+          const stats = SimulationService.calculateFitnessStats(results);
+          if (stats.validCount > 0) {
+            const newEntry = {
+              generation: currentGen,
+              best: stats.best,
+              average: stats.average,
+              worst: stats.worst,
+            };
+            history = [...history, newEntry];
+          }
+
+          // Save generation to storage
+          await StorageService.saveGeneration(currentGen, results);
+
+          // Update best creature tracking
+          const best = SimulationService.findBestCreature(results);
+          if (best) {
+            const currentBest = useEvolutionStore.getState().bestCreatureEver;
+            if (!currentBest || best.finalFitness > currentBest.finalFitness) {
+              setBestCreature(best, currentGen);
+              StorageService.updateBestCreature(best, currentGen);
+            }
+          }
+
+          // Record creature type history
+          const nodeCountDistribution = new Map<number, number>();
+          for (const result of results) {
+            const nodeCount = result.genome.nodes.length;
+            nodeCountDistribution.set(nodeCount, (nodeCountDistribution.get(nodeCount) || 0) + 1);
+          }
+          const typeEntry = { generation: currentGen, nodeCountDistribution };
+          const currentTypeHistory = useEvolutionStore.getState().creatureTypeHistory;
+          setCreatureTypeHistory([...currentTypeHistory, typeEntry]);
+          await StorageService.updateCreatureTypeHistory([...currentTypeHistory, typeEntry]);
+
+          // Update fitness history and generation every iteration (for live graph updates)
+          setFitnessHistory(history);
+          setGeneration(currentGen);
+          setMaxGeneration(currentGen);
+          await StorageService.updateFitnessHistory(history);
+
+          // Only update creature grid on the LAST iteration (avoid visual flickering)
+          if (i === generations - 1 || !SimState.isAutoRunning()) {
+            setSimulationResults(results);
+          }
         }
       } finally {
         SimState.setAutoRunning(false);
@@ -489,7 +582,8 @@ export function useSimulation() {
         clearCardAnimationStates();
       }
     },
-    [setIsAutoRunning, setEvolutionStep, runMutateStep, runSimulateStep, runSortStep, clearCardAnimationStates]
+    [setIsAutoRunning, setEvolutionStep, setSimulationResults, setGeneration, setMaxGeneration,
+     setFitnessHistory, setCreatureTypeHistory, setBestCreature, setLongestSurvivor, clearCardAnimationStates]
   );
 
   /**
