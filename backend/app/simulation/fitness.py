@@ -618,6 +618,9 @@ def update_fitness_state(
     dx = com[:, 0] - state.previous_com[:, 0]
     dz = com[:, 2] - state.previous_com[:, 2]
     step_distance = torch.sqrt(dx**2 + dz**2)
+    # Filter out micro-movements from oscillation jitter (threshold ~0.02 units per frame)
+    # This prevents stationary creatures from accumulating distance from muscle wobble
+    step_distance = torch.where(step_distance > 0.02, step_distance, torch.zeros_like(step_distance))
     state.distance_traveled = state.distance_traveled + step_distance
 
     # Update previous COM
