@@ -156,41 +156,44 @@ export function MenuScreen() {
           borderRadius: '8px',
         }}>
           {/* Selection method */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Selection</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <select
-                value={config.selectionMethod}
-                onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  color: 'var(--text-primary)',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="rank">Rank</option>
-                <option value="tournament">Tournament</option>
-                <option value="truncation">Truncation</option>
-              </select>
-              <InfoTooltip
-                text={
-                  config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
-                  config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
-                  TOOLTIPS.selectionRank
-                }
-                width={280}
-              />
+          <div className="param-group" style={{ width: '120px' }}>
+            <div className="param-label">
+              <span className="param-name">
+                Selection
+                <InfoTooltip
+                  text={
+                    config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
+                    config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
+                    TOOLTIPS.selectionRank
+                  }
+                  width={280}
+                />
+              </span>
             </div>
+            <select
+              value={config.selectionMethod}
+              onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
+              style={{
+                width: '100%',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                color: 'var(--text-primary)',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="rank">Rank</option>
+              <option value="tournament">Tournament</option>
+              <option value="truncation">Truncation</option>
+            </select>
           </div>
 
           {/* Tournament size - only shown when tournament selected */}
           {config.selectionMethod === 'tournament' && (
             <ParamSlider
-              name="Tournament Size"
+              name="Size"
               value={config.tournamentSize}
               displayValue={String(config.tournamentSize)}
               min={2}
@@ -198,7 +201,7 @@ export function MenuScreen() {
               step={1}
               tooltip={TOOLTIPS.tournamentSize}
               onChange={(v) => setConfig({ tournamentSize: v })}
-              width="120px"
+              width="100px"
             />
           )}
 
