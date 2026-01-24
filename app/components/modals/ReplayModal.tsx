@@ -6,7 +6,6 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { ReplayRenderer } from '../../../src/rendering/ReplayRenderer';
 import { NeuralVisualizer } from '../../../src/ui/NeuralVisualizer';
-import { gatherSensorInputsPure, gatherSensorInputsHybrid, NEURAL_INPUT_SIZE_PURE } from '../../../src/neural';
 import * as StorageService from '../../../src/services/StorageService';
 import type { CreatureGenome } from '../../../src/types';
 import type { CreatureSimulationResult } from '../../../src/types';
@@ -311,56 +310,12 @@ export function ReplayModal() {
       // Update neural visualization if creature has neural genome
       const genome = loadedResult.genome;
       if (neuralVisualizerRef.current && genome.neuralGenome && genome.controllerType === 'neural') {
-        // Prefer stored activations from simulation (accurate)
+        // Display stored activations from simulation
         if (loadedResult.activationsPerFrame && loadedResult.activationsPerFrame[frameIndex]) {
           neuralVisualizerRef.current.setStoredActivations(loadedResult.activationsPerFrame[frameIndex]);
-        } else {
-          // Fallback: recompute from sensor inputs (may differ from actual simulation)
-          const frame = frames[frameIndex];
-          const com = frame.centerOfMass;
-
-          // Find active pellet at this frame
-          const activePelletData = loadedResult.pellets.find((p) =>
-            p.spawnedAtFrame <= frameIndex &&
-            (p.collectedAtFrame === null || frameIndex < p.collectedAtFrame)
-          );
-
-          // Calculate pellet direction
-          let pelletDir = { x: 0, y: 0, z: 0 };
-          let normalizedDist = 1;
-
-          if (activePelletData) {
-            const dx = activePelletData.position.x - com.x;
-            const dy = activePelletData.position.y - com.y;
-            const dz = activePelletData.position.z - com.z;
-            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if (dist > 0.01) {
-              pelletDir = { x: dx / dist, y: dy / dist, z: dz / dist };
-            }
-            normalizedDist = Math.min(dist / 20, 1);
-          }
-
-          // Calculate velocity from previous frame
-          let velocityDir = { x: 0, y: 0, z: 0 };
-          if (frameIndex > 0) {
-            const prevFrame = frames[frameIndex - 1];
-            const vx = com.x - prevFrame.centerOfMass.x;
-            const vy = com.y - prevFrame.centerOfMass.y;
-            const vz = com.z - prevFrame.centerOfMass.z;
-            const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-            if (speed > 0.001) {
-              velocityDir = { x: vx / speed, y: vy / speed, z: vz / speed };
-            }
-          }
-
-          // Gather sensor inputs based on neural mode
-          const isPureMode = genome.neuralGenome.topology.inputSize === NEURAL_INPUT_SIZE_PURE;
-          const sensorInputs = isPureMode
-            ? gatherSensorInputsPure(pelletDir, velocityDir, normalizedDist)
-            : gatherSensorInputsHybrid(pelletDir, velocityDir, normalizedDist, targetTime);
-
-          neuralVisualizerRef.current.updateActivations(sensorInputs);
         }
+        // Note: Older replays without stored activations will still show network structure/weights,
+        // just not dynamic activation highlights
       }
 
       animationRef.current = requestAnimationFrame(animate);
