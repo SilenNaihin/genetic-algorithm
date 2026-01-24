@@ -76,6 +76,7 @@ export interface ApiSimulationResult {
   total_activation: number;
   frame_count: number;
   frames: number[][] | null;
+  activations_per_frame: number[][] | null;
 }
 
 export interface ApiBatchSimulationResponse {
@@ -534,12 +535,19 @@ export async function evolveGenomes(
   // Safely convert fitnesses (NaN -> 0)
   const safeFitnesses = fitnesses.map(f => Number.isFinite(f) ? f : 0);
 
+  // Debug: Log what we're SENDING to the backend
+  const apiGenomes = genomes.map(toApiGenome);
+  if (apiGenomes.length > 0) {
+    const firstSend = apiGenomes[0];
+    console.log(`[API] SENDING first genome survival_streak: ${firstSend.survival_streak}, original survivalStreak: ${genomes[0]?.survivalStreak}`);
+  }
+
   const response = await fetchJson<{ genomes: Record<string, unknown>[]; generation: number }>(
     '/api/genetics/evolve',
     {
       method: 'POST',
       body: JSON.stringify({
-        genomes: genomes.map(toApiGenome),
+        genomes: apiGenomes,
         fitness_scores: safeFitnesses,
         config: evolutionConfig,
         generation,
@@ -548,14 +556,19 @@ export async function evolveGenomes(
   );
 
   console.log(`[API] Evolved to generation ${response.generation} from backend`);
+
+  // Debug: Log raw API response for first genome
+  if (response.genomes.length > 0) {
+    const firstRaw = response.genomes[0];
+    console.log(`[API] Raw response first genome survival_streak: ${firstRaw.survival_streak}, survivalStreak: ${(firstRaw as Record<string, unknown>).survivalStreak}`);
+  }
+
   const result = response.genomes.map(fromApiGenome);
   // Debug: Log survival streaks
   const streaks = result.map(g => g.survivalStreak || 0);
   const maxStreak = Math.max(...streaks, 0);
   const withStreak = streaks.filter(s => s > 0).length;
-  if (maxStreak > 0) {
-    console.log(`[API] Evolved genomes: ${withStreak} with streak > 0, max=${maxStreak}, first genome streak=${result[0]?.survivalStreak}`);
-  }
+  console.log(`[API] Evolved genomes: ${withStreak} with streak > 0, max=${maxStreak}, first genome streak=${result[0]?.survivalStreak}`);
   return result;
 }
 

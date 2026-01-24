@@ -80,8 +80,8 @@ def evolve_one_generation(request: EvolveRequest):
     The crossover_rate determines probability of crossover vs mutation.
     Mutation rates can decay over generations if decay is configured.
     """
-    # Convert genomes to dicts
-    genomes = [g.model_dump(by_alias=True) for g in request.genomes]
+    # Convert genomes to dicts (use field names, not aliases, for internal processing)
+    genomes = [g.model_dump() for g in request.genomes]
 
     # Build internal config
     config = InternalEvolutionConfig(

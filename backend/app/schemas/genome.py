@@ -7,7 +7,7 @@ Supports both camelCase (from frontend) and snake_case (Python convention).
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class Vector3(BaseModel):
@@ -41,11 +41,25 @@ class MuscleGene(BaseModel):
     id: str
 
     # Connection (supports both camelCase and snake_case)
-    nodeA: str | None = Field(default=None, alias='node_a')
-    nodeB: str | None = Field(default=None, alias='node_b')
+    nodeA: str | None = Field(
+        default=None,
+        alias='node_a',
+        validation_alias=AliasChoices('nodeA', 'node_a'),
+    )
+    nodeB: str | None = Field(
+        default=None,
+        alias='node_b',
+        validation_alias=AliasChoices('nodeB', 'node_b'),
+    )
 
     # Spring properties
-    restLength: float = Field(default=1.0, ge=0.1, le=10.0, alias='rest_length')
+    restLength: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        alias='rest_length',
+        validation_alias=AliasChoices('restLength', 'rest_length'),
+    )
     stiffness: float = Field(default=100.0, ge=1.0, le=1000.0)
     damping: float = Field(default=0.5, ge=0.0, le=10.0)
 
@@ -55,16 +69,48 @@ class MuscleGene(BaseModel):
     phase: float = Field(default=0.0, ge=0.0, le=6.29)  # 0 to 2*PI (with floating point margin)
 
     # v1: Direction bias (muscle responds to pellet direction)
-    directionBias: Vector3 | None = Field(default=None, alias='direction_bias')
-    biasStrength: float = Field(default=0.0, ge=0.0, le=1.0, alias='bias_strength')
+    directionBias: Vector3 | None = Field(
+        default=None,
+        alias='direction_bias',
+        validation_alias=AliasChoices('directionBias', 'direction_bias'),
+    )
+    biasStrength: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        alias='bias_strength',
+        validation_alias=AliasChoices('biasStrength', 'bias_strength'),
+    )
 
     # v2: Velocity sensing (proprioception)
-    velocityBias: Vector3 | None = Field(default=None, alias='velocity_bias')
-    velocityStrength: float = Field(default=0.0, ge=0.0, le=1.0, alias='velocity_strength')
+    velocityBias: Vector3 | None = Field(
+        default=None,
+        alias='velocity_bias',
+        validation_alias=AliasChoices('velocityBias', 'velocity_bias'),
+    )
+    velocityStrength: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        alias='velocity_strength',
+        validation_alias=AliasChoices('velocityStrength', 'velocity_strength'),
+    )
 
     # v2: Distance awareness
-    distanceBias: float = Field(default=0.0, ge=-1.0, le=1.0, alias='distance_bias')
-    distanceStrength: float = Field(default=0.0, ge=0.0, le=1.0, alias='distance_strength')
+    distanceBias: float = Field(
+        default=0.0,
+        ge=-1.0,
+        le=1.0,
+        alias='distance_bias',
+        validation_alias=AliasChoices('distanceBias', 'distance_bias'),
+    )
+    distanceStrength: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        alias='distance_strength',
+        validation_alias=AliasChoices('distanceStrength', 'distance_strength'),
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -95,24 +141,42 @@ class CreatureGenome(BaseModel):
 
     id: str
     generation: int = 0
-    survivalStreak: int = Field(default=0, alias='survival_streak')
-    parentIds: list[str] = Field(default_factory=list, alias='parent_ids')
+    survivalStreak: int = Field(
+        default=0,
+        alias='survival_streak',
+        validation_alias=AliasChoices('survivalStreak', 'survival_streak'),
+    )
+    parentIds: list[str] = Field(
+        default_factory=list,
+        alias='parent_ids',
+        validation_alias=AliasChoices('parentIds', 'parent_ids'),
+    )
 
     nodes: list[NodeGene]
     muscles: list[MuscleGene]
 
     # Global modifiers
     globalFrequencyMultiplier: float = Field(
-        default=1.0, ge=0.1, le=3.0, alias='global_frequency_multiplier'
+        default=1.0,
+        ge=0.1,
+        le=3.0,
+        alias='global_frequency_multiplier',
+        validation_alias=AliasChoices('globalFrequencyMultiplier', 'global_frequency_multiplier'),
     )
 
     # Controller type
     controllerType: Literal['oscillator', 'neural'] = Field(
-        default='oscillator', alias='controller_type'
+        default='oscillator',
+        alias='controller_type',
+        validation_alias=AliasChoices('controllerType', 'controller_type'),
     )
 
     # Neural network (optional, used when controllerType='neural')
-    neuralGenome: NeuralGenome | None = Field(default=None, alias='neural_genome')
+    neuralGenome: NeuralGenome | None = Field(
+        default=None,
+        alias='neural_genome',
+        validation_alias=AliasChoices('neuralGenome', 'neural_genome'),
+    )
 
     # Color (for visualization, optional)
     color: dict | None = None  # {h, s, l}

@@ -568,6 +568,9 @@ export function useSimulation() {
             }
           }
 
+          // Update longest survivor tracking (check current population, not just dying creatures)
+          updateLongestSurvivor(results, currentGen);
+
           // Record creature type history
           const nodeCountDistribution = new Map<number, number>();
           for (const result of results) {
@@ -598,7 +601,7 @@ export function useSimulation() {
       }
     },
     [setIsAutoRunning, setEvolutionStep, setSimulationResults, setGeneration, setMaxGeneration,
-     setFitnessHistory, setCreatureTypeHistory, setBestCreature, setLongestSurvivor, clearCardAnimationStates]
+     setFitnessHistory, setCreatureTypeHistory, setBestCreature, setLongestSurvivor, updateLongestSurvivor, clearCardAnimationStates]
   );
 
   /**
