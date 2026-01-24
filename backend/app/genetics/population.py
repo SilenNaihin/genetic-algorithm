@@ -12,6 +12,7 @@ from typing import Any
 
 from .selection import (
     truncation_selection,
+    tournament_selection,
     rank_based_probabilities,
     weighted_random_select,
 )
@@ -61,6 +62,8 @@ class EvolutionConfig:
 
     # Selection
     cull_percentage: float = 0.5
+    selection_method: str = 'rank'  # 'truncation', 'tournament', 'rank'
+    tournament_size: int = 3  # For tournament selection
 
     # Reproduction
     crossover_rate: float = 0.5
@@ -418,6 +421,8 @@ def evolve_population(
             population_size=config.get('population_size', 100),
             elite_count=config.get('elite_count', 5),
             cull_percentage=config.get('cull_percentage', 0.5),
+            selection_method=config.get('selection_method', 'rank'),
+            tournament_size=config.get('tournament_size', 3),
             crossover_rate=config.get('crossover_rate', 0.5),
             use_mutation=config.get('use_mutation', True),
             use_crossover=config.get('use_crossover', True),
@@ -460,9 +465,24 @@ def evolve_population(
         max_amplitude=config.max_amplitude,
     )
 
-    # Select survivors
-    result = truncation_selection(genomes, fitness_scores, 1 - config.cull_percentage)
-    survivors = result.survivors
+    # Select survivors based on configured method
+    survival_rate = 1 - config.cull_percentage
+    num_survivors = max(1, int(len(genomes) * survival_rate))
+
+    if config.selection_method == 'truncation':
+        # Strict cutoff - only top performers survive
+        result = truncation_selection(genomes, fitness_scores, survival_rate)
+        survivors = result.survivors
+    elif config.selection_method == 'tournament':
+        # Tournament selection - random groups, best of each survives
+        survivors = tournament_selection(
+            genomes, fitness_scores, num_survivors, config.tournament_size
+        )
+    else:  # 'rank' (default)
+        # Rank-based selection - higher rank = higher survival probability
+        # Still uses truncation for initial survival, but rank-based for breeding
+        result = truncation_selection(genomes, fitness_scores, survival_rate)
+        survivors = result.survivors
 
     # Get survivor fitness scores for rank-based selection
     survivor_ids = {g['id'] for g in survivors}

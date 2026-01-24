@@ -99,6 +99,8 @@ async def run_generation(
             'population_size': config.population_size,
             'elite_count': config.elite_count,
             'cull_percentage': config.cull_percentage,
+            'selection_method': config.selection_method,
+            'tournament_size': config.tournament_size,
             'crossover_rate': config.crossover_rate,
             'use_mutation': config.use_mutation,
             'use_crossover': config.use_crossover,
@@ -138,11 +140,14 @@ async def run_generation(
 
     # Simulate all creatures
     start_time = time.time()
+    # Determine frame storage mode: if sparse, we still need to record all frames
+    # for selection later; if none, don't record; if all, record all
+    effective_frame_mode = "all" if config.frame_storage_mode == "sparse" else config.frame_storage_mode
     sim_results = await simulator.simulate_batch(
         genomes=genomes,
         config={
             "simulation_duration": config.simulation_duration,
-            "frame_storage_mode": "all",  # Store frames for sparse selection later
+            "frame_storage_mode": effective_frame_mode,
             "frame_rate": 15,
             "pellet_count": config.pellet_count,
             "arena_size": config.arena_size,
@@ -188,7 +193,7 @@ async def run_generation(
     )
     db.add(generation)
 
-    # Determine which creatures get frame storage
+    # Determine which creatures get frame storage based on config.frame_storage_mode
     sorted_results = sorted(
         zip(genomes, sim_results),
         key=lambda x: x[1]["fitness"],
@@ -196,21 +201,30 @@ async def run_generation(
     )
     keep_frames_ids = set()
 
-    # Top N
-    for genome, _ in sorted_results[: settings.frames_keep_top]:
-        keep_frames_ids.add(genome["id"])
+    if config.frame_storage_mode == "all":
+        # Store frames for all creatures
+        for genome, _ in sorted_results:
+            keep_frames_ids.add(genome["id"])
+    elif config.frame_storage_mode == "sparse":
+        # Use config values for sparse storage (top N + bottom N + random from middle)
+        top_count = config.sparse_top_count
+        bottom_count = config.sparse_bottom_count
 
-    # Bottom N
-    for genome, _ in sorted_results[-settings.frames_keep_bottom :]:
-        keep_frames_ids.add(genome["id"])
+        # Top N
+        for genome, _ in sorted_results[:top_count]:
+            keep_frames_ids.add(genome["id"])
 
-    # Random N from middle
-    middle = sorted_results[settings.frames_keep_top : -settings.frames_keep_bottom]
-    import random
+        # Bottom N
+        for genome, _ in sorted_results[-bottom_count:]:
+            keep_frames_ids.add(genome["id"])
 
-    random.shuffle(middle)
-    for genome, _ in middle[: settings.frames_keep_random]:
-        keep_frames_ids.add(genome["id"])
+        # Random N from middle (use settings.frames_keep_random for middle selection)
+        import random
+        middle = sorted_results[top_count:-bottom_count] if bottom_count > 0 else sorted_results[top_count:]
+        random.shuffle(middle)
+        for genome, _ in middle[:settings.frames_keep_random]:
+            keep_frames_ids.add(genome["id"])
+    # else: frame_storage_mode == "none" -> keep_frames_ids stays empty
 
     # Create/update creature records and performance records
     for genome, sim_result in zip(genomes, sim_results):

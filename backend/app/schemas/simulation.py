@@ -29,12 +29,14 @@ class SimulationConfig(BaseModel):
     # Evolution (not used in simulation, but included for parity)
     population_size: int = Field(default=100, ge=10, le=10000)
     cull_percentage: float = Field(default=0.5, ge=0.1, le=0.9)
-    mutation_rate: float = Field(default=0.1, ge=0.0, le=1.0)
+    selection_method: Literal['truncation', 'tournament', 'rank'] = 'rank'
+    tournament_size: int = Field(default=3, ge=2, le=10)
+    mutation_rate: float = Field(default=0.2, ge=0.0, le=1.0)
     mutation_magnitude: float = Field(default=0.3, ge=0.0, le=1.0)
     crossover_rate: float = Field(default=0.5, ge=0.0, le=1.0)
     elite_count: int = Field(default=5, ge=0, le=100)
     use_mutation: bool = True
-    use_crossover: bool = True
+    use_crossover: bool = False
 
     # Creature constraints
     min_nodes: int = Field(default=3, ge=2, le=20)
@@ -55,14 +57,14 @@ class SimulationConfig(BaseModel):
 
     # Neural network settings
     use_neural_net: bool = True
-    neural_mode: Literal['hybrid', 'pure'] = 'hybrid'
+    neural_mode: Literal['hybrid', 'pure'] = 'pure'
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
     neural_activation: str = Field(default='tanh')
-    weight_mutation_rate: float = Field(default=0.1, ge=0.0, le=1.0)
+    weight_mutation_rate: float = Field(default=0.2, ge=0.0, le=1.0)
     weight_mutation_magnitude: float = Field(default=0.3, ge=0.0, le=2.0)
-    weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'off'
-    neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
-    fitness_efficiency_penalty: float = Field(default=0.5, ge=0.0, le=5.0)
+    weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'linear'
+    neural_output_bias: float = Field(default=-0.1, ge=-2.0, le=2.0)
+    fitness_efficiency_penalty: float = Field(default=0.1, ge=0.0, le=5.0)
     neural_dead_zone: float = Field(default=0.1, ge=0.0, le=1.0)
 
     # Disqualification thresholds

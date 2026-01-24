@@ -129,6 +129,13 @@ export const TOOLTIPS = {
   crossoverRate: 'Probability of combining two parents vs just mutating one. Higher rates mix successful traits more often.',
   cullPercentage: 'Fraction of population replaced each generation. 50% means bottom half dies and is replaced by offspring of top half.',
 
+  // Selection methods
+  selectionMethod: 'How parents are chosen for breeding. Different methods have different selection pressure (how strongly fitness affects reproduction).',
+  selectionTruncation: 'Truncation: Strictly keeps top performers. High selection pressure - only the best survive. Fast convergence but may lose diversity. Good for well-defined fitness landscapes.',
+  selectionTournament: 'Tournament: Randomly picks N creatures and keeps the best. Tunable pressure via tournament size. Larger tournaments = higher pressure. Good balance of exploration and exploitation.',
+  selectionRank: 'Rank: Selection probability based on fitness rank, not raw value. Best creature has highest chance, but even low-ranked creatures can reproduce. Maintains diversity, prevents premature convergence.',
+  tournamentSize: 'Number of contestants per tournament. Larger = higher selection pressure (best creatures win more often). 2-3 for exploration, 5-7 for faster convergence.',
+
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',
   physicsFPS: 'Physics frames per second. Higher FPS = more expressive movement but more compute. 60 FPS default, 30 FPS for faster runs, 120 FPS for precision.',

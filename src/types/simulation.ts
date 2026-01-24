@@ -21,6 +21,8 @@ export interface SimulationConfig {
   // Evolution
   populationSize: number;       // 100
   cullPercentage: number;       // 0.5 (bottom 50%)
+  selectionMethod: 'truncation' | 'tournament' | 'rank';  // How survivors are selected
+  tournamentSize: number;       // For tournament selection: number of contestants per round
   mutationRate: number;         // Per-gene mutation rate (0.1-0.5)
   mutationMagnitude: number;    // How much values change
   crossoverRate: number;        // Probability of crossover vs mutation for new creatures (0-1)
@@ -72,12 +74,14 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   populationSize: 100,
   cullPercentage: 0.5,
-  mutationRate: 0.1,
+  selectionMethod: 'rank',
+  tournamentSize: 3,
+  mutationRate: 0.2,
   mutationMagnitude: 0.3,
   crossoverRate: 0.5,
   eliteCount: 5,
   useMutation: true,
-  useCrossover: true,
+  useCrossover: false,
 
   minNodes: 3,
   maxNodes: 8,
@@ -96,14 +100,14 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   // Neural network defaults (enabled by default)
   useNeuralNet: true,
-  neuralMode: 'hybrid',
+  neuralMode: 'pure',
   neuralHiddenSize: 8,
   neuralActivation: 'tanh',
-  weightMutationRate: 0.1,
+  weightMutationRate: 0.2,
   weightMutationMagnitude: 0.3,
-  weightMutationDecay: 'off',    // No decay by default
-  neuralOutputBias: 0.0,         // Initial output neuron bias (0 = neutral, inside dead zone)
-  fitnessEfficiencyPenalty: 0.5, // Subtract 0.5 * total_activation from fitness
+  weightMutationDecay: 'linear',
+  neuralOutputBias: -0.1,        // Slight negative bias so muscles must evolve to activate
+  fitnessEfficiencyPenalty: 0.1, // Subtle penalty for excessive activation
   neuralDeadZone: 0.1,           // Outputs with absolute value < 0.1 become 0 in pure mode
 
   // Frame storage mode

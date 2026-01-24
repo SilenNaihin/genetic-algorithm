@@ -155,6 +155,48 @@ export function MenuScreen() {
           background: 'var(--bg-tertiary)',
           borderRadius: '8px',
         }}>
+          {/* Selection method */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Selection:</span>
+            <select
+              value={config.selectionMethod}
+              onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                color: 'var(--text-primary)',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+              title={
+                config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
+                config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
+                TOOLTIPS.selectionRank
+              }
+            >
+              <option value="rank">Rank</option>
+              <option value="tournament">Tournament</option>
+              <option value="truncation">Truncation</option>
+            </select>
+          </div>
+
+          {/* Tournament size - only shown when tournament selected */}
+          {config.selectionMethod === 'tournament' && (
+            <ParamSlider
+              name="Tournament Size"
+              value={config.tournamentSize}
+              displayValue={String(config.tournamentSize)}
+              min={2}
+              max={10}
+              step={1}
+              tooltip={TOOLTIPS.tournamentSize}
+              onChange={(v) => setConfig({ tournamentSize: v })}
+              width="120px"
+            />
+          )}
+
           {/* Evolution mode checkboxes */}
           <div style={{ display: 'flex', gap: '16px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
