@@ -34,7 +34,6 @@ app/                    # Next.js React application
 src/                    # Core simulation modules (shared)
 ├── __tests__/          # Vitest tests
 ├── core/               # Domain models (Creature, Genome, Pellet)
-├── genetics/           # Evolution (Selection, Crossover, Mutation, Population)
 ├── neural/             # Neural network for neuroevolution
 ├── physics/            # Cannon-ES physics (BodyFactory, PhysicsWorld)
 ├── rendering/          # Three.js visualization (PreviewRenderer, ReplayRenderer)
@@ -82,10 +81,12 @@ backend/                # Python backend (PyTorch physics)
 
 ## Genetics System
 
+All genetics operations are handled by the **backend** via the evolution API.
+
 - **Selection**: Truncation (default), Tournament (coming soon)
 - **Mutation**: Body (node positions, muscle params), Neural weights, Structural (add/remove nodes/muscles)
 - **Crossover**: Interpolation (body), Uniform (neural weights)
-- **Key files**: `src/genetics/Selection.ts`, `Population.ts`, `Mutation.ts`, `Crossover.ts`
+- **Key files**: `backend/app/genetics/` (selection.py, mutation.py, crossover.py, population.py)
 - See `genetics-prd.json` for implementation roadmap
 
 ## Conventions
@@ -128,7 +129,7 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-175 frontend tests covering: genetics, genome, storage, neural networks, brain evolution, math utilities.
+130 frontend tests covering: genome, storage, neural networks, brain evolution, math utilities.
 441 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
 
 ## Global Commands
