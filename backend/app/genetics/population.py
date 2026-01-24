@@ -80,7 +80,7 @@ class EvolutionConfig:
     # Neural initialization
     use_neural_net: bool = True
     neural_hidden_size: int = 8
-    neural_output_bias: float = -0.5
+    neural_output_bias: float = 0.0
 
     # Constraints
     min_nodes: int = 3
@@ -156,7 +156,7 @@ def generate_random_genome(
     constraints: GenomeConstraints | dict | None = None,
     use_neural_net: bool = True,
     neural_hidden_size: int = 8,
-    neural_output_bias: float = -0.5,
+    neural_output_bias: float = 0.0,
 ) -> dict:
     """
     Generate a random creature genome.
@@ -320,7 +320,7 @@ def generate_population(
     constraints: GenomeConstraints | dict | None = None,
     use_neural_net: bool = True,
     neural_hidden_size: int = 8,
-    neural_output_bias: float = -0.5,
+    neural_output_bias: float = 0.0,
 ) -> list[dict]:
     """
     Generate an initial population of random genomes.

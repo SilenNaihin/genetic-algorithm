@@ -6,7 +6,7 @@
  * Weights are evolved through genetic algorithms, NOT trained with gradients.
  * Initialization is optimized for GA evolution:
  * - Small uniform weights (not Gaussian - no gradient assumptions)
- * - Negative output biases (default "off" state, must evolve to activate)
+ * - Zero output biases (neutral state, inside dead zone in pure mode)
  *
  * This class provides:
  * - Forward pass computation
@@ -16,8 +16,8 @@
 
 import { ActivationType, getActivation } from './activations';
 
-/** Default negative bias for output neurons (makes muscles default to "off") */
-export const DEFAULT_OUTPUT_BIAS = -0.5;
+/** Default bias for output neurons (0 = neutral, inside dead zone) */
+export const DEFAULT_OUTPUT_BIAS = 0.0;
 
 export interface NeuralNetworkConfig {
   inputSize: number;    // Number of sensor inputs (7 for pure mode, 8 for hybrid)
@@ -74,7 +74,7 @@ export class NeuralNetwork {
    * Unlike gradient-based training which uses Xavier/Gaussian init,
    * GA evolution benefits from:
    * - Small uniform weights (simpler search space, no gradient assumptions)
-   * - Negative output biases (muscles default to "off", must evolve to activate)
+   * - Zero output biases (muscles start neutral, inside dead zone)
    */
   static initialize(config: NeuralNetworkConfig): NeuralNetwork {
     const nn = new NeuralNetwork(config);
@@ -96,9 +96,8 @@ export class NeuralNetwork {
         nn.weightsHO[i][j] = (Math.random() - 0.5) * 2 * weightRange;
       }
     }
-    // Output biases start negative (muscles default to "off")
-    // tanh(-1.5) ≈ -0.9, so muscles are mostly inactive until evolution
-    // learns to overcome this bias with positive weighted inputs
+    // Output biases start at zero (neutral, inside dead zone in pure mode)
+    // Muscles are inactive until evolution learns to produce outputs outside dead zone
     nn.biasO.fill(DEFAULT_OUTPUT_BIAS);
 
     return nn;

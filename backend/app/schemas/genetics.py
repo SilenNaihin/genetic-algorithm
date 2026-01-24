@@ -68,7 +68,7 @@ class EvolutionConfig(BaseModel):
 
     # Neural network
     use_neural_net: bool = True
-    neural_output_bias: float = Field(default=-0.5, ge=-2.0, le=0.0)
+    neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
 
 
 class PopulationStats(BaseModel):
@@ -106,7 +106,7 @@ class GeneratePopulationRequest(BaseModel):
     constraints: GenomeConstraints = Field(default_factory=GenomeConstraints)
     use_neural_net: bool = True
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
-    neural_output_bias: float = Field(default=-0.5, ge=-2.0, le=0.0)
+    neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
 
 
 class GeneratePopulationResponse(BaseModel):

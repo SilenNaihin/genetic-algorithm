@@ -34,7 +34,7 @@ class TestConstants:
     """Test neural network constants match TypeScript."""
 
     def test_default_output_bias(self):
-        assert DEFAULT_OUTPUT_BIAS == -0.5
+        assert DEFAULT_OUTPUT_BIAS == 0.0
 
     def test_input_size_pure(self):
         assert NEURAL_INPUT_SIZE_PURE == 7
@@ -90,7 +90,7 @@ class TestNeuralConfig:
         assert config.activation == 'tanh'
         assert config.weight_mutation_rate == 0.1
         assert config.weight_mutation_magnitude == 0.3
-        assert config.output_bias == -0.5
+        assert config.output_bias == 0.0
         assert config.dead_zone == 0.1
 
     def test_custom_values(self):
@@ -423,25 +423,25 @@ class TestFromGenomes:
     """Test loading network from genome data."""
 
     def test_loads_weights_correctly(self):
-        # Create simple genome with known weights
+        """Test loading from structured format (weights_ih, weights_ho, biases_h, biases_o)."""
         input_size = 8
         hidden_size = 4
         output_size = 3
 
-        # Calculate weight count
-        weight_count = calculate_weight_count(input_size, hidden_size, output_size)
-
-        # Create sequential weights for verification
-        weights = list(range(weight_count))
+        # Create structured weight format (as sent by frontend API)
+        weights_ih = list(range(input_size * hidden_size))  # 32 weights
+        weights_ho = list(range(hidden_size * output_size))  # 12 weights
+        biases_h = [0.1] * hidden_size
+        biases_o = [-0.5] * output_size
 
         genome = {
-            'weights': weights,
-            'topology': {
-                'inputSize': input_size,
-                'hiddenSize': hidden_size,
-                'outputSize': output_size,
-            },
-            'activation': 'tanh',
+            'input_size': input_size,
+            'hidden_size': hidden_size,
+            'output_size': output_size,
+            'weights_ih': weights_ih,
+            'weights_ho': weights_ho,
+            'biases_h': biases_h,
+            'biases_o': biases_o,
         }
 
         config = NeuralConfig(hidden_size=hidden_size)
@@ -452,10 +452,10 @@ class TestFromGenomes:
             max_muscles=10,
         )
 
-        # Verify first few weights_ih values
+        # Verify first few weights_ih values (row-major order)
         assert network.weights_ih[0, 0, 0].item() == 0
         assert network.weights_ih[0, 0, 1].item() == 1
-        assert network.weights_ih[0, 1, 0].item() == 4
+        assert network.weights_ih[0, 1, 0].item() == hidden_size  # Next row starts at hidden_size
 
     def test_handles_none_genomes(self):
         config = NeuralConfig()
@@ -476,17 +476,15 @@ class TestFromGenomes:
         genomes = []
         for i in range(3):
             output_size = 5 + i  # 5, 6, 7 muscles
-            weight_count = calculate_weight_count(input_size, hidden_size, output_size)
-            weights = [float(i)] * weight_count  # Fill with creature index
-
+            # Fill with creature index to verify correct loading
             genomes.append({
-                'weights': weights,
-                'topology': {
-                    'inputSize': input_size,
-                    'hiddenSize': hidden_size,
-                    'outputSize': output_size,
-                },
-                'activation': 'tanh',
+                'input_size': input_size,
+                'hidden_size': hidden_size,
+                'output_size': output_size,
+                'weights_ih': [float(i)] * (input_size * hidden_size),
+                'weights_ho': [float(i)] * (hidden_size * output_size),
+                'biases_h': [float(i)] * hidden_size,
+                'biases_o': [float(i)] * output_size,
             })
 
         config = NeuralConfig(hidden_size=hidden_size)
@@ -504,6 +502,54 @@ class TestFromGenomes:
         # Third creature's weights should be 2.0
         assert network.weights_ih[2, 0, 0].item() == 2.0
 
+    def test_loads_structured_weights(self):
+        """Test loading from structured format (weights_ih, weights_ho, biases_h, biases_o)."""
+        input_size = 8
+        hidden_size = 4
+        output_size = 3
+
+        # Create structured weight format (as sent by frontend API)
+        weights_ih = list(range(input_size * hidden_size))  # 32 weights
+        weights_ho = list(range(hidden_size * output_size))  # 12 weights
+        biases_h = [0.1] * hidden_size  # 4 biases
+        biases_o = [-0.5] * output_size  # 3 biases (negative output bias)
+
+        genome = {
+            'input_size': input_size,
+            'hidden_size': hidden_size,
+            'output_size': output_size,
+            'weights_ih': weights_ih,
+            'weights_ho': weights_ho,
+            'biases_h': biases_h,
+            'biases_o': biases_o,
+        }
+
+        config = NeuralConfig(hidden_size=hidden_size)
+        network = BatchedNeuralNetwork.from_genomes(
+            neural_genomes=[genome],
+            num_muscles=[output_size],
+            config=config,
+            max_muscles=10,
+        )
+
+        # Verify weights_ih loaded correctly (row-major order)
+        # weights_ih[0] = 0, weights_ih[1] = 1, etc.
+        assert network.weights_ih[0, 0, 0].item() == 0
+        assert network.weights_ih[0, 0, 1].item() == 1
+        assert network.weights_ih[0, 1, 0].item() == hidden_size  # Next row
+
+        # Verify biases_h (use approx for float comparison)
+        assert abs(network.bias_h[0, 0].item() - 0.1) < 1e-6
+        assert abs(network.bias_h[0, 3].item() - 0.1) < 1e-6
+
+        # Verify weights_ho
+        assert network.weights_ho[0, 0, 0].item() == 0
+        assert network.weights_ho[0, 0, 1].item() == 1
+
+        # Verify biases_o
+        assert abs(network.bias_o[0, 0].item() - (-0.5)) < 1e-6
+        assert abs(network.bias_o[0, 2].item() - (-0.5)) < 1e-6
+
 
 # =============================================================================
 # Test Weight Export
@@ -512,7 +558,7 @@ class TestFromGenomes:
 class TestWeightExport:
     """Test exporting weights to flat array."""
 
-    def test_to_flat_weights_roundtrip(self):
+    def test_to_structured_weights_roundtrip(self):
         """Test that weights can be exported and re-imported."""
         input_size = 8
         hidden_size = 4
@@ -526,19 +572,8 @@ class TestWeightExport:
             max_muscles=output_size,
         )
 
-        # Export weights from first creature
-        weights = network.to_flat_weights(0)
-
-        # Create new network from exported weights
-        genome = {
-            'weights': weights,
-            'topology': {
-                'inputSize': input_size,
-                'hiddenSize': hidden_size,
-                'outputSize': output_size,
-            },
-            'activation': 'tanh',
-        }
+        # Export weights from first creature as structured format
+        genome = network.to_structured_weights(0, output_size)
 
         new_network = BatchedNeuralNetwork.from_genomes(
             neural_genomes=[genome],
@@ -550,8 +585,8 @@ class TestWeightExport:
         # Compare weights
         assert torch.allclose(network.weights_ih[0], new_network.weights_ih[0])
         assert torch.allclose(network.bias_h[0], new_network.bias_h[0])
-        assert torch.allclose(network.weights_ho[0], new_network.weights_ho[0])
-        assert torch.allclose(network.bias_o[0], new_network.bias_o[0])
+        assert torch.allclose(network.weights_ho[0, :, :output_size], new_network.weights_ho[0, :, :output_size])
+        assert torch.allclose(network.bias_o[0, :output_size], new_network.bias_o[0, :output_size])
 
     def test_weight_count_matches_export(self):
         input_size = 7

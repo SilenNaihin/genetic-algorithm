@@ -53,7 +53,7 @@ export interface SimulationConfig {
   weightMutationRate: number;         // Target/end probability each weight mutates
   weightMutationMagnitude: number;    // Std dev of weight perturbation
   weightMutationDecay: 'off' | 'linear' | 'exponential';  // Mutation rate decay mode
-  neuralOutputBias: number;           // Initial output neuron bias (-2 to 0, more negative = muscles harder to activate)
+  neuralOutputBias: number;           // Initial output neuron bias (0 = neutral, inside dead zone)
   fitnessEfficiencyPenalty: number;   // Penalty per unit of total muscle activation (encourages efficient movement)
   neuralDeadZone: number;             // Dead zone threshold for pure mode (outputs < threshold become 0)
 
@@ -102,7 +102,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   weightMutationRate: 0.1,
   weightMutationMagnitude: 0.3,
   weightMutationDecay: 'off',    // No decay by default
-  neuralOutputBias: -0.5,        // Initial output neuron bias (-2 to 0, more negative = muscles harder to activate)
+  neuralOutputBias: 0.0,         // Initial output neuron bias (0 = neutral, inside dead zone)
   fitnessEfficiencyPenalty: 0.5, // Subtract 0.5 * total_activation from fitness
   neuralDeadZone: 0.1,           // Outputs with absolute value < 0.1 become 0 in pure mode
 
@@ -191,6 +191,7 @@ export interface CreatureSimulationResult {
   pellets: PelletData[];
   fitnessOverTime: number[];
   disqualified: DisqualificationReason;
+  activationsPerFrame?: number[][];  // Neural network muscle outputs per frame [frame][muscle]
 }
 
 export interface PelletData {

@@ -55,7 +55,7 @@ class SimulationConfig:
     weight_mutation_rate: float = 0.1          # Probability each weight mutates
     weight_mutation_magnitude: float = 0.3     # Std dev of weight perturbation
     weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'off'
-    neural_output_bias: float = -0.5           # Initial output neuron bias
+    neural_output_bias: float = 0.0            # Initial output neuron bias (0 = neutral/dead zone)
     fitness_efficiency_penalty: float = 0.5    # Penalty per unit of muscle activation
     neural_dead_zone: float = 0.1              # Dead zone threshold for pure mode
 

@@ -13,7 +13,7 @@ from typing import Literal, Optional
 from dataclasses import dataclass
 
 # Constants matching TypeScript
-DEFAULT_OUTPUT_BIAS = -0.5
+DEFAULT_OUTPUT_BIAS = 0.0
 NEURAL_INPUT_SIZE_PURE = 7
 NEURAL_INPUT_SIZE_HYBRID = 8
 
@@ -189,42 +189,42 @@ class BatchedNeuralNetwork:
             if genome is None:
                 continue
 
-            weights = genome.get('weights', [])
-            topology = genome.get('topology', {})
+            # Structured format: weights_ih, weights_ho, biases_h, biases_o
+            weights_ih = genome.get('weights_ih', [])
+            weights_ho = genome.get('weights_ho', [])
+            biases_h = genome.get('biases_h', [])
+            biases_o = genome.get('biases_o', [])
 
             # Get topology info
-            g_input_size = topology.get('inputSize', input_size)
-            g_hidden_size = topology.get('hiddenSize', hidden_size)
-            g_output_size = topology.get('outputSize', num_muscles[i])
+            g_input_size = genome.get('input_size', input_size)
+            g_hidden_size = genome.get('hidden_size', hidden_size)
+            g_output_size = genome.get('output_size', num_muscles[i])
 
-            # Parse flat weight array (matching TypeScript order)
+            # weights_ih is flattened [input_size * hidden_size]
             idx = 0
-
-            # Input -> Hidden weights: [input_size, hidden_size]
             for inp in range(g_input_size):
                 for hid in range(g_hidden_size):
-                    if idx < len(weights) and inp < input_size and hid < hidden_size:
-                        network.weights_ih[i, inp, hid] = weights[idx]
+                    if idx < len(weights_ih) and inp < input_size and hid < hidden_size:
+                        network.weights_ih[i, inp, hid] = weights_ih[idx]
                     idx += 1
 
-            # Hidden biases: [hidden_size]
+            # biases_h is [hidden_size]
             for hid in range(g_hidden_size):
-                if idx < len(weights) and hid < hidden_size:
-                    network.bias_h[i, hid] = weights[idx]
-                idx += 1
+                if hid < len(biases_h) and hid < hidden_size:
+                    network.bias_h[i, hid] = biases_h[hid]
 
-            # Hidden -> Output weights: [hidden_size, output_size]
+            # weights_ho is flattened [hidden_size * output_size]
+            idx = 0
             for hid in range(g_hidden_size):
                 for out in range(g_output_size):
-                    if idx < len(weights) and hid < hidden_size and out < max_muscles:
-                        network.weights_ho[i, hid, out] = weights[idx]
+                    if idx < len(weights_ho) and hid < hidden_size and out < max_muscles:
+                        network.weights_ho[i, hid, out] = weights_ho[idx]
                     idx += 1
 
-            # Output biases: [output_size]
+            # biases_o is [output_size]
             for out in range(g_output_size):
-                if idx < len(weights) and out < max_muscles:
-                    network.bias_o[i, out] = weights[idx]
-                idx += 1
+                if out < len(biases_o) and out < max_muscles:
+                    network.bias_o[i, out] = biases_o[out]
 
             # Set muscle mask (valid muscles only)
             network.muscle_mask[i, :num_muscles[i]] = True
@@ -285,10 +285,43 @@ class BatchedNeuralNetwork:
         """Get total number of weights per creature."""
         return calculate_weight_count(self.input_size, self.hidden_size, self.max_muscles)
 
+    def to_structured_weights(self, creature_idx: int, output_size: int) -> dict:
+        """
+        Export weights for a single creature as structured dict.
+        Matches the API format used by frontend.
+        """
+        weights_ih = []
+        for inp in range(self.input_size):
+            for hid in range(self.hidden_size):
+                weights_ih.append(self.weights_ih[creature_idx, inp, hid].item())
+
+        biases_h = []
+        for hid in range(self.hidden_size):
+            biases_h.append(self.bias_h[creature_idx, hid].item())
+
+        weights_ho = []
+        for hid in range(self.hidden_size):
+            for out in range(output_size):
+                weights_ho.append(self.weights_ho[creature_idx, hid, out].item())
+
+        biases_o = []
+        for out in range(output_size):
+            biases_o.append(self.bias_o[creature_idx, out].item())
+
+        return {
+            'input_size': self.input_size,
+            'hidden_size': self.hidden_size,
+            'output_size': output_size,
+            'weights_ih': weights_ih,
+            'weights_ho': weights_ho,
+            'biases_h': biases_h,
+            'biases_o': biases_o,
+        }
+
     def to_flat_weights(self, creature_idx: int) -> list:
         """
         Export weights for a single creature as flat array.
-        Matches TypeScript weight order for compatibility.
+        Legacy format - prefer to_structured_weights for API use.
         """
         weights = []
 

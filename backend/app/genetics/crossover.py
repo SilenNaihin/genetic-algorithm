@@ -12,7 +12,7 @@ from typing import Any
 
 from .mutation import generate_id, distance, normalize, GenomeConstraints
 
-DEFAULT_OUTPUT_BIAS = -0.5
+DEFAULT_OUTPUT_BIAS = 0.0
 
 
 def lerp(a: float, b: float, t: float) -> float:

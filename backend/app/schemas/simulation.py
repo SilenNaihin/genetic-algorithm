@@ -61,7 +61,7 @@ class SimulationConfig(BaseModel):
     weight_mutation_rate: float = Field(default=0.1, ge=0.0, le=1.0)
     weight_mutation_magnitude: float = Field(default=0.3, ge=0.0, le=2.0)
     weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'off'
-    neural_output_bias: float = Field(default=-0.5, ge=-2.0, le=0.0)
+    neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
     fitness_efficiency_penalty: float = Field(default=0.5, ge=0.0, le=5.0)
     neural_dead_zone: float = Field(default=0.1, ge=0.0, le=1.0)
 
@@ -135,6 +135,10 @@ class SimulationResult(BaseModel):
 
     # Fitness over time (for graphing actual fitness progression)
     fitness_over_time: list[float] | None = None
+
+    # Neural network activations per frame (muscle outputs for each frame)
+    # Only populated for neural controller creatures when frames are recorded
+    activations_per_frame: list[list[float]] | None = None
 
 
 class BatchSimulationRequest(BaseModel):

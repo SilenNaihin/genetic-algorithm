@@ -49,7 +49,7 @@ export const DEFAULT_NEURAL_CONFIG: NeuralConfig = {
   activation: 'tanh',
   weightMutationRate: 0.1,
   weightMutationMagnitude: 0.3,
-  outputBias: -0.5
+  outputBias: 0.0
 };
 
 /**

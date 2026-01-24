@@ -628,6 +628,6 @@ class TestPhysicsConstantsParity:
         assert DEFAULT_CONFIG.neural_activation == 'tanh'
         assert DEFAULT_CONFIG.weight_mutation_rate == 0.1
         assert DEFAULT_CONFIG.weight_mutation_magnitude == 0.3
-        assert DEFAULT_CONFIG.neural_output_bias == -0.5
+        assert DEFAULT_CONFIG.neural_output_bias == 0.0
         assert DEFAULT_CONFIG.fitness_efficiency_penalty == 0.5
         assert DEFAULT_CONFIG.neural_dead_zone == 0.1
