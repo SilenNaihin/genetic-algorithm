@@ -682,9 +682,8 @@ def update_fitness_state(
     state.previous_com = com.clone()
 
     # Update closest edge distance (for regression penalty)
-    # Recalculate creature radii dynamically to reflect current shape
-    current_creature_radii = calculate_creature_xz_radius(batch)
-    current_edge_dist = compute_edge_distances(com, current_creature_radii, pellets.positions)
+    # Use stable initial radius to prevent oscillation from causing wild fitness swings
+    current_edge_dist = compute_edge_distances(com, state.creature_radii, pellets.positions)
     state.closest_edge_distance = torch.minimum(state.closest_edge_distance, current_edge_dist)
 
     # Check for disqualification
@@ -758,11 +757,10 @@ def calculate_fitness(
     pellet_fitness = pellets.total_collected.float() * config.pellet_points
 
     # 2. Progress toward current pellet (0-progress_max)
-    # Recalculate creature radii dynamically to reflect current shape
-    # This ensures progress is measured from the actual creature edge (furthest node)
-    current_creature_radii = calculate_creature_xz_radius(batch)
+    # Use stable initial radius to prevent oscillation from causing wild fitness swings
+    # The creature's "reach" is determined by its initial shape, not momentary muscle extension
     current_edge_dist = compute_edge_distances(
-        com, current_creature_radii, pellets.positions
+        com, state.creature_radii, pellets.positions
     )
     # Progress = (initial - current) / initial, clamped to [0, 1]
     progress = (pellets.initial_distances - current_edge_dist) / pellets.initial_distances.clamp(min=0.01)
