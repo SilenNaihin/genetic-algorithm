@@ -87,6 +87,13 @@ class GeneticsService:
             "survival_streak": 0,
             "global_frequency_multiplier": random.uniform(0.8, 1.2),
             "global_amplitude_multiplier": random.uniform(0.8, 1.2),
+            "controller_type": "oscillator",
+            "color": {
+                "h": random.random(),
+                "s": 0.6 + random.random() * 0.3,
+                "l": 0.4 + random.random() * 0.2,
+            },
+            "ancestry_chain": [],
         }
 
     def _create_muscle(self, node_a: dict, node_b: dict) -> dict:
@@ -101,11 +108,12 @@ class GeneticsService:
             "id": self.generate_id("m"),
             "node_a": node_a["id"],
             "node_b": node_b["id"],
-            "strength": random.uniform(1.0, 5.0),
-            "frequency": random.uniform(0.5, 2.0),
-            "phase": random.uniform(0, 2 * math.pi),
-            "amplitude": random.uniform(0.1, 0.5),
             "rest_length": max(0.2, rest_length),
+            "stiffness": random.uniform(50.0, 200.0),
+            "damping": random.uniform(0.3, 0.7),
+            "frequency": random.uniform(0.5, 2.0),
+            "amplitude": random.uniform(0.1, 0.5),
+            "phase": random.uniform(0, 2 * math.pi),
         }
 
     def evolve_population(
@@ -177,6 +185,19 @@ class GeneticsService:
         clone["id"] = self.generate_id("g")
         clone["parent_ids"] = [genome["id"]]
         clone["survival_streak"] = 0
+
+        # Ensure required fields exist with defaults
+        if "color" not in clone:
+            clone["color"] = {
+                "h": random.random(),
+                "s": 0.6 + random.random() * 0.3,
+                "l": 0.4 + random.random() * 0.2,
+            }
+        if "controller_type" not in clone:
+            clone["controller_type"] = "oscillator"
+        if "ancestry_chain" not in clone:
+            clone["ancestry_chain"] = []
+
         return clone
 
     def _crossover(self, parent1: dict, parent2: dict) -> dict:
@@ -213,9 +234,14 @@ class GeneticsService:
             for i in range(crossover_point, min(len(child["muscles"]), len(parent2["muscles"]))):
                 if i < len(child["muscles"]) and i < len(parent2["muscles"]):
                     # Blend muscle properties
-                    child["muscles"][i]["strength"] = self._lerp(
-                        child["muscles"][i]["strength"],
-                        parent2["muscles"][i]["strength"],
+                    child["muscles"][i]["stiffness"] = self._lerp(
+                        child["muscles"][i].get("stiffness", 100.0),
+                        parent2["muscles"][i].get("stiffness", 100.0),
+                        0.5,
+                    )
+                    child["muscles"][i]["damping"] = self._lerp(
+                        child["muscles"][i].get("damping", 0.5),
+                        parent2["muscles"][i].get("damping", 0.5),
                         0.5,
                     )
                     child["muscles"][i]["frequency"] = self._lerp(
@@ -240,6 +266,21 @@ class GeneticsService:
             parent2.get("global_amplitude_multiplier", 1.0),
             0.5,
         )
+
+        # Blend colors (or use parent1's if parent2 doesn't have one)
+        color1 = parent1.get("color", {"h": 0.5, "s": 0.7, "l": 0.5})
+        color2 = parent2.get("color", {"h": 0.5, "s": 0.7, "l": 0.5})
+        child["color"] = {
+            "h": self._lerp(color1["h"], color2["h"], 0.5),
+            "s": self._lerp(color1["s"], color2["s"], 0.5),
+            "l": self._lerp(color1["l"], color2["l"], 0.5),
+        }
+
+        # Ensure controller_type and ancestry_chain exist
+        if "controller_type" not in child:
+            child["controller_type"] = parent1.get("controller_type", "oscillator")
+        if "ancestry_chain" not in child:
+            child["ancestry_chain"] = []
 
         return child
 
@@ -269,8 +310,12 @@ class GeneticsService:
         # Muscle mutations
         for muscle in genome["muscles"]:
             if random.random() < mutation_rate:
-                muscle["strength"] = self._clamp(
-                    muscle["strength"] + random.gauss(0, 0.5), 0.1, 10.0
+                muscle["stiffness"] = self._clamp(
+                    muscle.get("stiffness", 100.0) + random.gauss(0, 20.0), 50.0, 500.0
+                )
+            if random.random() < mutation_rate:
+                muscle["damping"] = self._clamp(
+                    muscle.get("damping", 0.5) + random.gauss(0, 0.1), 0.1, 1.0
                 )
             if random.random() < mutation_rate:
                 muscle["frequency"] = self._clamp(
@@ -368,7 +413,8 @@ class GeneticsService:
 
         # Find pairs not connected
         connected = {(m["node_a"], m["node_b"]) for m in genome["muscles"]}
-        connected.update((b, a) for a, b in connected)
+        # Add reverse pairs (must iterate over a copy to avoid modifying during iteration)
+        connected.update((b, a) for a, b in list(connected))
 
         unconnected = []
         for i, n1 in enumerate(genome["nodes"]):
