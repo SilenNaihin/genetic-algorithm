@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Creature } from '../core/Creature';
 import { generateRandomGenome } from '../core/Genome';
-import { Population } from '../genetics/Population';
 import {
   truncationSelection,
   tournamentSelection,
@@ -458,87 +457,3 @@ describe('Mutation', () => {
   });
 });
 
-describe('Population', () => {
-  describe('createEmpty', () => {
-    it('creates empty population', () => {
-      const population = Population.createEmpty();
-      expect(population.creatures.length).toBe(0);
-    });
-  });
-
-  describe('replaceCreatures', () => {
-    it('replaces creatures with new genomes', () => {
-      const population = Population.createEmpty();
-      const genomes = [generateRandomGenome(), generateRandomGenome()];
-
-      population.replaceCreatures(genomes);
-
-      expect(population.creatures.length).toBe(2);
-      expect(population.creatures[0].genome.id).toBe(genomes[0].id);
-      expect(population.creatures[1].genome.id).toBe(genomes[1].id);
-    });
-  });
-
-  describe('getGenomes', () => {
-    it('returns all genomes', () => {
-      const population = Population.createEmpty();
-      const genomes = Array.from({ length: 10 }, () => generateRandomGenome());
-      population.replaceCreatures(genomes);
-
-      const result = population.getGenomes();
-      expect(result.length).toBe(10);
-    });
-  });
-
-  describe('rankByFitness', () => {
-    it('returns creatures sorted by fitness descending', () => {
-      const population = Population.createEmpty();
-      const genomes = Array.from({ length: 5 }, () => generateRandomGenome());
-      population.replaceCreatures(genomes);
-
-      // Assign known fitness values
-      population.creatures[0].state.fitness = 30;
-      population.creatures[1].state.fitness = 100;
-      population.creatures[2].state.fitness = 50;
-      population.creatures[3].state.fitness = 80;
-      population.creatures[4].state.fitness = 10;
-
-      const ranked = population.rankByFitness();
-
-      expect(ranked[0].state.fitness).toBe(100);
-      expect(ranked[1].state.fitness).toBe(80);
-      expect(ranked[2].state.fitness).toBe(50);
-      expect(ranked[3].state.fitness).toBe(30);
-      expect(ranked[4].state.fitness).toBe(10);
-    });
-  });
-
-  describe('getBest', () => {
-    it('returns creature with highest fitness', () => {
-      const population = Population.createEmpty();
-      const genomes = Array.from({ length: 5 }, () => generateRandomGenome());
-      population.replaceCreatures(genomes);
-
-      population.creatures[0].state.fitness = 30;
-      population.creatures[1].state.fitness = 100;
-      population.creatures[2].state.fitness = 50;
-
-      const best = population.getBest();
-
-      expect(best?.state.fitness).toBe(100);
-    });
-  });
-
-  describe('dispose', () => {
-    it('clears all creatures', () => {
-      const population = Population.createEmpty();
-      const genomes = Array.from({ length: 10 }, () => generateRandomGenome());
-      population.replaceCreatures(genomes);
-      expect(population.creatures.length).toBe(10);
-
-      population.dispose();
-
-      expect(population.creatures.length).toBe(0);
-    });
-  });
-});

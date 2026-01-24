@@ -2,10 +2,9 @@
 
 import { useCallback } from 'react';
 import { useEvolutionStore, type CardAnimationState } from '../stores/evolutionStore';
-import * as SimulationService from '../../src/services/SimulationService';
+import * as Api from '../../src/services/ApiClient';
 import * as StorageService from '../../src/services/StorageService';
-import * as SimState from '../lib/simulationState';
-import type { CreatureSimulationResult } from '../../src/types';
+import type { CreatureSimulationResult, DisqualificationReason } from '../../src/types';
 
 // Get showError from store for non-hook context
 const showError = (message: string) => useEvolutionStore.getState().showError(message);
@@ -19,12 +18,41 @@ const SORT_DELAY = 700;
 // Helper: delay function
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Module-level state for auto-run control
+let autoRunning = false;
+
+/**
+ * Convert API evolution creature to CreatureSimulationResult format
+ */
+function apiCreatureToResult(creature: Api.ApiEvolutionCreature): CreatureSimulationResult {
+  const genome = Api.fromApiGenome(creature.genome);
+  genome._apiCreatureId = creature.id;
+
+  return {
+    genome,
+    frames: [], // Frames loaded lazily for replay
+    finalFitness: creature.fitness,
+    pelletsCollected: creature.pellets_collected,
+    distanceTraveled: 0,
+    netDisplacement: 0,
+    closestPelletDistance: 0,
+    pellets: [],
+    fitnessOverTime: [],
+    disqualified: creature.disqualified_reason as DisqualificationReason,
+    // Store additional data for UI
+    _isSurvivor: creature.is_survivor,
+    _hasFrames: creature.has_frames,
+  };
+}
+
 /**
  * Hook for managing simulation lifecycle.
- * Handles the evolution cycle: mutate -> simulate -> sort
+ * Uses backend-owned evolution - frontend is a thin UI layer.
  *
- * Uses shared module state (simulationState.ts) for population
- * so it persists across component remounts.
+ * Data flow:
+ * 1. POST /api/runs → create run
+ * 2. POST /api/evolution/{runId}/step → backend does genetics + simulation + storage
+ * 3. Display creatures from response
  */
 export function useSimulation() {
 
@@ -45,35 +73,31 @@ export function useSimulation() {
   const setSimulationProgress = useEvolutionStore((s) => s.setSimulationProgress);
   const setCardAnimationStates = useEvolutionStore((s) => s.setCardAnimationStates);
   const clearCardAnimationStates = useEvolutionStore((s) => s.clearCardAnimationStates);
+  const setSortAnimationTriggered = useEvolutionStore((s) => s.setSortAnimationTriggered);
 
   /**
-   * Record fitness history for current generation
+   * Update fitness history from evolution response
    */
-  const recordFitnessHistory = useCallback(
-    async (results: CreatureSimulationResult[], gen: number, history: typeof fitnessHistory) => {
-      const stats = SimulationService.calculateFitnessStats(results);
-      if (stats.validCount === 0) return history;
-
+  const updateFitnessHistory = useCallback(
+    (response: Api.ApiEvolutionStepResponse, history: typeof fitnessHistory) => {
       const newEntry = {
-        generation: gen,
-        best: stats.best,
-        average: stats.average,
-        worst: stats.worst,
+        generation: response.generation,
+        best: response.best_fitness,
+        average: response.avg_fitness,
+        worst: response.worst_fitness,
       };
-
       const newHistory = [...history, newEntry];
       setFitnessHistory(newHistory);
-      await StorageService.updateFitnessHistory(newHistory);
       return newHistory;
     },
     [setFitnessHistory]
   );
 
   /**
-   * Record creature type history (node count distribution)
+   * Update creature type history from results
    */
-  const recordCreatureTypeHistory = useCallback(
-    async (results: CreatureSimulationResult[], gen: number) => {
+  const updateCreatureTypeHistory = useCallback(
+    (results: CreatureSimulationResult[], gen: number) => {
       const nodeCountDistribution = new Map<number, number>();
       for (const result of results) {
         const nodeCount = result.genome.nodes.length;
@@ -84,7 +108,6 @@ export function useSimulation() {
       const currentHistory = useEvolutionStore.getState().creatureTypeHistory;
       const newHistory = [...currentHistory, newEntry];
       setCreatureTypeHistory(newHistory);
-      await StorageService.updateCreatureTypeHistory(newHistory);
     },
     [setCreatureTypeHistory]
   );
@@ -94,20 +117,25 @@ export function useSimulation() {
    */
   const updateBestCreature = useCallback(
     (results: CreatureSimulationResult[], gen: number) => {
-      const best = SimulationService.findBestCreature(results);
-      if (!best) return;
+      const validResults = results.filter(
+        (r) => !isNaN(r.finalFitness) && isFinite(r.finalFitness)
+      );
+      if (validResults.length === 0) return;
+
+      const best = validResults.reduce((b, r) =>
+        r.finalFitness > b.finalFitness ? r : b
+      );
 
       const currentBest = useEvolutionStore.getState().bestCreatureEver;
       if (!currentBest || best.finalFitness > currentBest.finalFitness) {
         setBestCreature(best, gen);
-        StorageService.updateBestCreature(best, gen);
       }
     },
     [setBestCreature]
   );
 
   /**
-   * Update longest survivor tracking (creature with highest survivalStreak)
+   * Update longest survivor tracking
    */
   const updateLongestSurvivor = useCallback(
     (results: CreatureSimulationResult[], gen: number) => {
@@ -126,7 +154,6 @@ export function useSimulation() {
 
       if (streak > 0 && streak > currentLongestGens) {
         setLongestSurvivor(longestSurvivor, streak, gen);
-        StorageService.updateLongestSurvivor(longestSurvivor, streak, gen);
       }
     },
     [setLongestSurvivor]
@@ -137,10 +164,10 @@ export function useSimulation() {
    */
   const startSimulation = useCallback(async () => {
     try {
-      // Get config BEFORE any resets - this is what the user configured
+      // Get config BEFORE any resets
       const currentConfig = useEvolutionStore.getState().config;
 
-      // Reset evolution state but NOT config (matches vanilla behavior)
+      // Reset evolution state but NOT config
       setGeneration(0);
       setMaxGeneration(0);
       setViewingGeneration(null);
@@ -154,44 +181,37 @@ export function useSimulation() {
       await StorageService.initStorage();
       const runId = await StorageService.createRun(currentConfig);
 
-      // Create initial population from backend
-      const population = await SimulationService.createInitialPopulation(currentConfig);
-      SimState.setPopulation(population);
-
-      // Set initial progress BEFORE switching to grid - this prevents flickering
-      // where the grid briefly shows with no content
+      // Show progress UI
       setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
       setEvolutionStep('simulate');
       setAppState('grid');
 
-      // Run initial simulation (progress bar shows in grid view)
-      const genomes = population.getGenomes();
-      const results = await SimulationService.runSimulation(genomes, currentConfig, (progress) => {
-        setSimulationProgress(progress);
-      });
-      setSimulationProgress(null);
+      // Run initial generation via backend
+      const response = await Api.evolutionStep(runId);
 
-      // Update population fitness
-      SimulationService.updatePopulationFitness(population, results);
+      // Convert API creatures to results
+      const results = response.creatures.map(apiCreatureToResult);
+
+      setSimulationProgress(null);
 
       // Update store with results
       setSimulationResults(results);
+      setGeneration(response.generation);
+      setMaxGeneration(response.generation);
 
-      // Record history for gen 0
-      recordFitnessHistory(results, 0, []);
-      recordCreatureTypeHistory(results, 0);
-      updateBestCreature(results, 0);
+      // Record history
+      updateFitnessHistory(response, []);
+      updateCreatureTypeHistory(results, response.generation);
+      updateBestCreature(results, response.generation);
 
-      // Save to storage
-      await StorageService.saveGeneration(0, results);
-
-      // Reset to idle state after initial simulation
+      // Reset to idle state
       setEvolutionStep('idle');
 
       return { results, runId };
     } catch (error) {
       console.error('Failed to start simulation:', error);
       showError('Failed to start simulation. Please try again.');
+      setSimulationProgress(null);
       throw error;
     }
   }, [
@@ -206,8 +226,8 @@ export function useSimulation() {
     setBestCreature,
     setLongestSurvivor,
     setSimulationProgress,
-    recordFitnessHistory,
-    recordCreatureTypeHistory,
+    updateFitnessHistory,
+    updateCreatureTypeHistory,
     updateBestCreature,
   ]);
 
@@ -218,40 +238,27 @@ export function useSimulation() {
    * Phase 3: Spawn new offspring from parent positions (600ms)
    */
   const runMutateStep = useCallback(async (fastMode: boolean = false) => {
-    const population = SimState.getPopulation();
-    if (!population) return;
-
     const currentResults = useEvolutionStore.getState().simulationResults;
     const currentGen = useEvolutionStore.getState().generation;
+    const currentConfig = useEvolutionStore.getState().config;
 
     // Sort current results by fitness to find bottom cullPercentage%
-    const currentConfig = useEvolutionStore.getState().config;
     const sortedResults = [...currentResults].sort((a, b) => {
       const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
       const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
       return bFit - aFit;
     });
 
-    // cullPercentage is the fraction killed, so survivors = 1 - cullPercentage
     const survivorCount = Math.floor(sortedResults.length * (1 - currentConfig.cullPercentage));
-    const survivors = sortedResults.slice(0, survivorCount);
     const deadCreatures = sortedResults.slice(survivorCount);
 
-    // Check if any dying creature is the new longest survivor
-    // (We track creatures when they DIE, not while alive)
-    const dyingStreaks = deadCreatures.map(d => d.genome.survivalStreak || 0);
-    const maxDyingStreak = Math.max(...dyingStreaks, 0);
-    if (maxDyingStreak > 0) {
-      console.log(`[Evolution] Dying creatures have survival streaks: max=${maxDyingStreak}, all=${dyingStreaks.filter(s => s > 0).join(',')}`);
-    }
+    // Check for dying creatures that might be longest survivors
     for (const dead of deadCreatures) {
       const streak = dead.genome.survivalStreak || 0;
       if (streak > 0) {
         const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
         if (streak > currentLongestGens) {
-          console.log(`[Evolution] New longest survivor! streak=${streak} > current=${currentLongestGens}`);
-          setLongestSurvivor(dead, streak, currentGen + 1); // Dies at next generation
-          StorageService.updateLongestSurvivor(dead, streak, currentGen + 1);
+          setLongestSurvivor(dead, streak, currentGen + 1);
         }
       }
     }
@@ -265,9 +272,9 @@ export function useSimulation() {
       y: Math.floor(index / GRID_COLS) * (CARD_SIZE + CARD_GAP),
     });
 
-    // Build map of survivor positions (by their sorted index)
+    // Build map of survivor positions
     const survivorPositions: { x: number; y: number }[] = [];
-    for (let i = 0; i < survivors.length; i++) {
+    for (let i = 0; i < survivorCount; i++) {
       survivorPositions.push(getGridPosition(i));
     }
 
@@ -278,7 +285,7 @@ export function useSimulation() {
         const isDead = deadCreatures.some((d) => d.genome.id === result.genome.id);
         animStates.set(result.genome.id, {
           isDead,
-          isFadingOut: false, // Not fading yet, just marked red
+          isFadingOut: false,
           isMutated: false,
           isSpawning: false,
           spawnFromX: null,
@@ -291,13 +298,12 @@ export function useSimulation() {
 
     // === PHASE 2: Fade out dead cards (400ms) ===
     if (!fastMode) {
-      // Update dead cards to fade out
       const fadeStates = new Map<string, CardAnimationState>();
       for (const result of currentResults) {
         const isDead = deadCreatures.some((d) => d.genome.id === result.genome.id);
         fadeStates.set(result.genome.id, {
           isDead,
-          isFadingOut: isDead, // Dead cards now fade out
+          isFadingOut: isDead,
           isMutated: false,
           isSpawning: false,
           spawnFromX: null,
@@ -308,37 +314,23 @@ export function useSimulation() {
       await delay(FADE_OUT_DELAY);
     }
 
-    // === PHASE 3: Evolve and spawn new offspring ===
-    // Evolve the population using backend (this kills bottom 50% and creates offspring)
-    const newGenomes = await SimulationService.evolvePopulation(population, currentGen);
+    // === PHASE 3: Call backend evolution step ===
+    setEvolutionStep('simulate');
+    const runId = StorageService.getCurrentRunId();
+    if (!runId) {
+      showError('No active run');
+      return;
+    }
 
-    // Only increment generation AFTER successful backend response
-    setGeneration(currentGen + 1);
+    const response = await Api.evolutionStep(runId);
+    const newResults = response.creatures.map(apiCreatureToResult);
 
-    // Create placeholder results for ALL creatures (including survivors)
-    // All creatures show "..." until simulation runs
-    const placeholderResults: CreatureSimulationResult[] = newGenomes.map((genome) => {
-      return {
-        genome,
-        frames: [],
-        finalFitness: NaN,
-        pelletsCollected: 0,
-        distanceTraveled: 0,
-        netDisplacement: 0,
-        closestPelletDistance: Infinity,
-        pellets: [],
-        fitnessOverTime: [],
-        disqualified: null,
-      };
-    });
-
-    // Set up animation states for spawn animation with parent positions
+    // Set up animation states for spawn animation
     if (!fastMode) {
       const newAnimStates = new Map<string, CardAnimationState>();
-      for (const result of placeholderResults) {
-        const isSurvivor = survivors.some((s) => s.genome.id === result.genome.id);
+      for (const result of newResults) {
+        const isSurvivor = (result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
 
-        // For new offspring, pick a random survivor position to spawn from
         let spawnFromX: number | null = null;
         let spawnFromY: number | null = null;
         if (!isSurvivor && survivorPositions.length > 0) {
@@ -350,8 +342,8 @@ export function useSimulation() {
         newAnimStates.set(result.genome.id, {
           isDead: false,
           isFadingOut: false,
-          isMutated: !isSurvivor, // New offspring are marked as mutated
-          isSpawning: !isSurvivor, // New offspring spawn in
+          isMutated: !isSurvivor,
+          isSpawning: !isSurvivor,
           spawnFromX,
           spawnFromY,
         });
@@ -359,64 +351,32 @@ export function useSimulation() {
       setCardAnimationStates(newAnimStates);
     }
 
-    setSimulationResults(placeholderResults);
+    setSimulationResults(newResults);
+    setGeneration(response.generation);
+    setMaxGeneration(response.generation);
 
     if (!fastMode) {
-      // Small delay to let React render at spawn position first
       await delay(50);
 
-      // Clear spawning state to trigger animation to final positions
+      // Clear spawning state to trigger animation
       const transitionAnimStates = new Map<string, CardAnimationState>();
-      for (const result of placeholderResults) {
-        const isSurvivor = survivors.some((s) => s.genome.id === result.genome.id);
+      for (const result of newResults) {
+        const isSurvivor = (result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
         transitionAnimStates.set(result.genome.id, {
           isDead: false,
           isFadingOut: false,
           isMutated: !isSurvivor,
-          isSpawning: false, // Clear spawning to animate to final position
+          isSpawning: false,
           spawnFromX: null,
           spawnFromY: null,
         });
       }
       setCardAnimationStates(transitionAnimStates);
-
       await delay(SPAWN_DELAY);
     }
 
-    setEvolutionStep('simulate');
-  }, [setGeneration, setSimulationResults, setEvolutionStep, setCardAnimationStates, setLongestSurvivor]);
-
-  /**
-   * Run the simulation step
-   */
-  const runSimulateStep = useCallback(async () => {
-    const population = SimState.getPopulation();
-    if (!population) return;
-
-    const genomes = population.getGenomes();
-    const currentGen = useEvolutionStore.getState().generation;
-    const currentConfig = useEvolutionStore.getState().config;
-
-    const results = await SimulationService.runSimulation(genomes, currentConfig, (progress) => {
-      setSimulationProgress(progress);
-    });
-    setSimulationProgress(null);
-
-    // Update population fitness
-    SimulationService.updatePopulationFitness(population, results);
-
-    // Update store
-    setSimulationResults(results);
     setEvolutionStep('sort');
-
-    // Save to storage
-    await StorageService.saveGeneration(currentGen, results);
-    setMaxGeneration(currentGen);
-
-    return results;
-  }, [setSimulationResults, setEvolutionStep, setMaxGeneration, setSimulationProgress]);
-
-  const setSortAnimationTriggered = useEvolutionStore((s) => s.setSortAnimationTriggered);
+  }, [setGeneration, setMaxGeneration, setSimulationResults, setEvolutionStep, setCardAnimationStates, setLongestSurvivor]);
 
   /**
    * Run the sort step (reorder by fitness with animation, record history)
@@ -426,81 +386,77 @@ export function useSimulation() {
     const results = useEvolutionStore.getState().simulationResults;
     const history = useEvolutionStore.getState().fitnessHistory;
 
-    // Clear mutated states - all cards are now normal
+    // Clear mutated states
     clearCardAnimationStates();
 
-    // Trigger sort animation (CreatureGrid will respond to this)
+    // Trigger sort animation
     if (!fastMode) {
       setSortAnimationTriggered(true);
       await delay(SORT_DELAY);
       setSortAnimationTriggered(false);
     }
 
-    // Record history - must be sequential to avoid race conditions on storage writes
-    await recordFitnessHistory(results, currentGen, history);
-    await recordCreatureTypeHistory(results, currentGen);
+    // Get the latest response stats (we need to reconstruct from results)
+    const validResults = results.filter(r => !isNaN(r.finalFitness) && isFinite(r.finalFitness));
+    if (validResults.length > 0) {
+      const fitnesses = validResults.map(r => r.finalFitness).sort((a, b) => b - a);
+      const newEntry = {
+        generation: currentGen,
+        best: fitnesses[0],
+        average: fitnesses.reduce((s, f) => s + f, 0) / fitnesses.length,
+        worst: fitnesses[fitnesses.length - 1],
+      };
+      setFitnessHistory([...history, newEntry]);
+    }
+
+    updateCreatureTypeHistory(results, currentGen);
     updateBestCreature(results, currentGen);
     updateLongestSurvivor(results, currentGen);
 
     setEvolutionStep('idle');
-  }, [setEvolutionStep, clearCardAnimationStates, setSortAnimationTriggered, recordFitnessHistory, recordCreatureTypeHistory, updateBestCreature, updateLongestSurvivor]);
+  }, [setEvolutionStep, clearCardAnimationStates, setSortAnimationTriggered, setFitnessHistory, updateCreatureTypeHistory, updateBestCreature, updateLongestSurvivor]);
 
   /**
    * Execute one step in the evolution cycle.
-   * Each click advances one phase, matching vanilla app behavior:
-   * - idle → mutate: kill 50%, create offspring, then set to 'simulate'
-   * - simulate: run simulation, then set to 'sort'
-   * - sort: animate sort, record history, then set to 'idle'
    */
   const executeNextStep = useCallback(async () => {
     const currentStep = useEvolutionStore.getState().evolutionStep;
 
     if (currentStep === 'idle') {
-      // Start mutate phase
       setEvolutionStep('mutate');
       await runMutateStep();
-      // runMutateStep sets evolutionStep to 'simulate' when done
-    } else if (currentStep === 'simulate') {
-      // Run simulation
-      await runSimulateStep();
-      // runSimulateStep sets evolutionStep to 'sort' when done
+      // runMutateStep sets evolutionStep to 'sort' when done
     } else if (currentStep === 'sort') {
-      // Run sort step
       await runSortStep();
       // runSortStep sets evolutionStep to 'idle' when done
     }
-    // If in 'mutate' state, button should be disabled
-  }, [setEvolutionStep, runMutateStep, runSimulateStep, runSortStep]);
+  }, [setEvolutionStep, runMutateStep, runSortStep]);
 
   /**
    * Auto-run for a specific number of generations
-   * Does all work silently and updates UI once at the end
    */
   const autoRun = useCallback(
     async (generations: number) => {
-      if (SimState.isAutoRunning()) return;
+      if (autoRunning) return;
 
-      const population = SimState.getPopulation();
-      if (!population) return;
+      const runId = StorageService.getCurrentRunId();
+      if (!runId) return;
 
-      SimState.setAutoRunning(true);
+      autoRunning = true;
       setIsAutoRunning(true);
 
       try {
-        let currentGen = useEvolutionStore.getState().generation;
-        const currentConfig = useEvolutionStore.getState().config;
         let history = useEvolutionStore.getState().fitnessHistory;
 
-        // Track previous results for detecting dying creatures
-        let previousResults = useEvolutionStore.getState().simulationResults;
-
         for (let i = 0; i < generations; i++) {
-          if (!SimState.isAutoRunning()) break;
+          if (!autoRunning) break;
 
-          // Check for dying creatures that might be longest survivors
-          // (before evolution removes them)
+          // Check for dying creatures before evolution
+          const previousResults = useEvolutionStore.getState().simulationResults;
+          const currentConfig = useEvolutionStore.getState().config;
+          const currentGen = useEvolutionStore.getState().generation;
+
           if (previousResults.length > 0) {
-            // Find creatures that will die (sorted by fitness, bottom cullPercentage%)
             const sortedPrev = [...previousResults].sort((a, b) => {
               const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
               const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
@@ -509,106 +465,72 @@ export function useSimulation() {
             const survivorCount = Math.floor(sortedPrev.length * (1 - currentConfig.cullPercentage));
             const dyingCreatures = sortedPrev.slice(survivorCount);
 
-            // Debug: log survival streaks
-            const allStreaks = previousResults.map(r => r.genome.survivalStreak || 0);
-            const maxStreak = Math.max(...allStreaks, 0);
-            if (maxStreak > 0) {
-              console.log(`[AutoRun] Gen ${currentGen}: population has survivors with streaks up to ${maxStreak}`);
-            }
-
             for (const dead of dyingCreatures) {
               const streak = dead.genome.survivalStreak || 0;
               if (streak > 0) {
                 const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
-                console.log(`[AutoRun] Dying creature has streak=${streak}, current longest=${currentLongestGens}`);
                 if (streak > currentLongestGens) {
-                  console.log(`[AutoRun] New longest survivor! streak=${streak}`);
                   setLongestSurvivor(dead, streak, currentGen + 1);
-                  StorageService.updateLongestSurvivor(dead, streak, currentGen + 1);
                 }
               }
             }
           }
 
-          // 1. Evolve population (mutate/crossover) - silent
-          const newGenomes = await SimulationService.evolvePopulation(population, currentGen);
-          currentGen += 1;
+          // Run evolution step
+          const response = await Api.evolutionStep(runId);
+          const results = response.creatures.map(apiCreatureToResult);
 
-          // 2. Simulate all creatures - silent (no progress callback)
-          const results = await SimulationService.runSimulation(newGenomes, currentConfig);
+          // Update fitness history
+          const newEntry = {
+            generation: response.generation,
+            best: response.best_fitness,
+            average: response.avg_fitness,
+            worst: response.worst_fitness,
+          };
+          history = [...history, newEntry];
 
-          // 3. Update population fitness
-          SimulationService.updatePopulationFitness(population, results);
-
-          // Save for next iteration's dying creature check
-          previousResults = results;
-
-          // 4. Record history and save to storage
-          const stats = SimulationService.calculateFitnessStats(results);
-          if (stats.validCount > 0) {
-            const newEntry = {
-              generation: currentGen,
-              best: stats.best,
-              average: stats.average,
-              worst: stats.worst,
-            };
-            history = [...history, newEntry];
-          }
-
-          // Save generation to storage
-          await StorageService.saveGeneration(currentGen, results);
-
-          // Update best creature tracking
-          const best = SimulationService.findBestCreature(results);
-          if (best) {
-            const currentBest = useEvolutionStore.getState().bestCreatureEver;
-            if (!currentBest || best.finalFitness > currentBest.finalFitness) {
-              setBestCreature(best, currentGen);
-              StorageService.updateBestCreature(best, currentGen);
-            }
-          }
-
-          // Update longest survivor tracking (check current population, not just dying creatures)
-          updateLongestSurvivor(results, currentGen);
-
-          // Record creature type history
+          // Update creature type history
           const nodeCountDistribution = new Map<number, number>();
           for (const result of results) {
             const nodeCount = result.genome.nodes.length;
             nodeCountDistribution.set(nodeCount, (nodeCountDistribution.get(nodeCount) || 0) + 1);
           }
-          const typeEntry = { generation: currentGen, nodeCountDistribution };
+          const typeEntry = { generation: response.generation, nodeCountDistribution };
           const currentTypeHistory = useEvolutionStore.getState().creatureTypeHistory;
           setCreatureTypeHistory([...currentTypeHistory, typeEntry]);
-          await StorageService.updateCreatureTypeHistory([...currentTypeHistory, typeEntry]);
 
-          // Update fitness history and generation every iteration (for live graph updates)
+          // Update best creature
+          updateBestCreature(results, response.generation);
+
+          // Update longest survivor
+          updateLongestSurvivor(results, response.generation);
+
+          // Update UI
           setFitnessHistory(history);
-          setGeneration(currentGen);
-          setMaxGeneration(currentGen);
-          await StorageService.updateFitnessHistory(history);
+          setGeneration(response.generation);
+          setMaxGeneration(response.generation);
 
-          // Only update creature grid on the LAST iteration (avoid visual flickering)
-          if (i === generations - 1 || !SimState.isAutoRunning()) {
+          // Only update creature grid on last iteration
+          if (i === generations - 1 || !autoRunning) {
             setSimulationResults(results);
           }
         }
       } finally {
-        SimState.setAutoRunning(false);
+        autoRunning = false;
         setIsAutoRunning(false);
         setEvolutionStep('idle');
         clearCardAnimationStates();
       }
     },
     [setIsAutoRunning, setEvolutionStep, setSimulationResults, setGeneration, setMaxGeneration,
-     setFitnessHistory, setCreatureTypeHistory, setBestCreature, setLongestSurvivor, updateLongestSurvivor, clearCardAnimationStates]
+     setFitnessHistory, setCreatureTypeHistory, setLongestSurvivor, updateBestCreature, updateLongestSurvivor, clearCardAnimationStates]
   );
 
   /**
    * Stop auto-run
    */
   const stopAutoRun = useCallback(() => {
-    SimState.setAutoRunning(false);
+    autoRunning = false;
     setIsAutoRunning(false);
   }, [setIsAutoRunning]);
 
@@ -640,27 +562,6 @@ export function useSimulation() {
 
         // Set up state
         StorageService.setCurrentRunId(runId);
-
-        // Recreate population container from loaded genomes (no backend call needed)
-        const genomeConstraints = {
-          minNodes: 2,
-          maxNodes: run.config.maxNodes,
-          minMuscles: 1,
-          maxMuscles: run.config.maxMuscles,
-          minSize: 0.2,
-          maxSize: 0.8,
-          minStiffness: 50,
-          maxStiffness: 500,
-          minFrequency: 0.5,
-          maxFrequency: run.config.maxAllowedFrequency,
-          maxAmplitude: 0.4,
-          spawnRadius: 2.0,
-        };
-        const { Population } = await import('../../src/genetics/Population');
-        const population = Population.createEmpty(run.config, genomeConstraints);
-        population.replaceCreatures(results.map((r) => r.genome));
-        SimulationService.updatePopulationFitness(population, results);
-        SimState.setPopulation(population);
 
         // Update store
         useEvolutionStore.setState({
@@ -742,7 +643,6 @@ export function useSimulation() {
 
   /**
    * Fork the current run from a specific generation
-   * Creates a new run starting from the viewing generation
    */
   const forkFromGeneration = useCallback(async () => {
     const viewingGen = useEvolutionStore.getState().viewingGeneration;
@@ -762,27 +662,6 @@ export function useSimulation() {
       // Load the generation results
       const results = await StorageService.loadGeneration(newRunId, viewingGen, run.config);
       if (!results) throw new Error('Failed to load generation data');
-
-      // Recreate population container from loaded genomes (no backend call needed)
-      const genomeConstraints = {
-        minNodes: 2,
-        maxNodes: run.config.maxNodes,
-        minMuscles: 1,
-        maxMuscles: run.config.maxMuscles,
-        minSize: 0.2,
-        maxSize: 0.8,
-        minStiffness: 50,
-        maxStiffness: 500,
-        minFrequency: 0.5,
-        maxFrequency: run.config.maxAllowedFrequency,
-        maxAmplitude: 0.4,
-        spawnRadius: 2.0,
-      };
-      const { Population } = await import('../../src/genetics/Population');
-      const population = Population.createEmpty(run.config, genomeConstraints);
-      population.replaceCreatures(results.map((r) => r.genome));
-      SimulationService.updatePopulationFitness(population, results);
-      SimState.setPopulation(population);
 
       // Restore best creature
       let bestCreature: CreatureSimulationResult | null = null;
@@ -814,7 +693,7 @@ export function useSimulation() {
       useEvolutionStore.setState({
         generation: viewingGen,
         maxGeneration: viewingGen,
-        viewingGeneration: null, // No longer viewing history
+        viewingGeneration: null,
         evolutionStep: 'idle',
         simulationResults: results,
         runName: run.name || '',

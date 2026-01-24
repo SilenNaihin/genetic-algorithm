@@ -39,6 +39,7 @@ export interface CompactCreatureResult {
   disqualified: string | null;
   frames: number[][];  // Compact: [[time, x1,y1,z1, x2,y2,z2, ...], ...]
   pelletData: { position: Vector3; collectedAtFrame: number | null }[];
+  activationsPerFrame?: number[][];  // Neural network outputs per frame [frame][muscle]
 }
 
 /**

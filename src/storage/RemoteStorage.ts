@@ -1,14 +1,13 @@
 /**
  * Remote Storage - Backend API Implementation
  *
- * Implements the same interface as RunStorage but uses the backend API
- * instead of IndexedDB. This allows the frontend to use either local
- * or remote storage seamlessly.
+ * Read-only storage layer for the frontend.
+ * Backend handles all writes during evolution via the evolution API.
  */
 
 import * as Api from '../services/ApiClient';
 import type { CreatureSimulationResult, PelletData, SimulationFrame, DisqualificationReason } from '../types';
-import type { SimulationConfig, FitnessHistoryEntry, Vector3 } from '../types';
+import type { SimulationConfig, Vector3 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 import type { SavedRun, CompactCreatureResult } from './types';
 import { recalculateFitnessOverTime } from './types';
@@ -35,6 +34,7 @@ function apiRunToSavedRun(apiRun: Api.ApiRun): SavedRun {
 
 /**
  * Remote storage implementation using backend API.
+ * Frontend is read-only - all writes happen via evolution API.
  */
 export class RemoteStorage {
   private currentRunId: string | null = null;
@@ -62,39 +62,6 @@ export class RemoteStorage {
     this.currentRunId = id;
   }
 
-  async saveGeneration(gen: number, results: CreatureSimulationResult[]): Promise<void> {
-    if (!this.currentRunId) return;
-
-    // Helper to safely convert numbers (NaN/Infinity become 0)
-    const safeNum = (v: number) => Number.isFinite(v) ? v : 0;
-
-    // Convert results to API format
-    const creatures: Api.CreatureResultCreate[] = results.map(r => ({
-      genome: Api.toApiGenome(r.genome),
-      fitness: safeNum(r.finalFitness),
-      pellets_collected: r.pelletsCollected,
-      disqualified: r.disqualified !== null,
-      disqualified_reason: r.disqualified,
-      frames: this.compactFrames(r.frames, r.genome),
-      pellet_data: r.pellets.map(p => ({
-        position: {
-          x: safeNum(Math.round(p.position.x * 1000) / 1000),
-          y: safeNum(Math.round(p.position.y * 1000) / 1000),
-          z: safeNum(Math.round(p.position.z * 1000) / 1000)
-        },
-        collectedAtFrame: p.collectedAtFrame
-      }))
-    }));
-
-    try {
-      await Api.saveGeneration(this.currentRunId, gen, creatures);
-      console.log(`[RemoteStorage] Generation ${gen} saved with ${results.length} creatures`);
-    } catch (error) {
-      console.error('[RemoteStorage] Failed to save generation:', error);
-      throw error;
-    }
-  }
-
   compactCreatureResult(r: CreatureSimulationResult): CompactCreatureResult {
     return {
       genome: r.genome,
@@ -109,7 +76,8 @@ export class RemoteStorage {
           z: Math.round(p.position.z * 1000) / 1000
         },
         collectedAtFrame: p.collectedAtFrame
-      }))
+      })),
+      activationsPerFrame: r.activationsPerFrame,
     };
   }
 
@@ -155,7 +123,8 @@ export class RemoteStorage {
       closestPelletDistance: 0,
       pellets,
       fitnessOverTime,
-      disqualified: r.disqualified as DisqualificationReason
+      disqualified: r.disqualified as DisqualificationReason,
+      activationsPerFrame: r.activationsPerFrame,
     };
   }
 
@@ -194,7 +163,6 @@ export class RemoteStorage {
 
       // Convert API creatures to CreatureSimulationResult
       // NOTE: Frames are NOT loaded here - they are loaded lazily when replay modal opens
-      // This avoids N+1 queries (100 individual frame requests)
       const results: CreatureSimulationResult[] = creatures.map((c) => {
         const genome = Api.fromApiGenome(c.genome);
 
@@ -233,7 +201,6 @@ export class RemoteStorage {
 
   /**
    * Load frames for a specific creature (on-demand, for replay)
-   * Now accepts real pellet data and fitnessOverTime from simulation results.
    */
   async loadCreatureFrames(
     creatureId: string,
@@ -243,42 +210,67 @@ export class RemoteStorage {
     disqualified: string | null,
     realPellets?: PelletData[],
     realFitnessOverTime?: number[]
-  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[] }> {
+  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[] }> {
     try {
+      console.log('[RemoteStorage] Fetching frames for creature:', creatureId);
       const framesData = await Api.getCreatureFrames(creatureId);
+      console.log('[RemoteStorage] API response:', {
+        hasFramesData: !!framesData.frames_data,
+        framesDataLength: framesData.frames_data?.length,
+        frameCount: framesData.frame_count,
+        frameRate: framesData.frame_rate,
+        hasPelletFrames: !!framesData.pellet_frames,
+        pelletFramesLength: framesData.pellet_frames?.length,
+      });
+
       if (!framesData.frames_data || framesData.frames_data.length === 0) {
-        return { frames: [], fitnessOverTime: [] };
+        console.warn('[RemoteStorage] No frames data in API response');
+        return { frames: [], fitnessOverTime: [], pellets: [] };
       }
 
       const frames = this.expandFrames(framesData.frames_data, genome);
+      console.log('[RemoteStorage] Expanded frames:', frames.length, 'frames');
+
+      // Convert API pellet_frames to PelletData format
+      let pellets: PelletData[];
+      if (framesData.pellet_frames && framesData.pellet_frames.length > 0) {
+        pellets = framesData.pellet_frames.map((p, i) => ({
+          id: `pellet_${i}`,
+          position: p.position,
+          collectedAtFrame: p.collected_at_frame,
+          spawnedAtFrame: p.spawned_at_frame,
+          initialDistance: p.initial_distance,
+        }));
+        console.log('[RemoteStorage] Using pellet_frames from API:', pellets.length, 'pellets');
+      } else if (realPellets && realPellets.length > 0) {
+        pellets = realPellets;
+      } else {
+        // Create placeholder pellets
+        pellets = Array.from({ length: Math.max(1, pelletsCollected) }, (_, i) => ({
+          id: `pellet_${i}`,
+          position: { x: 0, y: 0, z: 0 },
+          collectedAtFrame: null,
+          spawnedAtFrame: 0,
+          initialDistance: 5
+        }));
+      }
 
       // Use real fitnessOverTime if provided and matches frame count
       if (realFitnessOverTime && realFitnessOverTime.length > 0) {
         if (realFitnessOverTime.length === frames.length) {
           console.log('[RemoteStorage] Using real fitnessOverTime from backend');
-          return { frames, fitnessOverTime: realFitnessOverTime };
+          return { frames, fitnessOverTime: realFitnessOverTime, pellets };
         } else {
           console.warn(`[RemoteStorage] fitnessOverTime length mismatch: ${realFitnessOverTime.length} vs ${frames.length} frames, recalculating`);
         }
       }
 
-      // Use real pellet data if provided, otherwise create placeholder
-      const pellets: PelletData[] = realPellets && realPellets.length > 0
-        ? realPellets
-        : Array.from({ length: Math.max(1, pelletsCollected) }, (_, i) => ({
-            id: `pellet_${i}`,
-            position: { x: 0, y: 0, z: 0 },
-            collectedAtFrame: null,
-            spawnedAtFrame: 0,
-            initialDistance: 5
-          }));
-
       const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, config, disqualified);
 
-      return { frames, fitnessOverTime };
+      return { frames, fitnessOverTime, pellets };
     } catch (error) {
       console.error('[RemoteStorage] Failed to load creature frames:', error);
-      return { frames: [], fitnessOverTime: [] };
+      return { frames: [], fitnessOverTime: [], pellets: [] };
     }
   }
 
@@ -376,29 +368,8 @@ export class RemoteStorage {
     await Api.deleteRun(runId);
   }
 
-  async updateFitnessHistory(_fitnessHistory: FitnessHistoryEntry[]): Promise<void> {
-    // Backend tracks this automatically during evolution
-    // This is a no-op for remote storage
-    console.log('[RemoteStorage] Fitness history update (handled by backend)');
-  }
-
-  async updateCreatureTypeHistory(_history: { generation: number; nodeCountDistribution: Map<number, number> }[]): Promise<void> {
-    // Backend tracks this automatically during evolution
-    console.log('[RemoteStorage] Creature type history update (handled by backend)');
-  }
-
   async updateRunName(runId: string, name: string): Promise<void> {
     await Api.updateRun(runId, { name });
-  }
-
-  async updateBestCreature(_creature: CreatureSimulationResult, _generation: number): Promise<void> {
-    // Backend tracks this automatically during evolution
-    console.log('[RemoteStorage] Best creature update (handled by backend)');
-  }
-
-  async updateLongestSurvivor(_creature: CreatureSimulationResult, _generations: number, _diedAtGeneration: number): Promise<void> {
-    // Backend tracks this automatically during evolution
-    console.log('[RemoteStorage] Longest survivor update (handled by backend)');
   }
 
   async getMaxGeneration(runId: string): Promise<number> {

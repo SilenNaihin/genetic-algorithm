@@ -13,7 +13,7 @@ Browser-based genetic algorithm simulator where soft-bodied creatures evolve to 
 ### Backend (FastAPI + PyTorch)
 - Dev: `cd backend && uvicorn app.main:app --reload --port 8000`
 - Test: `cd backend && pytest`
-- 417 tests covering physics, neural, genetics, API, parity, integration
+- 441 tests covering physics, neural, genetics, API, parity, integration
 
 ## Directory Structure
 
@@ -111,6 +111,7 @@ backend/                # Python backend (PyTorch physics)
 - Code readability over minimal diffs
 - Clean code over clever code
 - Commit after completing each feature/fix
+- No backwards compatibility unless explicitly requested - just fix it the right way
 
 ## Changelog
 
@@ -127,12 +128,12 @@ npm test -- --run  # Run once (no watch)
 ```
 
 175 frontend tests covering: genetics, genome, storage, neural networks, brain evolution, math utilities.
-440 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
+441 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
 
 ## Global Commands
 
 - `/commit-smart` - Atomic git commits (use after each phase/feature)
-- `/update-claudemd` - Update this file with new learnings
+- `/update-claudemd` - Update this file with meta learnings (conventions, philosophy, gotchas) - NOT specific technical details
 - `/debug` - Systematic debugging
 - `/setup-repo` - Repository setup
 

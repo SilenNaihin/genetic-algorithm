@@ -56,34 +56,6 @@ export interface ApiSimulationConfig {
   sparse_bottom_count: number;
 }
 
-export interface ApiFitnessBreakdown {
-  pellet_points: number;
-  progress: number;
-  distance_traveled: number;
-  regression_penalty: number;
-  efficiency_penalty: number;
-}
-
-export interface ApiSimulationResult {
-  genome_id: string;
-  fitness: number;
-  pellets_collected: number;
-  disqualified: boolean;
-  disqualified_reason: string | null;
-  fitness_breakdown: ApiFitnessBreakdown | null;
-  net_displacement: number;
-  distance_traveled: number;
-  total_activation: number;
-  frame_count: number;
-  frames: number[][] | null;
-  activations_per_frame: number[][] | null;
-}
-
-export interface ApiBatchSimulationResponse {
-  results: ApiSimulationResult[];
-  total_time_ms: number;
-  creatures_per_second: number;
-}
 
 export interface ApiRun {
   id: string;
@@ -127,17 +99,32 @@ export interface ApiCreature {
   parent_ids: string[];
 }
 
-export interface ApiGeneticsGenerateRequest {
-  count: number;
-  constraints?: Record<string, unknown>;
-  config?: Partial<ApiSimulationConfig>;
+/** Creature data from evolution step response */
+export interface ApiEvolutionCreature {
+  id: string;
+  genome: Record<string, unknown>;
+  fitness: number;
+  pellets_collected: number;
+  disqualified: boolean;
+  disqualified_reason: string | null;
+  is_survivor: boolean;
+  parent_ids: string[];
+  has_frames: boolean;
+  survival_streak: number;
 }
 
-export interface ApiGeneticsEvolveRequest {
-  genomes: Record<string, unknown>[];
-  fitnesses: number[];
-  config?: Partial<ApiSimulationConfig>;
+/** Evolution step response */
+export interface ApiEvolutionStepResponse {
+  generation: number;
+  best_fitness: number;
+  avg_fitness: number;
+  worst_fitness: number;
+  median_fitness: number;
+  simulation_time_ms: number;
+  creature_count: number;
+  creatures: ApiEvolutionCreature[];
 }
+
 
 // -------------------------------------------------------------------
 // Conversion helpers
@@ -299,6 +286,7 @@ export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
     controller_type: genome.controllerType,
     neural_genome: neuralGenome,
     color: genome.color,
+    ancestry_chain: genome.ancestryChain || [],
   };
 }
 
@@ -430,140 +418,6 @@ async function fetchJson<T>(
 }
 
 // -------------------------------------------------------------------
-// Simulation API
-// -------------------------------------------------------------------
-
-export async function simulateBatch(
-  genomes: CreatureGenome[],
-  config: SimulationConfig
-): Promise<ApiBatchSimulationResponse> {
-  const apiGenomes = genomes.map(toApiGenome);
-  const apiConfig = toApiConfig(config);
-
-  // Debug: Log first genome to help diagnose 422 errors
-  if (apiGenomes.length > 0) {
-    console.log('[API] simulateBatch - first genome:', JSON.stringify(apiGenomes[0], null, 2));
-  }
-
-  return fetchJson<ApiBatchSimulationResponse>('/api/simulation/batch', {
-    method: 'POST',
-    body: JSON.stringify({
-      genomes: apiGenomes,
-      config: apiConfig,
-    }),
-  });
-}
-
-// -------------------------------------------------------------------
-// Genetics API
-// -------------------------------------------------------------------
-
-export async function generateGenomes(
-  count: number,
-  config: SimulationConfig
-): Promise<CreatureGenome[]> {
-  const response = await fetchJson<{ genomes: Record<string, unknown>[]; count: number }>(
-    '/api/genetics/generate',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        size: count,
-        constraints: {
-          minNodes: 2,
-          maxNodes: config.maxNodes,
-          minMuscles: 1,
-          maxMuscles: config.maxMuscles,
-          spawnRadius: 2.0,
-          minSize: 0.2,
-          maxSize: 0.8,
-          minStiffness: 50,
-          maxStiffness: 500,
-          minFrequency: 0.5,
-          maxFrequency: config.maxAllowedFrequency,
-          maxAmplitude: 0.4,
-        },
-        use_neural_net: config.useNeuralNet,
-        neural_hidden_size: config.neuralHiddenSize,
-        neural_output_bias: config.neuralOutputBias,
-      }),
-    }
-  );
-
-  console.log(`[API] Generated ${response.count} genomes from backend`);
-  return response.genomes.map(fromApiGenome);
-}
-
-export async function evolveGenomes(
-  genomes: CreatureGenome[],
-  fitnesses: number[],
-  config: SimulationConfig,
-  generation: number = 0
-): Promise<CreatureGenome[]> {
-  // Build the evolution config that matches backend schema
-  const evolutionConfig = {
-    population_size: config.populationSize,
-    elite_count: config.eliteCount,
-    cull_percentage: config.cullPercentage,
-    crossover_rate: config.crossoverRate,
-    use_mutation: config.useMutation,
-    use_crossover: config.useCrossover,
-    use_neural_net: config.useNeuralNet,
-    neural_output_bias: config.neuralOutputBias,
-    mutation: {
-      rate: config.mutationRate,
-      magnitude: config.mutationMagnitude,
-      structural_rate: 0.1,  // Default structural mutation rate
-      neural_rate: config.weightMutationRate,
-      neural_magnitude: config.weightMutationMagnitude,
-    },
-    decay: {
-      mode: config.weightMutationDecay,
-      start_rate: config.weightMutationRate,
-      end_rate: 0.01,
-      decay_generations: 100,
-    },
-    selection: {
-      method: 'truncation',
-      survival_rate: 1 - config.cullPercentage,
-      tournament_size: 3,
-    },
-    constraints: {
-      minNodes: 2,
-      maxNodes: config.maxNodes,
-      minMuscles: 1,
-      maxMuscles: config.maxMuscles,
-      spawnRadius: 2.0,
-      minSize: 0.2,
-      maxSize: 0.8,
-      minStiffness: 50,
-      maxStiffness: 500,
-      minFrequency: 0.5,
-      maxFrequency: config.maxAllowedFrequency,
-      maxAmplitude: 0.4,
-    },
-  };
-
-  // Safely convert fitnesses (NaN -> 0)
-  const safeFitnesses = fitnesses.map(f => Number.isFinite(f) ? f : 0);
-
-  const response = await fetchJson<{ genomes: Record<string, unknown>[]; generation: number }>(
-    '/api/genetics/evolve',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        genomes: genomes.map(toApiGenome),
-        fitness_scores: safeFitnesses,
-        config: evolutionConfig,
-        generation,
-      }),
-    }
-  );
-
-  console.log(`[API] Evolved to generation ${response.generation} from backend`);
-  return response.genomes.map(fromApiGenome);
-}
-
-// -------------------------------------------------------------------
 // Runs API
 // -------------------------------------------------------------------
 
@@ -617,6 +471,21 @@ export async function forkRun(
 }
 
 // -------------------------------------------------------------------
+// Evolution API
+// -------------------------------------------------------------------
+
+/**
+ * Run a single evolution step (generation).
+ * Backend handles: genetics + simulation + storage.
+ * Returns stats + creature data for immediate display.
+ */
+export async function evolutionStep(runId: string): Promise<ApiEvolutionStepResponse> {
+  return fetchJson<ApiEvolutionStepResponse>(`/api/evolution/${runId}/step`, {
+    method: 'POST',
+  });
+}
+
+// -------------------------------------------------------------------
 // Generations API
 // -------------------------------------------------------------------
 
@@ -637,40 +506,6 @@ export async function getGeneration(
   return { generation: genData, creatures };
 }
 
-/** Input for saving a creature result */
-export interface CreatureResultCreate {
-  genome: Record<string, unknown>;
-  fitness: number;
-  pellets_collected: number;
-  disqualified: boolean;
-  disqualified_reason: string | null;
-  frames: number[][] | null;
-  pellet_data: { position: { x: number; y: number; z: number }; collectedAtFrame: number | null }[] | null;
-}
-
-/** Input for saving a generation */
-export interface GenerationCreate {
-  generation: number;
-  creatures: CreatureResultCreate[];
-  simulation_time_ms: number;
-}
-
-export async function saveGeneration(
-  runId: string,
-  generationNumber: number,
-  creatures: CreatureResultCreate[],
-  simulationTimeMs: number = 0
-): Promise<{ status: string; run_id: string; generation: number; creature_count: number }> {
-  return fetchJson(`/api/runs/${runId}/generations`, {
-    method: 'POST',
-    body: JSON.stringify({
-      generation: generationNumber,
-      creatures,
-      simulation_time_ms: simulationTimeMs,
-    }),
-  });
-}
-
 // -------------------------------------------------------------------
 // Creatures API
 // -------------------------------------------------------------------
@@ -681,7 +516,17 @@ export async function getCreature(creatureId: string): Promise<ApiCreature> {
 
 export async function getCreatureFrames(
   creatureId: string
-): Promise<{ frames_data: number[][]; frame_count: number; frame_rate: number }> {
+): Promise<{
+  frames_data: number[][];
+  frame_count: number;
+  frame_rate: number;
+  pellet_frames: Array<{
+    position: { x: number; y: number; z: number };
+    collected_at_frame: number | null;
+    spawned_at_frame: number;
+    initial_distance: number;
+  }> | null;
+}> {
   return fetchJson(`/api/creatures/${creatureId}/frames`);
 }
 

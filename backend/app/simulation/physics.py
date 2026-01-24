@@ -1380,6 +1380,7 @@ def simulate_with_fitness_neural(
     total_activation = torch.zeros(B, device=device)
     frames = []
     fitness_per_frame = []
+    activations_per_frame = []  # Store nn_outputs per frame for visualization
     time = 0.0
     frame_index = 0
 
@@ -1455,6 +1456,10 @@ def simulate_with_fitness_neural(
                 batch, pellets, fitness_state, time, fitness_config
             )
             fitness_per_frame.append(current_fitness.clone())
+
+            # Record neural network outputs for this frame
+            activations_per_frame.append(nn_outputs.clone())
+
             frame_index += 1
 
     result = {
@@ -1469,5 +1474,7 @@ def simulate_with_fitness_neural(
         result['frames'] = torch.stack(frames, dim=1)  # [B, F, N, 3]
         if fitness_per_frame:
             result['fitness_per_frame'] = torch.stack(fitness_per_frame, dim=1)  # [B, F]
+        if activations_per_frame:
+            result['activations_per_frame'] = torch.stack(activations_per_frame, dim=1)  # [B, F, M]
 
     return result

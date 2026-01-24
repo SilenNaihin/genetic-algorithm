@@ -8,7 +8,6 @@ import { ReplayRenderer } from '../../../src/rendering/ReplayRenderer';
 import { NeuralVisualizer } from '../../../src/ui/NeuralVisualizer';
 import { gatherSensorInputsPure, gatherSensorInputsHybrid, NEURAL_INPUT_SIZE_PURE } from '../../../src/neural';
 import * as StorageService from '../../../src/services/StorageService';
-import * as ApiClient from '../../../src/services/ApiClient';
 import type { CreatureGenome } from '../../../src/types';
 import type { CreatureSimulationResult } from '../../../src/types';
 
@@ -81,6 +80,8 @@ export function ReplayModal() {
         pelletsCount: replayResult.pellets?.length,
         firstFitness: replayResult.fitnessOverTime?.[0],
         lastFitness: replayResult.fitnessOverTime?.[replayResult.fitnessOverTime?.length - 1],
+        activationsPerFrameLength: replayResult.activationsPerFrame?.length,
+        firstActivations: replayResult.activationsPerFrame?.[0]?.slice(0, 3),
       });
       setLoadedResult(replayResult);
       return;
@@ -96,6 +97,12 @@ export function ReplayModal() {
     }
 
     console.log('[ReplayModal] Loading frames from API for creature:', creatureId);
+    console.log('[ReplayModal] replayResult:', {
+      genomeId: replayResult.genome.id,
+      framesLength: replayResult.frames.length,
+      pelletsCollected: replayResult.pelletsCollected,
+      pelletsLength: replayResult.pellets.length,
+    });
 
     // Load frames lazily
     setFramesLoading(true);
@@ -109,11 +116,19 @@ export function ReplayModal() {
       replayResult.disqualified,
       replayResult.pellets,  // Pass real pellet data
       replayResult.fitnessOverTime  // Pass real fitness over time
-    ).then(({ frames, fitnessOverTime }) => {
+    ).then(({ frames, fitnessOverTime, pellets }) => {
+      console.log('[ReplayModal] Loaded frames:', {
+        framesLength: frames.length,
+        fitnessOverTimeLength: fitnessOverTime.length,
+        pelletsLength: pellets.length,
+        firstFrame: frames[0],
+        lastFrame: frames[frames.length - 1],
+      });
       setLoadedResult({
         ...replayResult,
         frames,
         fitnessOverTime,
+        pellets: pellets.length > 0 ? pellets : replayResult.pellets,
       });
       setFramesLoading(false);
     }).catch((error) => {
@@ -197,59 +212,54 @@ export function ReplayModal() {
     };
   }, [isOpen, loadedResult]);
 
-  // Build family tree using efficient backend endpoint
-  const buildFamilyTree = useCallback(async (genome: CreatureGenome) => {
-    setFamilyTreeLoading(true);
-
-    // Build ancestor map
-    const ancestorMap = new Map<string, AncestorInfo>();
-
-    // Add current creature from simulation results
+  // Build family tree from embedded ancestry chain (no DB lookups needed)
+  const buildFamilyTree = useCallback((genome: CreatureGenome) => {
+    // Get current creature's fitness from simulation results
     const currentResult = simulationResults.find((r) => r.genome.id === genome.id);
-    ancestorMap.set(
-      genome.id,
-      genomeToAncestorInfo(genome, currentResult?.finalFitness || 0, currentResult?.pelletsCollected || 0)
-    );
+    const currentFitness = currentResult?.finalFitness || 0;
 
-    // Try to fetch ancestors from backend using efficient endpoint
-    const creatureId = genome._apiCreatureId;
-    if (creatureId) {
-      try {
-        const { ancestors } = await ApiClient.getCreatureAncestors(creatureId, 50);
-        for (const ancestor of ancestors) {
-          ancestorMap.set(ancestor.id, {
-            id: ancestor.id,
-            generation: ancestor.generation,
-            fitness: ancestor.fitness,
-            pelletsCollected: ancestor.pellets_collected,
-            nodeCount: ancestor.node_count,
-            muscleCount: ancestor.muscle_count,
-            color: ancestor.color,
-            parentIds: ancestor.parent_ids,
-          });
-        }
-      } catch (error) {
-        console.warn('[ReplayModal] Failed to fetch ancestors:', error);
-        // Fall back to current results only
-      }
+    // Build simple linear ancestry from embedded chain
+    const ancestryChain = genome.ancestryChain || [];
+
+    // Create tree structure from the flat ancestry chain
+    const tree: FamilyTreeNode = {
+      creature: {
+        id: genome.id,
+        generation: genome.generation,
+        fitness: currentFitness,
+        pelletsCollected: currentResult?.pelletsCollected || 0,
+        nodeCount: genome.nodes.length,
+        muscleCount: genome.muscles.length,
+        color: genome.color,
+        parentIds: genome.parentIds,
+      },
+      parents: [],
+    };
+
+    // Build parent chain from ancestry (reverse order - most recent parent first)
+    let currentNode = tree;
+    for (let i = ancestryChain.length - 1; i >= 0; i--) {
+      const ancestor = ancestryChain[i];
+      const parentNode: FamilyTreeNode = {
+        creature: {
+          id: `ancestor-${i}`,
+          generation: ancestor.generation,
+          fitness: ancestor.fitness,
+          pelletsCollected: 0,
+          nodeCount: ancestor.nodeCount,
+          muscleCount: ancestor.muscleCount,
+          color: ancestor.color || { h: 0.5, s: 0.7, l: 0.5 },
+          parentIds: i > 0 ? [`ancestor-${i - 1}`] : [],
+        },
+        parents: [],
+      };
+      currentNode.parents.push(parentNode);
+      currentNode = parentNode;
     }
 
-    // Also add ancestors from current simulation results (in case they're not in DB yet)
-    for (const result of simulationResults) {
-      if (!ancestorMap.has(result.genome.id)) {
-        ancestorMap.set(
-          result.genome.id,
-          genomeToAncestorInfo(result.genome, result.finalFitness, result.pelletsCollected)
-        );
-      }
-    }
-
-    // Build tree
-    const ancestorCount = { count: 0 };
-    const tree = buildTreeNode(genome.id, ancestorMap, 0, 100, ancestorCount, lineageMode);
     setFamilyTree(tree);
     setFamilyTreeLoading(false);
-  }, [simulationResults, lineageMode]);
+  }, [simulationResults]);
 
   // Rebuild family tree when lineage mode changes
   useEffect(() => {
@@ -299,50 +309,56 @@ export function ReplayModal() {
       // Update neural visualization if creature has neural genome
       const genome = loadedResult.genome;
       if (neuralVisualizerRef.current && genome.neuralGenome && genome.controllerType === 'neural') {
-        const frame = frames[frameIndex];
-        const com = frame.centerOfMass;
+        // Prefer stored activations from simulation (accurate)
+        if (loadedResult.activationsPerFrame && loadedResult.activationsPerFrame[frameIndex]) {
+          neuralVisualizerRef.current.setStoredActivations(loadedResult.activationsPerFrame[frameIndex]);
+        } else {
+          // Fallback: recompute from sensor inputs (may differ from actual simulation)
+          const frame = frames[frameIndex];
+          const com = frame.centerOfMass;
 
-        // Find active pellet at this frame
-        const activePelletData = loadedResult.pellets.find((p) =>
-          p.spawnedAtFrame <= frameIndex &&
-          (p.collectedAtFrame === null || frameIndex < p.collectedAtFrame)
-        );
+          // Find active pellet at this frame
+          const activePelletData = loadedResult.pellets.find((p) =>
+            p.spawnedAtFrame <= frameIndex &&
+            (p.collectedAtFrame === null || frameIndex < p.collectedAtFrame)
+          );
 
-        // Calculate pellet direction
-        let pelletDir = { x: 0, y: 0, z: 0 };
-        let normalizedDist = 1;
+          // Calculate pellet direction
+          let pelletDir = { x: 0, y: 0, z: 0 };
+          let normalizedDist = 1;
 
-        if (activePelletData) {
-          const dx = activePelletData.position.x - com.x;
-          const dy = activePelletData.position.y - com.y;
-          const dz = activePelletData.position.z - com.z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist > 0.01) {
-            pelletDir = { x: dx / dist, y: dy / dist, z: dz / dist };
+          if (activePelletData) {
+            const dx = activePelletData.position.x - com.x;
+            const dy = activePelletData.position.y - com.y;
+            const dz = activePelletData.position.z - com.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist > 0.01) {
+              pelletDir = { x: dx / dist, y: dy / dist, z: dz / dist };
+            }
+            normalizedDist = Math.min(dist / 20, 1);
           }
-          normalizedDist = Math.min(dist / 20, 1);
-        }
 
-        // Calculate velocity from previous frame
-        let velocityDir = { x: 0, y: 0, z: 0 };
-        if (frameIndex > 0) {
-          const prevFrame = frames[frameIndex - 1];
-          const vx = com.x - prevFrame.centerOfMass.x;
-          const vy = com.y - prevFrame.centerOfMass.y;
-          const vz = com.z - prevFrame.centerOfMass.z;
-          const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-          if (speed > 0.001) {
-            velocityDir = { x: vx / speed, y: vy / speed, z: vz / speed };
+          // Calculate velocity from previous frame
+          let velocityDir = { x: 0, y: 0, z: 0 };
+          if (frameIndex > 0) {
+            const prevFrame = frames[frameIndex - 1];
+            const vx = com.x - prevFrame.centerOfMass.x;
+            const vy = com.y - prevFrame.centerOfMass.y;
+            const vz = com.z - prevFrame.centerOfMass.z;
+            const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+            if (speed > 0.001) {
+              velocityDir = { x: vx / speed, y: vy / speed, z: vz / speed };
+            }
           }
+
+          // Gather sensor inputs based on neural mode
+          const isPureMode = genome.neuralGenome.topology.inputSize === NEURAL_INPUT_SIZE_PURE;
+          const sensorInputs = isPureMode
+            ? gatherSensorInputsPure(pelletDir, velocityDir, normalizedDist)
+            : gatherSensorInputsHybrid(pelletDir, velocityDir, normalizedDist, targetTime);
+
+          neuralVisualizerRef.current.updateActivations(sensorInputs);
         }
-
-        // Gather sensor inputs based on neural mode
-        const isPureMode = genome.neuralGenome.topology.inputSize === NEURAL_INPUT_SIZE_PURE;
-        const sensorInputs = isPureMode
-          ? gatherSensorInputsPure(pelletDir, velocityDir, normalizedDist)
-          : gatherSensorInputsHybrid(pelletDir, velocityDir, normalizedDist, targetTime);
-
-        neuralVisualizerRef.current.updateActivations(sensorInputs);
       }
 
       animationRef.current = requestAnimationFrame(animate);
@@ -810,80 +826,6 @@ export function ReplayModal() {
       </div>
     </Modal>
   );
-}
-
-// Helper functions
-function genomeToAncestorInfo(
-  genome: CreatureGenome,
-  fitness: number,
-  pelletsCollected: number
-): AncestorInfo {
-  return {
-    id: genome.id,
-    generation: genome.generation,
-    fitness,
-    pelletsCollected,
-    nodeCount: genome.nodes.length,
-    muscleCount: genome.muscles.length,
-    color: genome.color,
-    parentIds: genome.parentIds,
-  };
-}
-
-function shouldFollowLineage(parentCount: number, mode: 'both' | 'crossover' | 'clone'): boolean {
-  switch (mode) {
-    case 'crossover':
-      return parentCount > 1;
-    case 'clone':
-      return parentCount === 1;
-    case 'both':
-    default:
-      return true;
-  }
-}
-
-function buildTreeNode(
-  creatureId: string,
-  ancestorMap: Map<string, AncestorInfo>,
-  depth: number,
-  maxDepth: number,
-  ancestorCount: { count: number },
-  lineageMode: 'both' | 'crossover' | 'clone'
-): FamilyTreeNode {
-  const ancestor = ancestorMap.get(creatureId);
-
-  if (!ancestor) {
-    return {
-      creature: {
-        id: creatureId,
-        generation: -1,
-        fitness: 0,
-        pelletsCollected: 0,
-        nodeCount: 0,
-        muscleCount: 0,
-        color: { h: 0, s: 0, l: 0.5 },
-        parentIds: [],
-      },
-      parents: [],
-    };
-  }
-
-  ancestorCount.count++;
-
-  const parents: FamilyTreeNode[] = [];
-
-  if (
-    depth < maxDepth &&
-    ancestorCount.count < MAX_ANCESTORS &&
-    shouldFollowLineage(ancestor.parentIds.length, lineageMode)
-  ) {
-    for (const parentId of ancestor.parentIds) {
-      if (ancestorCount.count >= MAX_ANCESTORS) break;
-      parents.push(buildTreeNode(parentId, ancestorMap, depth + 1, maxDepth, ancestorCount, lineageMode));
-    }
-  }
-
-  return { creature: ancestor, parents };
 }
 
 // Family tree display component

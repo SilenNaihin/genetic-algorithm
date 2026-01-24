@@ -192,6 +192,10 @@ export interface CreatureSimulationResult {
   fitnessOverTime: number[];
   disqualified: DisqualificationReason;
   activationsPerFrame?: number[][];  // Neural network muscle outputs per frame [frame][muscle]
+
+  // UI-specific properties (set by frontend from evolution step response)
+  _isSurvivor?: boolean;   // For animation: creature survived from previous generation
+  _hasFrames?: boolean;    // For replay button: frames are available in database
 }
 
 export interface PelletData {

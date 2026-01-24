@@ -1,20 +1,15 @@
 /**
  * Storage Service
  *
- * Uses the backend PostgreSQL API for all storage.
- * Backend must be running for the application to work.
+ * Uses the backend PostgreSQL API for storage.
+ * Backend handles all writes during evolution - frontend only reads.
  */
 
 import { RemoteStorage } from '../storage/RemoteStorage';
 import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../types';
-import type { SimulationConfig, FitnessHistoryEntry } from '../types/simulation';
+import type { SimulationConfig } from '../types/simulation';
 import type { CreatureGenome } from '../types/genome';
 import type { SavedRun, CompactCreatureResult } from '../storage/types';
-
-export interface CreatureTypeHistoryEntry {
-  generation: number;
-  nodeCountDistribution: Map<number, number>;
-}
 
 // Single storage instance - always remote
 const storage = new RemoteStorage();
@@ -51,16 +46,6 @@ export function getCurrentRunId(): string | null {
  */
 export function setCurrentRunId(id: string | null): void {
   storage.setCurrentRunId(id);
-}
-
-/**
- * Save generation results
- */
-export async function saveGeneration(
-  generation: number,
-  results: CreatureSimulationResult[]
-): Promise<void> {
-  await storage.saveGeneration(generation, results);
 }
 
 /**
@@ -103,45 +88,6 @@ export async function updateRunName(runId: string, name: string): Promise<void> 
 }
 
 /**
- * Update fitness history for current run
- */
-export async function updateFitnessHistory(
-  fitnessHistory: FitnessHistoryEntry[]
-): Promise<void> {
-  await storage.updateFitnessHistory(fitnessHistory);
-}
-
-/**
- * Update creature type history for current run
- */
-export async function updateCreatureTypeHistory(
-  history: CreatureTypeHistoryEntry[]
-): Promise<void> {
-  await storage.updateCreatureTypeHistory(history);
-}
-
-/**
- * Update best creature for current run
- */
-export async function updateBestCreature(
-  creature: CreatureSimulationResult,
-  generation: number
-): Promise<void> {
-  await storage.updateBestCreature(creature, generation);
-}
-
-/**
- * Update longest survivor for current run
- */
-export async function updateLongestSurvivor(
-  creature: CreatureSimulationResult,
-  generations: number,
-  diedAtGeneration: number
-): Promise<void> {
-  await storage.updateLongestSurvivor(creature, generations, diedAtGeneration);
-}
-
-/**
  * Get max generation for a run
  */
 export async function getMaxGeneration(runId: string): Promise<number> {
@@ -180,8 +126,6 @@ export function compactCreatureResult(
 
 /**
  * Load frames for a specific creature (on-demand, for replay)
- * This is called lazily when opening the replay modal, not when loading generations.
- * Now accepts real pellet data and fitnessOverTime from simulation results.
  */
 export async function loadCreatureFrames(
   creatureId: string,
@@ -191,7 +135,7 @@ export async function loadCreatureFrames(
   disqualified: string | null,
   pellets?: PelletData[],
   fitnessOverTime?: number[]
-): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[] }> {
+): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[] }> {
   return storage.loadCreatureFrames(creatureId, genome, pelletsCollected, config, disqualified, pellets, fitnessOverTime);
 }
 

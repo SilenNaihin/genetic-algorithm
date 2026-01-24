@@ -52,6 +52,15 @@ export interface MuscleController {
 
 export type ControllerType = 'oscillator' | 'neural';
 
+// Embedded ancestor info for lineage display
+export interface AncestorEntry {
+  generation: number;
+  fitness: number;
+  nodeCount: number;
+  muscleCount: number;
+  color: HSL;
+}
+
 export interface CreatureGenome {
   id: string;
   generation: number;      // Lineage age (how many generations of ancestors)
@@ -71,6 +80,9 @@ export interface CreatureGenome {
 
   // Visual
   color: HSL;
+
+  // Embedded ancestry chain - lineage info without DB lookups
+  ancestryChain?: AncestorEntry[];
 
   // Internal: API creature ID for lazy frame loading (not saved to storage)
   _apiCreatureId?: string;

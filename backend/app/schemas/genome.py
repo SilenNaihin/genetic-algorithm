@@ -181,6 +181,14 @@ class CreatureGenome(BaseModel):
     # Color (for visualization, optional)
     color: dict | None = None  # {h, s, l}
 
+    # Ancestry chain - embedded lineage for easy display without DB lookups
+    # Each entry: {generation, fitness, nodeCount, muscleCount, color}
+    ancestryChain: list[dict] = Field(
+        default_factory=list,
+        alias='ancestry_chain',
+        validation_alias=AliasChoices('ancestryChain', 'ancestry_chain'),
+    )
+
     model_config = ConfigDict(populate_by_name=True)
 
 
