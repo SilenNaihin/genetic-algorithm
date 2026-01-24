@@ -69,8 +69,10 @@ class SimulationConfig(BaseModel):
 
     # Adaptive mutation
     use_adaptive_mutation: bool = False
-    stagnation_threshold: int = Field(default=10, ge=1, le=100)
-    adaptive_mutation_boost: float = Field(default=2.0, ge=1.0, le=5.0)
+    stagnation_threshold: int = Field(default=20, ge=5, le=100)
+    adaptive_mutation_boost: float = Field(default=2.0, ge=1.1, le=5.0)
+    max_adaptive_boost: float = Field(default=8.0, ge=2.0, le=32.0)
+    improvement_threshold: float = Field(default=5.0, ge=1.0, le=50.0)
 
     # Disqualification thresholds
     position_threshold: float = Field(default=50.0, ge=10.0)

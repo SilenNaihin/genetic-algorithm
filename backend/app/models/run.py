@@ -48,6 +48,10 @@ class Run(Base):
         String(20), default="idle", nullable=False
     )  # idle, running, paused, completed
 
+    # Adaptive mutation state (persists between generations)
+    adaptive_boost_level: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    gens_since_boost_change: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     # Relationships
     generations: Mapped[list["Generation"]] = relationship(
         "Generation", back_populates="run", cascade="all, delete-orphan"

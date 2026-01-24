@@ -24,6 +24,73 @@ from app.genetics.population import (
 router = APIRouter()
 
 
+def trimmed_mean(values: list[float]) -> float:
+    """Compute trimmed mean (drop highest and lowest, then average).
+
+    More robust to outliers than regular mean.
+    For lists with < 3 values, returns regular mean.
+    """
+    if len(values) == 0:
+        return 0.0
+    if len(values) < 3:
+        return sum(values) / len(values)
+
+    sorted_vals = sorted(values)
+    # Drop lowest and highest
+    trimmed = sorted_vals[1:-1]
+    return sum(trimmed) / len(trimmed)
+
+
+def compute_adaptive_boost(
+    best_fitness_history: list[float],
+    current_boost: float,
+    gens_since_change: int,
+    config: SimulationConfig,
+) -> tuple[float, int, str]:
+    """Compute new adaptive boost level based on fitness history.
+
+    Uses trimmed rolling mean to compare current window vs previous window.
+
+    Returns:
+        tuple of (new_boost_level, new_gens_since_change, decision)
+        decision is one of: 'cooldown', 'stagnating', 'marginal', 'improving'
+    """
+    threshold = config.stagnation_threshold
+
+    # Need at least 2 windows of history
+    if len(best_fitness_history) < 2 * threshold:
+        return current_boost, gens_since_change + 1, 'cooldown'
+
+    # Increment counter
+    new_gens_since_change = gens_since_change + 1
+
+    # Still in cooldown period after last boost change
+    if new_gens_since_change < threshold:
+        return current_boost, new_gens_since_change, 'cooldown'
+
+    # Compute trimmed means for current and previous windows
+    current_window = best_fitness_history[-threshold:]
+    previous_window = best_fitness_history[-2*threshold:-threshold]
+
+    current_avg = trimmed_mean(current_window)
+    previous_avg = trimmed_mean(previous_window)
+
+    improvement = current_avg - previous_avg
+
+    # Three-way decision
+    if improvement >= config.improvement_threshold:
+        # Real improvement - reduce boost (halve toward 1.0)
+        new_boost = max(1.0, current_boost / 2)
+        return new_boost, 0, 'improving'
+    elif improvement <= 0:
+        # Stagnation or regression - increase boost
+        new_boost = min(config.max_adaptive_boost, current_boost * config.adaptive_mutation_boost)
+        return new_boost, 0, 'stagnating'
+    else:
+        # Marginal improvement - maintain, keep watching
+        return current_boost, new_gens_since_change, 'marginal'
+
+
 async def run_generation(
     run_id: str,
     db: AsyncSession,
@@ -116,13 +183,10 @@ async def run_generation(
             'max_nodes': config.max_nodes,
             'max_muscles': config.max_muscles,
             'max_frequency': config.max_allowed_frequency,
-            'use_adaptive_mutation': config.use_adaptive_mutation,
-            'stagnation_threshold': config.stagnation_threshold,
-            'adaptive_mutation_boost': config.adaptive_mutation_boost,
         }
 
-        # Build best fitness history for adaptive mutation
-        best_fitness_history = None
+        # Compute adaptive mutation boost if enabled
+        adaptive_boost_level = 1.0
         if config.use_adaptive_mutation:
             # Get best fitness from all previous generations
             gen_result = await db.execute(
@@ -132,6 +196,22 @@ async def run_generation(
             )
             best_fitness_history = [row[0] for row in gen_result.all()]
 
+            # Compute new boost level
+            new_boost, new_gens_since_change, decision = compute_adaptive_boost(
+                best_fitness_history=best_fitness_history,
+                current_boost=run.adaptive_boost_level,
+                gens_since_change=run.gens_since_boost_change,
+                config=config,
+            )
+
+            # Update run state
+            run.adaptive_boost_level = new_boost
+            run.gens_since_boost_change = new_gens_since_change
+            adaptive_boost_level = new_boost
+
+        # Pass boost level to evolution config
+        evolution_config['adaptive_boost_level'] = adaptive_boost_level
+
         # Evolve to get new genomes
         # Note: evolve_population preserves survivor IDs, gives new IDs to offspring
         genomes, _ = genetics_evolve_population(
@@ -139,7 +219,6 @@ async def run_generation(
             fitness_scores=prev_fitness,
             config=evolution_config,
             generation=current_gen - 1,
-            best_fitness_history=best_fitness_history,
         )
 
         # Only generate new IDs for offspring (survivalStreak == 0)

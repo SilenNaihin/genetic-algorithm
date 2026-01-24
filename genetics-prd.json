@@ -66,14 +66,16 @@
       "id": 4,
       "name": "Adaptive Mutation",
       "status": "complete",
-      "description": "Auto-increase mutation when fitness stagnates",
+      "description": "Auto-increase mutation when fitness stagnates, with stateful tracking",
       "tasks": [
-        "Add useAdaptiveMutation: boolean to SimulationConfig",
-        "Add stagnationThreshold (default 10 generations)",
-        "Add adaptiveMutationBoost (default 2x)",
-        "Track best fitness history in Population",
-        "Implement stagnation detection and rate boost logic",
-        "Add UI toggle and parameter controls"
+        "Add useAdaptiveMutation, stagnationThreshold (20), adaptiveMutationBoost (2x), maxAdaptiveBoost (8x), improvementThreshold (5 pts) to config",
+        "Add adaptive_boost_level and gens_since_boost_change columns to Run model",
+        "Implement trimmed_mean() for outlier-robust averaging",
+        "Implement three-way decision logic (stagnating/marginal/improving)",
+        "Add cooldown period between boost changes",
+        "Add UI controls with all parameters",
+        "Create database migration 004",
+        "Create docs/ADAPTIVE_MUTATION.md"
       ],
       "files": [
         "src/types/simulation.ts",

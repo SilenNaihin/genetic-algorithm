@@ -136,9 +136,11 @@ export const TOOLTIPS = {
   tournamentSize: 'How many creatures compete in each tournament. Size 2 = weak pressure (50% chance the best wins). Size 5+ = strong pressure (best almost always wins). Lower for exploration, higher for exploitation.',
 
   // Adaptive mutation
-  adaptiveMutation: 'Automatically boost mutation rate when evolution stagnates (no fitness improvement for N generations). Helps escape local optima.',
-  stagnationThreshold: 'Number of generations without best fitness improvement before boosting mutation. Lower = more aggressive adaptation.',
-  adaptiveMutationBoost: 'Multiplier applied to mutation rates during stagnation. 2.0 = double mutation rate. Higher values explore more aggressively.',
+  adaptiveMutation: 'Automatically boost mutation rate when evolution stagnates. Compares trimmed rolling averages of two windows to detect stagnation. Gradually increases boost during stagnation, decreases when improvement detected.',
+  stagnationThreshold: 'Window size for comparing fitness (in generations). Compares avg of last N gens vs previous N gens. Also the cooldown period between boost changes. Default 20.',
+  adaptiveMutationBoost: 'Multiplier applied to mutation rates each time stagnation is detected. 2.0 = double. Compounds over continued stagnation (2x → 4x → 8x).',
+  maxAdaptiveBoost: 'Maximum boost multiplier cap. Prevents mutation rate from going too high and destroying learned behaviors. Default 8x.',
+  improvementThreshold: 'Minimum fitness improvement (in absolute points) to count as real progress. Prevents noise from triggering boost reduction. Default 5 points.',
 
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',

@@ -240,10 +240,10 @@ export function NeuralPanel() {
               <>
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
-                    name="Stagnation Gens"
+                    name="Window Size"
                     value={config.stagnationThreshold}
-                    displayValue={String(config.stagnationThreshold)}
-                    min={5}
+                    displayValue={`${config.stagnationThreshold} gens`}
+                    min={10}
                     max={50}
                     step={5}
                     onChange={(v) => setConfig({ stagnationThreshold: v })}
@@ -253,14 +253,40 @@ export function NeuralPanel() {
                 </div>
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
-                    name="Boost Multiplier"
+                    name="Boost Factor"
                     value={config.adaptiveMutationBoost}
                     displayValue={`${config.adaptiveMutationBoost}x`}
                     min={1.5}
-                    max={5}
+                    max={4}
                     step={0.5}
                     onChange={(v) => setConfig({ adaptiveMutationBoost: v })}
                     tooltip={TOOLTIPS.adaptiveMutationBoost}
+                    width="100%"
+                  />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Max Boost"
+                    value={config.maxAdaptiveBoost}
+                    displayValue={`${config.maxAdaptiveBoost}x`}
+                    min={2}
+                    max={16}
+                    step={2}
+                    onChange={(v) => setConfig({ maxAdaptiveBoost: v })}
+                    tooltip={TOOLTIPS.maxAdaptiveBoost}
+                    width="100%"
+                  />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Improve Threshold"
+                    value={config.improvementThreshold}
+                    displayValue={`${config.improvementThreshold} pts`}
+                    min={1}
+                    max={20}
+                    step={1}
+                    onChange={(v) => setConfig({ improvementThreshold: v })}
+                    tooltip={TOOLTIPS.improvementThreshold}
                     width="100%"
                   />
                 </div>

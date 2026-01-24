@@ -61,8 +61,10 @@ export interface SimulationConfig {
 
   // Adaptive mutation (escape stagnation)
   useAdaptiveMutation: boolean;       // Auto-boost mutation when fitness stagnates
-  stagnationThreshold: number;        // Generations without improvement before boosting
+  stagnationThreshold: number;        // Window size for comparing fitness (default 20)
   adaptiveMutationBoost: number;      // Multiplier for mutation rate during stagnation (e.g., 2.0 = double)
+  maxAdaptiveBoost: number;           // Maximum boost multiplier cap (e.g., 8.0)
+  improvementThreshold: number;       // Minimum fitness improvement to count as progress (absolute points)
 
   // Frame storage mode for replay capability
   frameStorageMode: 'none' | 'sparse' | 'all';  // none = no replays, sparse = top/bottom only, all = all creatures
@@ -117,8 +119,10 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   // Adaptive mutation defaults
   useAdaptiveMutation: false,    // Off by default - enable for long runs
-  stagnationThreshold: 10,       // 10 generations without improvement
+  stagnationThreshold: 20,       // 20-generation window for comparison
   adaptiveMutationBoost: 2.0,    // Double mutation rate during stagnation
+  maxAdaptiveBoost: 8.0,         // Cap at 8x mutation rate
+  improvementThreshold: 5.0,     // Need 5+ fitness points improvement to count
 
   // Frame storage mode
   frameStorageMode: 'all',       // Store frames for all creatures by default (enables replays)

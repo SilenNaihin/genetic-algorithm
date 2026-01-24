@@ -65,10 +65,8 @@ class EvolutionConfig:
     selection_method: str = 'rank'  # 'truncation', 'tournament', 'rank'
     tournament_size: int = 3  # For tournament selection
 
-    # Adaptive mutation
-    use_adaptive_mutation: bool = False
-    stagnation_threshold: int = 10  # Generations without improvement
-    adaptive_mutation_boost: float = 2.0  # Multiplier during stagnation
+    # Adaptive mutation (boost level is computed externally and passed in)
+    adaptive_boost_level: float = 1.0  # Current boost multiplier (1.0 = no boost)
 
     # Reproduction
     crossover_rate: float = 0.5
@@ -400,7 +398,6 @@ def evolve_population(
     fitness_scores: list[float],
     config: EvolutionConfig | dict | None = None,
     generation: int = 0,
-    best_fitness_history: list[float] | None = None,
 ) -> tuple[list[dict], PopulationStats]:
     """
     Evolve a population to the next generation.
@@ -411,10 +408,8 @@ def evolve_population(
     Args:
         genomes: Current population genomes
         fitness_scores: Fitness values for each genome
-        config: Evolution configuration
+        config: Evolution configuration (includes adaptive_boost_level if computed externally)
         generation: Current generation number
-        best_fitness_history: List of best fitness values from previous generations
-                             (used for adaptive mutation stagnation detection)
 
     Returns:
         Tuple of (new genomes, population stats)
@@ -431,9 +426,7 @@ def evolve_population(
             cull_percentage=config.get('cull_percentage', 0.5),
             selection_method=config.get('selection_method', 'rank'),
             tournament_size=config.get('tournament_size', 3),
-            use_adaptive_mutation=config.get('use_adaptive_mutation', False),
-            stagnation_threshold=config.get('stagnation_threshold', 10),
-            adaptive_mutation_boost=config.get('adaptive_mutation_boost', 2.0),
+            adaptive_boost_level=config.get('adaptive_boost_level', 1.0),
             crossover_rate=config.get('crossover_rate', 0.5),
             use_mutation=config.get('use_mutation', True),
             use_crossover=config.get('use_crossover', True),
@@ -568,21 +561,11 @@ def evolve_population(
     )
     effective_neural_rate = calculate_decayed_rate(generation, decay_config)
 
-    # Detect stagnation and apply adaptive mutation boost
-    is_stagnating = False
-    if config.use_adaptive_mutation and best_fitness_history:
-        threshold = config.stagnation_threshold
-        if len(best_fitness_history) >= threshold:
-            # Check if best fitness hasn't improved in last N generations
-            recent_best = max(best_fitness_history[-threshold:])
-            oldest_in_window = best_fitness_history[-threshold]
-            # Stagnating if no improvement (recent best <= oldest in window)
-            is_stagnating = recent_best <= oldest_in_window
-
-    # Apply boost if stagnating
-    mutation_boost = config.adaptive_mutation_boost if is_stagnating else 1.0
-    effective_mutation_rate = min(1.0, config.mutation_rate * mutation_boost)
-    effective_neural_rate = min(1.0, effective_neural_rate * mutation_boost)
+    # Apply adaptive boost (computed externally and passed via config)
+    # Boost level of 1.0 = no boost, 2.0 = double, etc.
+    boost = config.adaptive_boost_level
+    effective_mutation_rate = min(1.0, config.mutation_rate * boost)
+    effective_neural_rate = min(1.0, effective_neural_rate * boost)
 
     # Build mutation config
     mutation_config = MutationConfig(
