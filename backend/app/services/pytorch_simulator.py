@@ -214,9 +214,16 @@ class PyTorchSimulator:
             )
 
             # Build fitness breakdown (with NaN guards)
-            efficiency_penalty_val = _safe_float(
-                total_activation[i].item() * fitness_config.efficiency_penalty if use_neural else 0.0
-            )
+            # Efficiency penalty is normalized by simulation time and muscle count
+            if use_neural and simulation_time > 0:
+                num_muscles_i = len(genomes[i].get("muscles", []))
+                if num_muscles_i > 0:
+                    avg_activation = total_activation[i].item() / (simulation_time * num_muscles_i)
+                    efficiency_penalty_val = _safe_float((avg_activation / 60) * 10 * fitness_config.efficiency_penalty)
+                else:
+                    efficiency_penalty_val = 0.0
+            else:
+                efficiency_penalty_val = 0.0
 
             breakdown = FitnessBreakdown(
                 pellet_points=_safe_float(pellets_collected * fitness_config.pellet_points),
@@ -288,6 +295,15 @@ class PyTorchSimulator:
                 fitness_tensor = result['fitness_per_frame'][i]  # [F]
                 fitness_over_time_list = [_safe_float(f.item()) for f in fitness_tensor]
 
+            # Build activations per frame from simulation's per-frame neural outputs
+            activations_per_frame_list = None
+            if config.record_frames and 'activations_per_frame' in result and frame_count > 0:
+                activations_tensor = result['activations_per_frame'][i]  # [F, M]
+                activations_per_frame_list = [
+                    [_safe_float(a.item()) for a in frame_activations]
+                    for frame_activations in activations_tensor
+                ]
+
             results.append(SimulationResult(
                 genome_id=genome_id,
                 fitness=fitness_val,
@@ -302,6 +318,7 @@ class PyTorchSimulator:
                 frames=frames,
                 pellets=pellet_list,
                 fitness_over_time=fitness_over_time_list,
+                activations_per_frame=activations_per_frame_list,
             ))
 
         return results

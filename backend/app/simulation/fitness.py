@@ -726,7 +726,20 @@ def calculate_fitness(
     distance_fitness = torch.clamp(distance_fitness, 0, config.distance_traveled_max)
 
     # 5. Efficiency penalty
-    efficiency_cost = state.total_activation * config.efficiency_penalty
+    # Normalize by simulation time and muscle count to get average activation per muscle
+    # This makes the penalty independent of simulation duration and creature size
+    if simulation_time > 0:
+        # Count valid muscles per creature
+        num_muscles = batch.spring_mask.sum(dim=1).float().clamp(min=1)  # [B]
+        # Frames = time / dt, but we have total_activation already summed
+        # avg_activation_rate = total_activation / simulation_time gives activation per second
+        # Then divide by muscle count for per-muscle average
+        avg_activation_per_muscle = state.total_activation / (simulation_time * num_muscles)
+        # Scale so that max activation (1.0 per muscle per frame) gives ~10 penalty at default 0.5
+        # Max avg is roughly fps (60) since we sum |output| per frame, so divide by 60
+        efficiency_cost = (avg_activation_per_muscle / 60) * 10 * config.efficiency_penalty
+    else:
+        efficiency_cost = torch.zeros_like(state.total_activation)
 
     # Total fitness
     fitness = (
