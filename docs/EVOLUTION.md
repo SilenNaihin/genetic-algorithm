@@ -1,4 +1,4 @@
-# Genetics System
+# Evolution System
 
 This document covers the genetic algorithm operators and how they work together to evolve creature populations.
 
@@ -50,34 +50,70 @@ Body crossover always uses **interpolation** - each property is blended between 
 - Structure comes from parent1 (node/muscle count)
 
 ### Neural Weight Crossover
-Configured via `neuralCrossoverMethod`:
+
+Configured via `neuralCrossoverMethod`. Three methods available:
 
 #### Interpolation (`'interpolation'`)
 ```
 child_weight = lerp(parent1_weight, parent2_weight, random())
 ```
-- Always produces values between parents
-- Conservative, never explores beyond parent range
+- Always produces values strictly between parents
+- Cannot explore beyond the parent range
 - Simple and predictable
 
 #### Uniform (`'uniform'`)
 ```
 child_weight = random() < 0.5 ? parent1_weight : parent2_weight
 ```
-- Each weight randomly picked from either parent
-- Can be disruptive - child may get mismatched weights
-- Maintains more diversity than interpolation
+- Each weight randomly picked from either parent (50/50)
+- Can be disruptive - child may inherit mismatched weights
+- No smooth blending - offspring are "patchwork" of parents
 
 #### SBX (`'sbx'`) - Default, Recommended
-Simulated Binary Crossover (Deb & Agrawal, 1995):
-- Produces offspring statistically centered around parents
-- Can explore slightly beyond parent range
-- Spread controlled by `sbxEta` parameter:
-  - Low eta (0.5-1): Wide spread, more exploration
-  - High eta (3-5): Narrow spread, stays close to parents
-  - Default eta = 2: Balanced
 
-See [SBX_CROSSOVER.md](./SBX_CROSSOVER.md) for mathematical details.
+Simulated Binary Crossover (Deb & Agrawal, 1995) simulates single-point crossover on binary strings but for real numbers. It produces offspring that:
+
+1. Are statistically centered around parent values
+2. Have controllable spread via the **eta (η)** parameter
+3. Can explore slightly outside the parent range
+
+**The Algorithm:**
+```python
+def sbx_single(p1: float, p2: float, eta: float) -> float:
+    if abs(p1 - p2) < 1e-14:
+        return p1  # Parents identical
+
+    u = random()  # Uniform [0, 1]
+
+    # Calculate spread factor beta
+    if u <= 0.5:
+        beta = (2 * u) ** (1 / (eta + 1))
+    else:
+        beta = (1 / (2 * (1 - u))) ** (1 / (eta + 1))
+
+    # Generate two children, return one randomly
+    child1 = 0.5 * ((1 + beta) * p1 + (1 - beta) * p2)
+    child2 = 0.5 * ((1 - beta) * p1 + (1 + beta) * p2)
+    return child1 if random() < 0.5 else child2
+```
+
+**The Eta Parameter:**
+
+| Eta | Spread | Use Case |
+|-----|--------|----------|
+| 0.5-1 | Wide | Early evolution, exploration |
+| 2 | Balanced | Default, general purpose |
+| 3-5 | Narrow | Fine-tuning, exploitation |
+
+**Visual Comparison:**
+```
+Parent A weight: 0.3
+Parent B weight: 0.7
+
+Interpolation:  Always in [0.3, 0.7]     → 0.35, 0.52, 0.68
+Uniform:        Always exactly 0.3 or 0.7 → 0.3, 0.7, 0.3
+SBX (eta=2):    Usually near [0.3, 0.7], can go beyond → 0.25, 0.35, 0.65, 0.75
+```
 
 ## Mutation
 
@@ -96,7 +132,7 @@ Controlled by `weightMutationRate` and `weightMutationMagnitude`:
 - Optional decay via `weightMutationDecay`: `'off'`, `'linear'`, `'exponential'`
 
 ### Structural Mutation
-Controlled by `structuralRate` (part of mutation, not separate config):
+Controlled by `structuralRate` (default 0.1):
 - **Add node:** Insert new node, create muscles to connect it
 - **Remove node:** Remove node and its connected muscles (respects `minNodes`)
 - **Add muscle:** Connect two unconnected nodes
@@ -195,6 +231,7 @@ Enable [Adaptive Mutation](./ADAPTIVE_MUTATION.md) to automatically boost mutati
 
 ## References
 
-- Deb, K. & Agrawal, R.B. (1995). "Simulated Binary Crossover for Continuous Search Space"
+- Deb, K. & Agrawal, R.B. (1995). "Simulated Binary Crossover for Continuous Search Space." *Complex Systems*, 9(2), 115-148.
+- Deb, K. & Beyer, H.G. (2001). "Self-Adaptive Genetic Algorithms with Simulated Binary Crossover." *Evolutionary Computation*, 9(2), 197-221.
 - Goldberg, D.E. (1989). "Genetic Algorithms in Search, Optimization, and Machine Learning"
-- Stanley, K.O. & Miikkulainen, R. (2002). "Evolving Neural Networks through Augmenting Topologies"
+- Stanley, K.O. & Miikkulainen, R. (2002). "Evolving Neural Networks through Augmenting Topologies." *Evolutionary Computation*, 10(2), 99-127.
