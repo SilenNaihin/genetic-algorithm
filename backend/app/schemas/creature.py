@@ -16,11 +16,15 @@ class CreatureCreate(BaseModel):
 
 
 class CreatureRead(BaseModel):
-    """Response with creature data (without frames)."""
+    """
+    Response with creature data (without frames).
+
+    Combines identity from Creature with performance from CreaturePerformance.
+    """
 
     id: str
     run_id: str
-    generation: int
+    generation: int  # Which generation this performance is from
     genome: CreatureGenome
     fitness: float
     pellets_collected: int
@@ -30,6 +34,9 @@ class CreatureRead(BaseModel):
     is_elite: bool
     parent_ids: list[str]
     has_frames: bool = False
+    # Lifecycle fields
+    birth_generation: int | None = None
+    death_generation: int | None = None
 
     class Config:
         from_attributes = True
@@ -51,3 +58,19 @@ class CreatureWithFrames(CreatureRead):
     """Creature with frame data for replay."""
 
     frames: FrameData | None = None
+
+
+class PerformanceRead(BaseModel):
+    """Per-generation performance data."""
+
+    creature_id: str
+    generation: int
+    run_id: str
+    fitness: float
+    pellets_collected: int
+    disqualified: bool
+    disqualified_reason: str | None
+    has_frames: bool = False
+
+    class Config:
+        from_attributes = True

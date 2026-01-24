@@ -2,99 +2,170 @@ import json
 import zlib
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Creature, CreatureFrame
+from app.models import Creature, CreaturePerformance, CreatureFrame
 from app.schemas.creature import CreatureRead, CreatureWithFrames, FrameData
 
 router = APIRouter()
+
+
+def build_creature_read(creature: Creature, performance: CreaturePerformance) -> CreatureRead:
+    """Build CreatureRead from Creature identity and CreaturePerformance data."""
+    return CreatureRead(
+        id=creature.id,
+        run_id=creature.run_id,
+        generation=performance.generation,
+        genome=creature.genome,
+        fitness=performance.fitness,
+        pellets_collected=performance.pellets_collected,
+        disqualified=performance.disqualified,
+        disqualified_reason=performance.disqualified_reason,
+        survival_streak=creature.survival_streak,
+        is_elite=creature.is_elite,
+        parent_ids=creature.parent_ids,
+        has_frames=performance.frames is not None,
+        birth_generation=creature.birth_generation,
+        death_generation=creature.death_generation,
+    )
 
 
 @router.get("/{creature_id}", response_model=CreatureRead)
 async def get_creature(
     creature_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
+    generation: int | None = Query(None, description="Specific generation to get performance for"),
 ):
-    """Get a creature by ID (without frames)."""
+    """
+    Get a creature by ID (without frames).
+
+    If generation is provided, returns performance for that generation.
+    Otherwise, returns the latest performance.
+    """
+    # Get the creature identity
     result = await db.execute(
-        select(Creature)
-        .where(Creature.id == creature_id)
-        .options(selectinload(Creature.frames))
+        select(Creature).where(Creature.id == creature_id)
     )
     creature = result.scalar_one_or_none()
     if not creature:
         raise HTTPException(status_code=404, detail="Creature not found")
 
-    return CreatureRead(
-        id=creature.id,
-        run_id=creature.run_id,
-        generation=creature.generation,
-        genome=creature.genome,
-        fitness=creature.fitness,
-        pellets_collected=creature.pellets_collected,
-        disqualified=creature.disqualified,
-        disqualified_reason=creature.disqualified_reason,
-        survival_streak=creature.survival_streak,
-        is_elite=creature.is_elite,
-        parent_ids=creature.parent_ids,
-        has_frames=creature.frames is not None,
-    )
+    # Get performance (specific generation or latest)
+    if generation is not None:
+        perf_result = await db.execute(
+            select(CreaturePerformance)
+            .where(
+                CreaturePerformance.creature_id == creature_id,
+                CreaturePerformance.generation == generation
+            )
+            .options(selectinload(CreaturePerformance.frames))
+        )
+    else:
+        perf_result = await db.execute(
+            select(CreaturePerformance)
+            .where(CreaturePerformance.creature_id == creature_id)
+            .order_by(CreaturePerformance.generation.desc())
+            .limit(1)
+            .options(selectinload(CreaturePerformance.frames))
+        )
+
+    performance = perf_result.scalar_one_or_none()
+    if not performance:
+        raise HTTPException(status_code=404, detail="No performance data found for creature")
+
+    return build_creature_read(creature, performance)
 
 
 @router.get("/{creature_id}/with-frames", response_model=CreatureWithFrames)
 async def get_creature_with_frames(
     creature_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
+    generation: int | None = Query(None, description="Specific generation to get frames for"),
 ):
-    """Get a creature with its frame data for replay."""
+    """
+    Get a creature with its frame data for replay.
+
+    If generation is provided, returns frames for that generation.
+    Otherwise, returns frames from the latest generation that has them.
+    """
+    # Get the creature identity
     result = await db.execute(
-        select(Creature)
-        .where(Creature.id == creature_id)
-        .options(selectinload(Creature.frames))
+        select(Creature).where(Creature.id == creature_id)
     )
     creature = result.scalar_one_or_none()
     if not creature:
         raise HTTPException(status_code=404, detail="Creature not found")
 
+    # Get performance with frames
+    if generation is not None:
+        perf_result = await db.execute(
+            select(CreaturePerformance)
+            .where(
+                CreaturePerformance.creature_id == creature_id,
+                CreaturePerformance.generation == generation
+            )
+            .options(selectinload(CreaturePerformance.frames))
+        )
+        performance = perf_result.scalar_one_or_none()
+    else:
+        # Find latest performance that has frames
+        perf_result = await db.execute(
+            select(CreaturePerformance)
+            .where(CreaturePerformance.creature_id == creature_id)
+            .order_by(CreaturePerformance.generation.desc())
+            .options(selectinload(CreaturePerformance.frames))
+        )
+        performances = perf_result.scalars().all()
+        performance = None
+        for p in performances:
+            if p.frames is not None:
+                performance = p
+                break
+        if performance is None and performances:
+            performance = performances[0]
+
+    if not performance:
+        raise HTTPException(status_code=404, detail="No performance data found for creature")
+
     frames = None
-    if creature.frames:
-        # Decompress and parse frame data
+    if performance.frames:
         try:
-            node_frames_raw = zlib.decompress(creature.frames.frames_data)
+            node_frames_raw = zlib.decompress(performance.frames.frames_data)
             node_frames = json.loads(node_frames_raw)
 
             pellet_frames = None
-            if creature.frames.pellet_frames:
-                pellet_frames_raw = zlib.decompress(creature.frames.pellet_frames)
+            if performance.frames.pellet_frames:
+                pellet_frames_raw = zlib.decompress(performance.frames.pellet_frames)
                 pellet_frames = json.loads(pellet_frames_raw)
 
             frames = FrameData(
-                frame_count=creature.frames.frame_count,
-                frame_rate=creature.frames.frame_rate,
+                frame_count=performance.frames.frame_count,
+                frame_rate=performance.frames.frame_rate,
                 node_frames=node_frames,
                 pellet_frames=pellet_frames,
             )
         except Exception as e:
-            # Log error but don't fail the request
             print(f"Error decompressing frames for {creature_id}: {e}")
 
     return CreatureWithFrames(
         id=creature.id,
         run_id=creature.run_id,
-        generation=creature.generation,
+        generation=performance.generation,
         genome=creature.genome,
-        fitness=creature.fitness,
-        pellets_collected=creature.pellets_collected,
-        disqualified=creature.disqualified,
-        disqualified_reason=creature.disqualified_reason,
+        fitness=performance.fitness,
+        pellets_collected=performance.pellets_collected,
+        disqualified=performance.disqualified,
+        disqualified_reason=performance.disqualified_reason,
         survival_streak=creature.survival_streak,
         is_elite=creature.is_elite,
         parent_ids=creature.parent_ids,
-        has_frames=creature.frames is not None,
+        has_frames=performance.frames is not None,
+        birth_generation=creature.birth_generation,
+        death_generation=creature.death_generation,
         frames=frames,
     )
 
@@ -103,29 +174,52 @@ async def get_creature_with_frames(
 async def get_creature_frames(
     creature_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
+    generation: int | None = Query(None, description="Specific generation to get frames for"),
 ):
-    """Get frame data for a creature (for replay)."""
-    result = await db.execute(
-        select(Creature)
-        .where(Creature.id == creature_id)
-        .options(selectinload(Creature.frames))
-    )
-    creature = result.scalar_one_or_none()
-    if not creature:
-        raise HTTPException(status_code=404, detail="Creature not found")
+    """
+    Get frame data for a creature (for replay).
 
-    if not creature.frames:
+    If generation is provided, returns frames for that generation.
+    Otherwise, returns frames from the latest generation that has them.
+    """
+    # Build query for frames
+    if generation is not None:
+        frame_result = await db.execute(
+            select(CreatureFrame)
+            .where(
+                CreatureFrame.creature_id == creature_id,
+                CreatureFrame.generation == generation
+            )
+        )
+        frame = frame_result.scalar_one_or_none()
+    else:
+        # Find latest frame record
+        frame_result = await db.execute(
+            select(CreatureFrame)
+            .where(CreatureFrame.creature_id == creature_id)
+            .order_by(CreatureFrame.generation.desc())
+            .limit(1)
+        )
+        frame = frame_result.scalar_one_or_none()
+
+    if not frame:
         raise HTTPException(status_code=404, detail="No frames available for this creature")
 
-    # Decompress and parse frame data
     try:
-        frames_raw = zlib.decompress(creature.frames.frames_data)
+        frames_raw = zlib.decompress(frame.frames_data)
         frames_data = json.loads(frames_raw)
+
+        pellet_frames = None
+        if frame.pellet_frames:
+            pellet_frames_raw = zlib.decompress(frame.pellet_frames)
+            pellet_frames = json.loads(pellet_frames_raw)
 
         return {
             "frames_data": frames_data,
-            "frame_count": creature.frames.frame_count,
-            "frame_rate": creature.frames.frame_rate,
+            "frame_count": frame.frame_count,
+            "frame_rate": frame.frame_rate,
+            "pellet_frames": pellet_frames,
+            "generation": frame.generation,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error decompressing frames: {e}")
@@ -136,31 +230,28 @@ async def get_best_creature(
     run_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Get the best creature ever for a run."""
-    result = await db.execute(
-        select(Creature)
-        .where(Creature.run_id == run_id)
-        .order_by(Creature.fitness.desc())
+    """Get the best creature ever for a run (highest fitness in any generation)."""
+    # Query best performance
+    perf_result = await db.execute(
+        select(CreaturePerformance)
+        .where(CreaturePerformance.run_id == run_id)
+        .order_by(CreaturePerformance.fitness.desc())
         .limit(1)
+        .options(selectinload(CreaturePerformance.frames))
     )
-    creature = result.scalar_one_or_none()
-    if not creature:
+    performance = perf_result.scalar_one_or_none()
+    if not performance:
         raise HTTPException(status_code=404, detail="No creatures found")
 
-    return CreatureRead(
-        id=creature.id,
-        run_id=creature.run_id,
-        generation=creature.generation,
-        genome=creature.genome,
-        fitness=creature.fitness,
-        pellets_collected=creature.pellets_collected,
-        disqualified=creature.disqualified,
-        disqualified_reason=creature.disqualified_reason,
-        survival_streak=creature.survival_streak,
-        is_elite=creature.is_elite,
-        parent_ids=creature.parent_ids,
-        has_frames=False,
+    # Get creature identity
+    creature_result = await db.execute(
+        select(Creature).where(Creature.id == performance.creature_id)
     )
+    creature = creature_result.scalar_one_or_none()
+    if not creature:
+        raise HTTPException(status_code=404, detail="Creature not found")
+
+    return build_creature_read(creature, performance)
 
 
 @router.get("/run/{run_id}/longest-survivor")
@@ -169,6 +260,7 @@ async def get_longest_survivor(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get the longest surviving creature for a run."""
+    # survival_streak is on Creature
     result = await db.execute(
         select(Creature)
         .where(Creature.run_id == run_id)
@@ -179,20 +271,19 @@ async def get_longest_survivor(
     if not creature:
         raise HTTPException(status_code=404, detail="No creatures found")
 
-    return CreatureRead(
-        id=creature.id,
-        run_id=creature.run_id,
-        generation=creature.generation,
-        genome=creature.genome,
-        fitness=creature.fitness,
-        pellets_collected=creature.pellets_collected,
-        disqualified=creature.disqualified,
-        disqualified_reason=creature.disqualified_reason,
-        survival_streak=creature.survival_streak,
-        is_elite=creature.is_elite,
-        parent_ids=creature.parent_ids,
-        has_frames=False,
+    # Get latest performance for this creature
+    perf_result = await db.execute(
+        select(CreaturePerformance)
+        .where(CreaturePerformance.creature_id == creature.id)
+        .order_by(CreaturePerformance.generation.desc())
+        .limit(1)
+        .options(selectinload(CreaturePerformance.frames))
     )
+    performance = perf_result.scalar_one_or_none()
+    if not performance:
+        raise HTTPException(status_code=404, detail="No performance data found")
+
+    return build_creature_read(creature, performance)
 
 
 @router.get("/{creature_id}/ancestors")
@@ -204,9 +295,7 @@ async def get_creature_ancestors(
     """
     Get ancestor chain for a creature.
     Returns a flat list of ancestors with their info for building a family tree.
-    This is much more efficient than loading all generations.
     """
-    # Track visited to avoid cycles
     visited = set()
     ancestors = []
     to_visit = [creature_id]
@@ -224,7 +313,15 @@ async def get_creature_ancestors(
         if not creature:
             continue
 
-        # Extract just the fields needed for family tree
+        # Get best performance for this creature (highest fitness)
+        perf_result = await db.execute(
+            select(CreaturePerformance)
+            .where(CreaturePerformance.creature_id == current_id)
+            .order_by(CreaturePerformance.fitness.desc())
+            .limit(1)
+        )
+        performance = perf_result.scalar_one_or_none()
+
         genome = creature.genome or {}
         color = genome.get("color", {"h": 0.5, "s": 0.7, "l": 0.5})
         nodes = genome.get("nodes", [])
@@ -232,16 +329,17 @@ async def get_creature_ancestors(
 
         ancestors.append({
             "id": creature.id,
-            "generation": creature.generation,
-            "fitness": creature.fitness,
-            "pellets_collected": creature.pellets_collected,
+            "birth_generation": creature.birth_generation,
+            "death_generation": creature.death_generation,
+            "survival_streak": creature.survival_streak,
+            "fitness": performance.fitness if performance else 0,
+            "pellets_collected": performance.pellets_collected if performance else 0,
             "node_count": len(nodes),
             "muscle_count": len(muscles),
             "color": color,
             "parent_ids": creature.parent_ids or [],
         })
 
-        # Queue parents for visiting
         if creature.parent_ids:
             for parent_id in creature.parent_ids:
                 if parent_id not in visited:

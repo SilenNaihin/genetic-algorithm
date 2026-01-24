@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
-from app.models import Creature, CreatureFrame, Generation, Run
+from app.models import Creature, CreaturePerformance, CreatureFrame, Generation, Run
 
 
 @pytest.fixture
@@ -86,30 +86,41 @@ async def sample_run(test_session: AsyncSession):
         test_session.add(gen)
 
         # Create creatures for each generation
+        # For simplicity, each generation has 5 new creatures with unique IDs
         for i in range(5):
             creature_id = f"creature-{gen_num}-{i}"
             parent_ids = []
             if gen_num > 0:
                 parent_ids = [f"creature-{gen_num - 1}-{i % 5}"]
 
+            # Create creature identity record
             creature = Creature(
                 id=creature_id,
                 run_id="test-run-123",
-                generation=gen_num,
                 genome={"id": creature_id, "nodes": [], "muscles": []},
-                fitness=50.0 + i * 10 + gen_num * 20,
-                pellets_collected=i,
-                disqualified=False,
-                survival_streak=gen_num if i == 0 else 0,
+                birth_generation=gen_num,
+                survival_streak=0,  # No survivors in this simple test
                 is_elite=i < 2,
                 parent_ids=parent_ids,
             )
             test_session.add(creature)
 
+            # Create performance record for this generation
+            performance = CreaturePerformance(
+                creature_id=creature_id,
+                generation=gen_num,
+                run_id="test-run-123",
+                fitness=50.0 + i * 10 + gen_num * 20,
+                pellets_collected=i,
+                disqualified=False,
+            )
+            test_session.add(performance)
+
             # Add frames for first creature of each generation
             if i == 0:
                 frames = CreatureFrame(
                     creature_id=creature_id,
+                    generation=gen_num,
                     frames_data=b"test frame data",
                     frame_count=100,
                     frame_rate=15,

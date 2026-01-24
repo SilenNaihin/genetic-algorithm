@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.creature import Creature
+    from app.models.creature import CreaturePerformance
     from app.models.run import Run
 
 
@@ -41,8 +41,8 @@ class Generation(Base):
 
     # Relationships
     run: Mapped["Run"] = relationship("Run", back_populates="generations")
-    creatures: Mapped[list["Creature"]] = relationship(
-        "Creature", back_populates="generation_rel", cascade="all, delete-orphan"
+    performances: Mapped[list["CreaturePerformance"]] = relationship(
+        "CreaturePerformance", back_populates="generation_rel", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

@@ -10,11 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import Creature, CreatureFrame, Generation, Run
+from app.models import Creature, CreaturePerformance, CreatureFrame, Generation, Run
 from app.schemas.genome import CreatureGenome
 from app.schemas.simulation import SimulationConfig
-from app.services.genetics import GeneticsService
 from app.services.simulator import SimulatorService
+from app.genetics.population import (
+    generate_population,
+    evolve_population as genetics_evolve_population,
+    GenomeConstraints,
+    EvolutionConfig,
+)
 
 router = APIRouter()
 
@@ -22,7 +27,6 @@ router = APIRouter()
 async def run_generation(
     run_id: str,
     db: AsyncSession,
-    genetics: GeneticsService,
     simulator: SimulatorService,
 ) -> dict:
     """Run a single generation of evolution."""
@@ -35,46 +39,124 @@ async def run_generation(
     config = SimulationConfig(**run.config)
     current_gen = run.current_generation
 
+    # Track survivor IDs for animation states
+    survivor_ids: set[str] = set()
+
     # Get genomes for this generation
     if current_gen == 0:
-        # Generate initial population
-        genomes = genetics.generate_initial_population(
+        # Generate initial population with neural network support
+        constraints = GenomeConstraints(
+            min_nodes=config.min_nodes,
+            max_nodes=config.max_nodes,
+            max_muscles=config.max_muscles,
+            max_frequency=config.max_allowed_frequency,
+        )
+        genomes = generate_population(
             size=config.population_size,
-            constraints={
-                "min_nodes": config.min_nodes,
-                "max_nodes": config.max_nodes,
-                "max_muscles": config.max_muscles,
-            },
+            constraints=constraints,
+            use_neural_net=config.use_neural_net,
+            neural_hidden_size=config.neural_hidden_size,
+            neural_output_bias=config.neural_output_bias,
         )
     else:
-        # Get previous generation creatures
+        # Get previous generation performances (sorted by fitness)
         prev_result = await db.execute(
-            select(Creature)
-            .where(Creature.run_id == run_id, Creature.generation == current_gen - 1)
-            .order_by(Creature.fitness.desc())
+            select(CreaturePerformance)
+            .where(
+                CreaturePerformance.run_id == run_id,
+                CreaturePerformance.generation == current_gen - 1
+            )
+            .order_by(CreaturePerformance.fitness.desc())
         )
-        prev_creatures = prev_result.scalars().all()
+        prev_performances = prev_result.scalars().all()
 
-        if not prev_creatures:
+        if not prev_performances:
             raise HTTPException(status_code=400, detail="No creatures in previous generation")
 
-        # Evolve to get new genomes
-        genomes = genetics.evolve_population(
-            creatures=[{"genome": c.genome, "fitness": c.fitness} for c in prev_creatures],
-            config=config.model_dump(),
+        # Load the creature records for genomes
+        creature_ids = [p.creature_id for p in prev_performances]
+        creatures_result = await db.execute(
+            select(Creature).where(Creature.id.in_(creature_ids))
         )
+        prev_creatures_map = {c.id: c for c in creatures_result.scalars().all()}
+
+        # Calculate survivor count based on cull percentage
+        survivor_count = int(len(prev_performances) * (1 - config.cull_percentage))
+        survivor_creature_ids = {prev_performances[i].creature_id for i in range(survivor_count)}
+
+        # Mark culled creatures as dead
+        for perf in prev_performances[survivor_count:]:
+            creature = prev_creatures_map.get(perf.creature_id)
+            if creature and creature.death_generation is None:
+                creature.death_generation = current_gen - 1
+
+        # Prepare genomes and fitness scores for evolution
+        prev_genomes = [prev_creatures_map[p.creature_id].genome for p in prev_performances]
+        prev_fitness = [p.fitness for p in prev_performances]
+
+        # Build evolution config
+        evolution_config = {
+            'population_size': config.population_size,
+            'elite_count': config.elite_count,
+            'cull_percentage': config.cull_percentage,
+            'crossover_rate': config.crossover_rate,
+            'use_mutation': config.use_mutation,
+            'use_crossover': config.use_crossover,
+            'mutation_rate': config.mutation_rate,
+            'mutation_magnitude': config.mutation_magnitude,
+            'weight_mutation_rate': config.weight_mutation_rate,
+            'weight_mutation_magnitude': config.weight_mutation_magnitude,
+            'weight_mutation_decay': config.weight_mutation_decay,
+            'use_neural_net': config.use_neural_net,
+            'neural_hidden_size': config.neural_hidden_size,
+            'neural_output_bias': config.neural_output_bias,
+            'min_nodes': config.min_nodes,
+            'max_nodes': config.max_nodes,
+            'max_muscles': config.max_muscles,
+            'max_frequency': config.max_allowed_frequency,
+        }
+
+        # Evolve to get new genomes
+        # Note: evolve_population preserves survivor IDs, gives new IDs to offspring
+        genomes, _ = genetics_evolve_population(
+            genomes=prev_genomes,
+            fitness_scores=prev_fitness,
+            config=evolution_config,
+            generation=current_gen - 1,
+        )
+
+        # Only generate new IDs for offspring (survivalStreak == 0)
+        # Survivors keep their original creature ID
+        for genome in genomes:
+            if genome.get('survivalStreak', 0) == 0:
+                # New offspring - generate new unique ID
+                genome['id'] = f"creature_{uuid.uuid4().hex[:8]}"
+            # Survivors keep their original ID from evolve_population
+
+        # Track survivor IDs for frontend animation
+        survivor_ids = survivor_creature_ids
 
     # Simulate all creatures
     start_time = time.time()
     sim_results = await simulator.simulate_batch(
         genomes=genomes,
         config={
-            "duration": config.simulation_duration,
-            "record_frames": True,
+            "simulation_duration": config.simulation_duration,
+            "frame_storage_mode": "all",  # Store frames for sparse selection later
             "frame_rate": 15,
             "pellet_count": config.pellet_count,
             "arena_size": config.arena_size,
             "max_allowed_frequency": config.max_allowed_frequency,
+            "fitness_pellet_points": config.fitness_pellet_points,
+            "fitness_progress_max": config.fitness_progress_max,
+            "fitness_distance_per_unit": config.fitness_distance_per_unit,
+            "fitness_distance_traveled_max": config.fitness_distance_traveled_max,
+            "fitness_regression_penalty": config.fitness_regression_penalty,
+            "fitness_efficiency_penalty": config.fitness_efficiency_penalty,
+            "neural_dead_zone": config.neural_dead_zone,
+            "use_neural_net": config.use_neural_net,
+            "neural_mode": config.neural_mode,
+            "neural_hidden_size": config.neural_hidden_size,
         },
     )
     simulation_time_ms = int((time.time() - start_time) * 1000)
@@ -130,32 +212,81 @@ async def run_generation(
     for genome, _ in middle[: settings.frames_keep_random]:
         keep_frames_ids.add(genome["id"])
 
-    # Create creature records
+    # Create/update creature records and performance records
     for genome, sim_result in zip(genomes, sim_results):
-        creature = Creature(
-            id=genome["id"],
-            run_id=run_id,
+        creature_id = genome["id"]
+        survival_streak = genome.get("survivalStreak", genome.get("survival_streak", 0))
+        is_survivor = survival_streak > 0 and current_gen > 0
+
+        if is_survivor:
+            # Survivor: Update existing creature record
+            result = await db.execute(
+                select(Creature).where(Creature.id == creature_id)
+            )
+            creature = result.scalar_one_or_none()
+            if creature:
+                creature.survival_streak = survival_streak
+                # Update genome with new survivalStreak value
+                updated_genome = dict(creature.genome)
+                updated_genome['survivalStreak'] = survival_streak
+                creature.genome = updated_genome
+            else:
+                # Shouldn't happen, but handle gracefully
+                creature = Creature(
+                    id=creature_id,
+                    run_id=run_id,
+                    genome=genome,
+                    birth_generation=current_gen,
+                    survival_streak=survival_streak,
+                    is_elite=False,
+                    parent_ids=genome.get("parentIds", genome.get("parent_ids", [])),
+                )
+                db.add(creature)
+        else:
+            # New offspring: Create new creature record
+            creature = Creature(
+                id=creature_id,
+                run_id=run_id,
+                genome=genome,
+                birth_generation=current_gen,
+                survival_streak=0,
+                is_elite=False,
+                parent_ids=genome.get("parentIds", genome.get("parent_ids", [])),
+            )
+            db.add(creature)
+
+        # Create performance record for this generation
+        performance = CreaturePerformance(
+            creature_id=creature_id,
             generation=current_gen,
-            genome=genome,
+            run_id=run_id,
             fitness=sim_result["fitness"],
             pellets_collected=sim_result["pellets_collected"],
             disqualified=sim_result["disqualified"],
             disqualified_reason=sim_result.get("disqualified_reason"),
-            survival_streak=genome.get("survival_streak", 0),
-            is_elite=False,  # Will be set in evolution
-            parent_ids=genome.get("parent_ids", []),
         )
-        db.add(creature)
+        db.add(performance)
 
         # Store frames if this creature is in the keep set
-        if genome["id"] in keep_frames_ids and "frames" in sim_result:
+        if creature_id in keep_frames_ids and sim_result.get("frames"):
             frames_data = zlib.compress(json.dumps(sim_result["frames"]).encode())
+
+            # Convert pellets list to pellet_frames format for storage
             pellet_data = None
-            if "pellet_frames" in sim_result:
-                pellet_data = zlib.compress(json.dumps(sim_result["pellet_frames"]).encode())
+            if sim_result.get("pellets"):
+                pellet_frames = []
+                for p in sim_result["pellets"]:
+                    pellet_frames.append({
+                        "position": p["position"],
+                        "collected_at_frame": p.get("collected_at_frame"),
+                        "spawned_at_frame": p.get("spawned_at_frame", 0),
+                        "initial_distance": p.get("initial_distance", 5.0),
+                    })
+                pellet_data = zlib.compress(json.dumps(pellet_frames).encode())
 
             creature_frame = CreatureFrame(
-                creature_id=genome["id"],
+                creature_id=creature_id,
+                generation=current_gen,
                 frames_data=frames_data,
                 frame_count=sim_result.get("frame_count", 0),
                 frame_rate=15,
@@ -176,6 +307,23 @@ async def run_generation(
 
     await db.commit()
 
+    # Build creature data for frontend display
+    creatures_data = []
+    for genome, sim_result in zip(genomes, sim_results):
+        creature_id = genome["id"]
+        creatures_data.append({
+            "id": creature_id,
+            "genome": genome,
+            "fitness": sim_result["fitness"],
+            "pellets_collected": sim_result["pellets_collected"],
+            "disqualified": sim_result["disqualified"],
+            "disqualified_reason": sim_result.get("disqualified_reason"),
+            "is_survivor": creature_id in survivor_ids,
+            "parent_ids": genome.get("parentIds", genome.get("parent_ids", [])),
+            "has_frames": creature_id in keep_frames_ids,
+            "survival_streak": genome.get("survivalStreak", genome.get("survival_streak", 0)),
+        })
+
     return {
         "generation": current_gen,
         "best_fitness": best_fitness,
@@ -184,6 +332,7 @@ async def run_generation(
         "median_fitness": median_fitness,
         "simulation_time_ms": simulation_time_ms,
         "creature_count": len(genomes),
+        "creatures": creatures_data,
     }
 
 
@@ -193,10 +342,9 @@ async def evolution_step(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Run a single generation of evolution."""
-    genetics = GeneticsService()
     simulator = SimulatorService()
 
-    result = await run_generation(run_id, db, genetics, simulator)
+    result = await run_generation(run_id, db, simulator)
     return result
 
 

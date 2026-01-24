@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Creature, CreatureFrame, Generation, Run
+from app.models import Creature, CreaturePerformance, CreatureFrame, Generation, Run
 from app.schemas.generation import GenerationRead
 
 router = APIRouter()
@@ -119,25 +119,49 @@ async def save_generation(
     gen_longest_survivor_id = None
     gen_longest_streak = run.longest_survivor_streak or 0
 
-    # Create creature records
+    # Create creature records (identity) and performance records (per-gen data)
     for c in data.creatures:
-        creature_id = str(uuid.uuid4())
+        # Use genome ID as creature ID so parent_ids references work
+        creature_id = c.genome.get("id", str(uuid.uuid4()))
 
         # Get survival streak from genome
         survival_streak = c.genome.get("survival_streak", c.genome.get("survivalStreak", 0))
 
-        creature = Creature(
-            id=creature_id,
-            run_id=run_id,
+        # Get parent IDs from genome (supports both camelCase and snake_case)
+        parent_ids = c.genome.get("parentIds", c.genome.get("parent_ids", []))
+
+        # Check if this creature already exists (survivor from previous generation)
+        existing_result = await db.execute(
+            select(Creature).where(Creature.id == creature_id)
+        )
+        existing_creature = existing_result.scalar_one_or_none()
+
+        if existing_creature:
+            # Survivor - update survival streak on identity record
+            existing_creature.survival_streak = survival_streak
+        else:
+            # New creature - create identity record
+            creature = Creature(
+                id=creature_id,
+                run_id=run_id,
+                genome=c.genome,
+                birth_generation=data.generation,
+                survival_streak=survival_streak,
+                parent_ids=parent_ids,
+            )
+            db.add(creature)
+
+        # Create performance record for this generation
+        performance = CreaturePerformance(
+            creature_id=creature_id,
             generation=data.generation,
-            genome=c.genome,
+            run_id=run_id,
             fitness=c.fitness,
             pellets_collected=c.pellets_collected,
             disqualified=c.disqualified,
             disqualified_reason=c.disqualified_reason,
-            survival_streak=survival_streak,
         )
-        db.add(creature)
+        db.add(performance)
 
         # Track best creature (only non-disqualified)
         if not c.disqualified and c.fitness > gen_best_fitness:
@@ -163,6 +187,7 @@ async def save_generation(
 
             frame_record = CreatureFrame(
                 creature_id=creature_id,
+                generation=data.generation,
                 frames_data=frames_compressed,
                 frame_count=len(c.frames),
                 frame_rate=15,  # Default frame rate
@@ -215,11 +240,11 @@ async def list_generations(
     )
     generations = result.scalars().all()
 
-    # Get creature counts
+    # Get creature counts via CreaturePerformance
     count_result = await db.execute(
-        select(Creature.generation, func.count(Creature.id))
-        .where(Creature.run_id == run_id)
-        .group_by(Creature.generation)
+        select(CreaturePerformance.generation, func.count(CreaturePerformance.creature_id))
+        .where(CreaturePerformance.run_id == run_id)
+        .group_by(CreaturePerformance.generation)
     )
     counts = dict(count_result.all())
 
@@ -309,10 +334,10 @@ async def get_generation(
     if not gen:
         raise HTTPException(status_code=404, detail="Generation not found")
 
-    # Get creature count
+    # Get creature count via CreaturePerformance
     count_result = await db.execute(
-        select(func.count(Creature.id))
-        .where(Creature.run_id == run_id, Creature.generation == generation)
+        select(func.count(CreaturePerformance.creature_id))
+        .where(CreaturePerformance.run_id == run_id, CreaturePerformance.generation == generation)
     )
     creature_count = count_result.scalar() or 0
 
@@ -338,29 +363,36 @@ async def get_generation_creatures(
     include_frames: bool = False,
 ):
     """Get all creatures for a specific generation."""
+    # Query performances for this generation, join with creatures
     result = await db.execute(
-        select(Creature)
-        .where(Creature.run_id == run_id, Creature.generation == generation)
-        .order_by(Creature.fitness.desc())
-        .options(selectinload(Creature.frames) if include_frames else selectinload(Creature.frames))
+        select(CreaturePerformance)
+        .where(CreaturePerformance.run_id == run_id, CreaturePerformance.generation == generation)
+        .order_by(CreaturePerformance.fitness.desc())
+        .options(
+            selectinload(CreaturePerformance.creature),
+            selectinload(CreaturePerformance.frames),
+        )
     )
-    creatures = result.scalars().all()
+    performances = result.scalars().all()
 
     response = []
-    for c in creatures:
+    for p in performances:
+        creature = p.creature
         creature_dict = {
-            "id": c.id,
-            "run_id": c.run_id,
-            "generation": c.generation,
-            "genome": c.genome,
-            "fitness": c.fitness,
-            "pellets_collected": c.pellets_collected,
-            "disqualified": c.disqualified,
-            "disqualified_reason": c.disqualified_reason,
-            "survival_streak": c.survival_streak,
-            "is_elite": c.is_elite,
-            "parent_ids": c.parent_ids,
-            "has_frames": c.frames is not None,
+            "id": creature.id,
+            "run_id": creature.run_id,
+            "generation": p.generation,
+            "genome": creature.genome,
+            "fitness": p.fitness,
+            "pellets_collected": p.pellets_collected,
+            "disqualified": p.disqualified,
+            "disqualified_reason": p.disqualified_reason,
+            "survival_streak": creature.survival_streak,
+            "is_elite": creature.is_elite,
+            "parent_ids": creature.parent_ids,
+            "has_frames": p.frames is not None,
+            "birth_generation": creature.birth_generation,
+            "death_generation": creature.death_generation,
         }
         response.append(creature_dict)
 

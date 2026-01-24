@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Run, Generation, Creature, CreatureFrame
+from app.models import Run, Generation, Creature, CreaturePerformance, CreatureFrame
 from app.schemas.run import RunCreate, RunRead, RunUpdate
 
 
@@ -148,7 +148,6 @@ async def fork_run(
         select(Generation)
         .where(Generation.run_id == run_id)
         .where(Generation.generation <= fork_request.up_to_generation)
-        .options(selectinload(Generation.creatures).selectinload(Creature.frames))
         .order_by(Generation.generation)
     )
     generations = gen_result.scalars().all()
@@ -174,34 +173,65 @@ async def fork_run(
         )
         db.add(new_gen)
 
-        # Copy creatures
-        for creature in gen.creatures:
-            new_creature_id = str(uuid.uuid4())
-            creature_id_map[creature.id] = new_creature_id
-
-            # Map parent IDs to new IDs (if they exist in the map)
-            new_parent_ids = [
-                creature_id_map.get(pid, pid) for pid in creature.parent_ids
-            ]
-
-            new_creature = Creature(
-                id=new_creature_id,
-                run_id=new_run_id,
-                generation=gen.generation,
-                genome=creature.genome,
-                fitness=creature.fitness,
-                pellets_collected=creature.pellets_collected,
-                disqualified=creature.disqualified,
-                disqualified_reason=creature.disqualified_reason,
-                survival_streak=creature.survival_streak,
-                is_elite=creature.is_elite,
-                parent_ids=new_parent_ids,
+        # Get performances for this generation
+        perf_result = await db.execute(
+            select(CreaturePerformance)
+            .where(
+                CreaturePerformance.run_id == run_id,
+                CreaturePerformance.generation == gen.generation
             )
-            db.add(new_creature)
+            .options(
+                selectinload(CreaturePerformance.creature),
+                selectinload(CreaturePerformance.frames),
+            )
+        )
+        performances = perf_result.scalars().all()
+
+        # Copy creatures and performances
+        for perf in performances:
+            creature = perf.creature
+            old_creature_id = creature.id
+
+            # Check if we already created this creature in a previous generation (survivor)
+            if old_creature_id in creature_id_map:
+                new_creature_id = creature_id_map[old_creature_id]
+            else:
+                new_creature_id = str(uuid.uuid4())
+                creature_id_map[old_creature_id] = new_creature_id
+
+                # Map parent IDs to new IDs (if they exist in the map)
+                new_parent_ids = [
+                    creature_id_map.get(pid, pid) for pid in creature.parent_ids
+                ]
+
+                # Create creature identity record
+                new_creature = Creature(
+                    id=new_creature_id,
+                    run_id=new_run_id,
+                    genome=creature.genome,
+                    birth_generation=creature.birth_generation,
+                    death_generation=creature.death_generation,
+                    survival_streak=creature.survival_streak,
+                    is_elite=creature.is_elite,
+                    parent_ids=new_parent_ids,
+                )
+                db.add(new_creature)
+
+            # Create performance record for this generation
+            new_perf = CreaturePerformance(
+                creature_id=new_creature_id,
+                generation=gen.generation,
+                run_id=new_run_id,
+                fitness=perf.fitness,
+                pellets_collected=perf.pellets_collected,
+                disqualified=perf.disqualified,
+                disqualified_reason=perf.disqualified_reason,
+            )
+            db.add(new_perf)
 
             # Track best creature
-            if creature.fitness > best_fitness:
-                best_fitness = creature.fitness
+            if perf.fitness > best_fitness:
+                best_fitness = perf.fitness
                 best_creature_id = new_creature_id
                 best_creature_gen = gen.generation
 
@@ -212,13 +242,14 @@ async def fork_run(
                 longest_survivor_gen = gen.generation
 
             # Copy frames if they exist
-            if creature.frames:
+            if perf.frames:
                 new_frames = CreatureFrame(
                     creature_id=new_creature_id,
-                    frames_data=creature.frames.frames_data,
-                    frame_count=creature.frames.frame_count,
-                    frame_rate=creature.frames.frame_rate,
-                    pellet_frames=creature.frames.pellet_frames,
+                    generation=gen.generation,
+                    frames_data=perf.frames.frames_data,
+                    frame_count=perf.frames.frame_count,
+                    frame_rate=perf.frames.frame_rate,
+                    pellet_frames=perf.frames.pellet_frames,
                 )
                 db.add(new_frames)
 
