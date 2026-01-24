@@ -135,6 +135,11 @@ export const TOOLTIPS = {
   selectionRank: 'Sort by fitness and assign breeding probability by rank (1st place gets most chances, last place fewest). Unlike truncation, even low-ranked creatures can reproduce. Maintains diversity while favoring the fit.',
   tournamentSize: 'How many creatures compete in each tournament. Size 2 = weak pressure (50% chance the best wins). Size 5+ = strong pressure (best almost always wins). Lower for exploration, higher for exploitation.',
 
+  // Adaptive mutation
+  adaptiveMutation: 'Automatically boost mutation rate when evolution stagnates (no fitness improvement for N generations). Helps escape local optima.',
+  stagnationThreshold: 'Number of generations without best fitness improvement before boosting mutation. Lower = more aggressive adaptation.',
+  adaptiveMutationBoost: 'Multiplier applied to mutation rates during stagnation. 2.0 = double mutation rate. Higher values explore more aggressively.',
+
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',
   physicsFPS: 'Physics frames per second. Higher FPS = more expressive movement but more compute. 60 FPS default, 30 FPS for faster runs, 120 FPS for precision.',

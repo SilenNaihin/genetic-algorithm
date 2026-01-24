@@ -67,6 +67,11 @@ class SimulationConfig(BaseModel):
     fitness_efficiency_penalty: float = Field(default=0.1, ge=0.0, le=5.0)
     neural_dead_zone: float = Field(default=0.1, ge=0.0, le=1.0)
 
+    # Adaptive mutation
+    use_adaptive_mutation: bool = False
+    stagnation_threshold: int = Field(default=10, ge=1, le=100)
+    adaptive_mutation_boost: float = Field(default=2.0, ge=1.0, le=5.0)
+
     # Disqualification thresholds
     position_threshold: float = Field(default=50.0, ge=10.0)
     height_threshold: float = Field(default=30.0, ge=5.0)

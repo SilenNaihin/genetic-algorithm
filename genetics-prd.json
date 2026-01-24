@@ -45,14 +45,14 @@
     {
       "id": 3,
       "name": "Selection Methods",
-      "status": "pending",
+      "status": "complete",
       "description": "Add tournament selection as alternative to truncation",
       "tasks": [
-        "Add selectionMethod: 'truncation' | 'tournament' to SimulationConfig",
+        "Add selectionMethod: 'truncation' | 'tournament' | 'rank' to SimulationConfig",
         "Add tournamentSize parameter (default 3)",
-        "Implement tournamentSelection() in Selection.ts",
-        "Update Population.evolve() to use selected method",
-        "Add UI dropdown for selection method"
+        "Wire up existing tournamentSelection() in backend",
+        "Update evolve_population() to use selected method",
+        "Add UI dropdown with dynamic tooltips for each method"
       ],
       "files": [
         "src/types/simulation.ts",
@@ -65,7 +65,7 @@
     {
       "id": 4,
       "name": "Adaptive Mutation",
-      "status": "pending",
+      "status": "complete",
       "description": "Auto-increase mutation when fitness stagnates",
       "tasks": [
         "Add useAdaptiveMutation: boolean to SimulationConfig",

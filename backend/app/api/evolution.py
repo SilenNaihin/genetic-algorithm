@@ -116,7 +116,21 @@ async def run_generation(
             'max_nodes': config.max_nodes,
             'max_muscles': config.max_muscles,
             'max_frequency': config.max_allowed_frequency,
+            'use_adaptive_mutation': config.use_adaptive_mutation,
+            'stagnation_threshold': config.stagnation_threshold,
+            'adaptive_mutation_boost': config.adaptive_mutation_boost,
         }
+
+        # Build best fitness history for adaptive mutation
+        best_fitness_history = None
+        if config.use_adaptive_mutation:
+            # Get best fitness from all previous generations
+            gen_result = await db.execute(
+                select(Generation.best_fitness)
+                .where(Generation.run_id == run_id)
+                .order_by(Generation.generation)
+            )
+            best_fitness_history = [row[0] for row in gen_result.all()]
 
         # Evolve to get new genomes
         # Note: evolve_population preserves survivor IDs, gives new IDs to offspring
@@ -125,6 +139,7 @@ async def run_generation(
             fitness_scores=prev_fitness,
             config=evolution_config,
             generation=current_gen - 1,
+            best_fitness_history=best_fitness_history,
         )
 
         # Only generate new IDs for offspring (survivalStreak == 0)

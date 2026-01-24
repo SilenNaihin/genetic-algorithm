@@ -59,6 +59,11 @@ export interface SimulationConfig {
   fitnessEfficiencyPenalty: number;   // Penalty per unit of total muscle activation (encourages efficient movement)
   neuralDeadZone: number;             // Dead zone threshold for pure mode (outputs < threshold become 0)
 
+  // Adaptive mutation (escape stagnation)
+  useAdaptiveMutation: boolean;       // Auto-boost mutation when fitness stagnates
+  stagnationThreshold: number;        // Generations without improvement before boosting
+  adaptiveMutationBoost: number;      // Multiplier for mutation rate during stagnation (e.g., 2.0 = double)
+
   // Frame storage mode for replay capability
   frameStorageMode: 'none' | 'sparse' | 'all';  // none = no replays, sparse = top/bottom only, all = all creatures
   sparseTopCount: number;             // Number of top performers to store frames for (sparse mode)
@@ -109,6 +114,11 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   neuralOutputBias: -0.1,        // Slight negative bias so muscles must evolve to activate
   fitnessEfficiencyPenalty: 0.1, // Subtle penalty for excessive activation
   neuralDeadZone: 0.1,           // Outputs with absolute value < 0.1 become 0 in pure mode
+
+  // Adaptive mutation defaults
+  useAdaptiveMutation: false,    // Off by default - enable for long runs
+  stagnationThreshold: 10,       // 10 generations without improvement
+  adaptiveMutationBoost: 2.0,    // Double mutation rate during stagnation
 
   // Frame storage mode
   frameStorageMode: 'all',       // Store frames for all creatures by default (enables replays)

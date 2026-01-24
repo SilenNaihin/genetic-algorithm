@@ -220,6 +220,53 @@ export function NeuralPanel() {
               width="100%"
             />
           </div>
+
+          {/* Adaptive Mutation Section */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={labelStyle}>
+                Adaptive Mutation
+                <InfoTooltip text={TOOLTIPS.adaptiveMutation} />
+              </span>
+              <input
+                type="checkbox"
+                checked={config.useAdaptiveMutation}
+                onChange={(e) => setConfig({ useAdaptiveMutation: e.target.checked })}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+              />
+            </div>
+
+            {config.useAdaptiveMutation && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Stagnation Gens"
+                    value={config.stagnationThreshold}
+                    displayValue={String(config.stagnationThreshold)}
+                    min={5}
+                    max={50}
+                    step={5}
+                    onChange={(v) => setConfig({ stagnationThreshold: v })}
+                    tooltip={TOOLTIPS.stagnationThreshold}
+                    width="100%"
+                  />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Boost Multiplier"
+                    value={config.adaptiveMutationBoost}
+                    displayValue={`${config.adaptiveMutationBoost}x`}
+                    min={1.5}
+                    max={5}
+                    step={0.5}
+                    onChange={(v) => setConfig({ adaptiveMutationBoost: v })}
+                    tooltip={TOOLTIPS.adaptiveMutationBoost}
+                    width="100%"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
