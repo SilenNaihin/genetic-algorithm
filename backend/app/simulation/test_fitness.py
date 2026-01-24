@@ -560,16 +560,13 @@ class TestFitnessCalculation:
 
         assert fitness[0].item() == 0
 
-    def test_regression_penalty_after_collection(self):
-        """Should penalize moving away from pellet after collecting one."""
+    def test_regression_penalty_on_moving_away(self):
+        """Should penalize moving away from pellet after approaching it."""
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
         state = initialize_fitness_state(batch, pellets)
         config = FitnessConfig(regression_penalty=20.0)
-
-        # Simulate collecting first pellet (total > 0 enables regression penalty)
-        pellets.total_collected[0] = 1
 
         # Move toward pellet first to set closest distance
         direction = pellets.positions[0, [0, 2]] - get_center_of_mass(batch)[0, [0, 2]]
@@ -590,26 +587,26 @@ class TestFitnessCalculation:
         # Fitness should be lower due to regression penalty
         assert fitness_after_regression[0].item() < fitness_at_closest[0].item()
 
-    def test_displacement_bonus_only_after_settling(self):
-        """Displacement bonus should only apply after 0.5s settling period."""
+    def test_distance_traveled_bonus_from_movement(self):
+        """Distance traveled bonus is based on cumulative distance moved."""
         genome = make_simple_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
         state = initialize_fitness_state(batch, pellets)
-        config = FitnessConfig(net_displacement_max=15.0)
+        config = FitnessConfig(distance_traveled_max=20.0, distance_per_unit=3.0)
 
-        # Move creature significantly
-        batch.positions[0, :, 0] += 10.0
+        # Get fitness before moving
+        fitness_before = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
+
+        # Move creature and accumulate distance traveled
+        batch.positions[0, :, 0] += 5.0
         update_fitness_state(batch, state, pellets)
 
-        # Fitness at t=0.3 (before settling)
-        fitness_early = calculate_fitness(batch, pellets, state, simulation_time=0.3, config=config)
+        # Get fitness after moving
+        fitness_after = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
 
-        # Fitness at t=1.0 (after settling)
-        fitness_late = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
-
-        # Later fitness should include displacement bonus
-        assert fitness_late[0].item() > fitness_early[0].item()
+        # Fitness should increase due to distance traveled bonus
+        assert fitness_after[0].item() > fitness_before[0].item()
 
 
 # =============================================================================

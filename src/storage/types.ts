@@ -4,7 +4,7 @@
  * Shared types for storage implementations.
  */
 
-import type { PelletData, SimulationFrame } from '../simulation/BatchSimulator';
+import type { PelletData, SimulationFrame } from '../types';
 import type { SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 
@@ -60,7 +60,6 @@ export function recalculateFitnessOverTime(
   // Get fitness config (with defaults for legacy runs)
   const pelletPoints = config.fitnessPelletPoints ?? DEFAULT_CONFIG.fitnessPelletPoints;
   const progressMax = config.fitnessProgressMax ?? DEFAULT_CONFIG.fitnessProgressMax;
-  const netDisplacementMax = config.fitnessNetDisplacementMax ?? DEFAULT_CONFIG.fitnessNetDisplacementMax;
   const distancePerUnit = config.fitnessDistancePerUnit ?? DEFAULT_CONFIG.fitnessDistancePerUnit;
   const distanceTraveledMax = config.fitnessDistanceTraveledMax ?? DEFAULT_CONFIG.fitnessDistanceTraveledMax;
 
@@ -71,7 +70,6 @@ export function recalculateFitnessOverTime(
   for (let i = 0; i < frames.length; i++) {
     const frame = frames[i];
     const com = frame.centerOfMass;
-    const time = frame.time;
 
     // Accumulate distance traveled (XZ only)
     if (i > 0) {
@@ -103,16 +101,6 @@ export function recalculateFitnessOverTime(
         (activePellet.initialDistance - currentDist) / activePellet.initialDistance
       ));
       f += progress * progressMax;
-    }
-
-    // Net displacement bonus (rate-based)
-    if (time > 0.5) {
-      const netDx = com.x - initialCOM.x;
-      const netDz = com.z - initialCOM.z;
-      const netDisp = Math.sqrt(netDx * netDx + netDz * netDz);
-      const dispRate = netDisp / time;
-      const displacementRatio = Math.min(1, dispRate / 1.0); // 1 unit/sec = full bonus
-      f += displacementRatio * netDisplacementMax;
     }
 
     // Distance traveled bonus

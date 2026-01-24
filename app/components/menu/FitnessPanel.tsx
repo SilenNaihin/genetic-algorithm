@@ -16,7 +16,6 @@ export function FitnessPanel() {
     setConfig({
       fitnessPelletPoints: DEFAULT_CONFIG.fitnessPelletPoints,
       fitnessProgressMax: DEFAULT_CONFIG.fitnessProgressMax,
-      fitnessNetDisplacementMax: DEFAULT_CONFIG.fitnessNetDisplacementMax,
       fitnessDistancePerUnit: DEFAULT_CONFIG.fitnessDistancePerUnit,
       fitnessDistanceTraveledMax: DEFAULT_CONFIG.fitnessDistanceTraveledMax,
       fitnessRegressionPenalty: DEFAULT_CONFIG.fitnessRegressionPenalty,
@@ -73,18 +72,6 @@ export function FitnessPanel() {
             max={150}
             hint="Max progress bonus toward pellet"
             onChange={(v) => setConfig({ fitnessProgressMax: v })}
-            width="100%"
-          />
-        </div>
-        <div style={{ marginBottom: '12px' }}>
-          <ParamSlider
-            name="Net Displacement Max"
-            value={config.fitnessNetDisplacementMax}
-            displayValue={String(config.fitnessNetDisplacementMax)}
-            min={0}
-            max={50}
-            hint="Max bonus for straight-line distance from start"
-            onChange={(v) => setConfig({ fitnessNetDisplacementMax: v })}
             width="100%"
           />
         </div>

@@ -7,12 +7,11 @@
  */
 
 import * as Api from '../services/ApiClient';
-import type { CreatureSimulationResult, PelletData, SimulationFrame } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult, PelletData, SimulationFrame, DisqualificationReason } from '../types';
 import type { SimulationConfig, FitnessHistoryEntry, Vector3 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 import type { SavedRun, CompactCreatureResult } from './types';
 import { recalculateFitnessOverTime } from './types';
-import type { DisqualificationReason } from '../simulation/BatchSimulator';
 
 /**
  * Convert API run to SavedRun format
@@ -234,13 +233,16 @@ export class RemoteStorage {
 
   /**
    * Load frames for a specific creature (on-demand, for replay)
+   * Now accepts real pellet data and fitnessOverTime from simulation results.
    */
   async loadCreatureFrames(
     creatureId: string,
     genome: { nodes: { id: string }[] },
     pelletsCollected: number,
     config: SimulationConfig,
-    disqualified: string | null
+    disqualified: string | null,
+    realPellets?: PelletData[],
+    realFitnessOverTime?: number[]
   ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[] }> {
     try {
       const framesData = await Api.getCreatureFrames(creatureId);
@@ -250,14 +252,26 @@ export class RemoteStorage {
 
       const frames = this.expandFrames(framesData.frames_data, genome);
 
-      // Create pellet data for fitness calculation
-      const pellets: PelletData[] = Array.from({ length: pelletsCollected }, (_, i) => ({
-        id: `pellet_${i}`,
-        position: { x: 0, y: 0, z: 0 },
-        collectedAtFrame: null,
-        spawnedAtFrame: 0,
-        initialDistance: 5
-      }));
+      // Use real fitnessOverTime if provided and matches frame count
+      if (realFitnessOverTime && realFitnessOverTime.length > 0) {
+        if (realFitnessOverTime.length === frames.length) {
+          console.log('[RemoteStorage] Using real fitnessOverTime from backend');
+          return { frames, fitnessOverTime: realFitnessOverTime };
+        } else {
+          console.warn(`[RemoteStorage] fitnessOverTime length mismatch: ${realFitnessOverTime.length} vs ${frames.length} frames, recalculating`);
+        }
+      }
+
+      // Use real pellet data if provided, otherwise create placeholder
+      const pellets: PelletData[] = realPellets && realPellets.length > 0
+        ? realPellets
+        : Array.from({ length: Math.max(1, pelletsCollected) }, (_, i) => ({
+            id: `pellet_${i}`,
+            position: { x: 0, y: 0, z: 0 },
+            collectedAtFrame: null,
+            spawnedAtFrame: 0,
+            initialDistance: 5
+          }));
 
       const fitnessOverTime = recalculateFitnessOverTime(frames, pellets, config, disqualified);
 

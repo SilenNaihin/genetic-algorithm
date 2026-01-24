@@ -23,13 +23,12 @@ Use this checklist when modifying the fitness function to ensure all related com
 
 ## Fitness Components Reference
 
-Current fitness formula:
+Current fitness formula (all distances measured from creature edge, XZ-only):
 ```
-fitness = pellets * pelletPoints              // 100 per pellet
-        + progress * progressMax              // 0-80 toward current pellet
-        + displacementRatio * netDisplacementMax  // 0-15 net distance from start
-        + distanceBonus                       // 0-15 total distance traveled
-        - regressionPenalty                   // 0-20 for moving away after collection
+fitness = pellets * pelletPoints              // 20 per pellet (on top of 80 progress = 100 total)
+        + progress * progressMax              // 0-80 progress toward current pellet (edge distance)
+        + distanceBonus                       // 0-20 total distance traveled
+        - regressionPenalty                   // 0-20 for moving away (only after first collection)
         - muscleActivation * efficiencyPenalty  // Penalize excessive activation
 ```
 

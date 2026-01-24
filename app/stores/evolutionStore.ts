@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { SimulationConfig, FitnessHistoryEntry } from '../../src/types/simulation';
-import type { CreatureSimulationResult } from '../../src/simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../../src/types';
 import { DEFAULT_CONFIG } from '../../src/types/simulation';
 
 /**

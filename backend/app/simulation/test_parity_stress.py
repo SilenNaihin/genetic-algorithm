@@ -378,28 +378,21 @@ class TestFitnessConfigPermutations:
         if efficiency_penalty > 0:
             assert fitness[0].item() <= fitness_no_activation[0].item()
 
-    @pytest.mark.parametrize("displacement_max,distance_max", [
-        (0.0, 0.0),
-        (15.0, 15.0),
-        (30.0, 30.0),
-        (15.0, 0.0),
-        (0.0, 15.0),
-    ])
-    def test_movement_bonus_combinations(self, displacement_max, distance_max):
-        """Displacement and distance bonuses should work independently."""
+    @pytest.mark.parametrize("distance_max", [0.0, 10.0, 20.0, 30.0])
+    def test_distance_traveled_max_values(self, distance_max):
+        """Distance traveled bonus should work with different max values."""
         genome = make_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
         state = initialize_fitness_state(batch, pellets)
 
         config = FitnessConfig(
-            net_displacement_max=displacement_max,
             distance_traveled_max=distance_max,
         )
 
         # Move creature
         batch.positions[0, :, 0] += 5.0
-        update_fitness_state(batch, state, pellets, config)
+        update_fitness_state(batch, state, pellets)
 
         fitness = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
         assert fitness[0].item() >= 0

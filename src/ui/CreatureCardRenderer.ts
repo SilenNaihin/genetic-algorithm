@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createCreatureMesh, updateMuscleMesh } from '../rendering/CreatureMeshFactory';
-import type { CreatureSimulationResult } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../types';
 import type { CreatureGenome } from '../types';
 
 /**

@@ -5,7 +5,7 @@
  * Backend (PyTorch) is required - no local simulation fallback.
  */
 
-import { type CreatureSimulationResult, type SimulationFrame, type PelletData, type DisqualificationReason } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult, SimulationFrame, PelletData, DisqualificationReason } from '../types';
 import { Population } from '../genetics/Population';
 import type { SimulationConfig } from '../types/simulation';
 import type { CreatureGenome, Vector3 } from '../types/genome';
@@ -118,22 +118,41 @@ function apiResultToCreatureResult(
     });
   }
 
-  // Create dummy pellet data based on pellets collected
-  const pellets: PelletData[] = Array.from({ length: apiResult.pellets_collected }, (_, i) => ({
-    id: `pellet_${i}`,
-    position: { x: 0, y: 0, z: 0 },
-    collectedAtFrame: null,
-    spawnedAtFrame: 0,
-    initialDistance: 5,
-  }));
+  // Use real pellet data from backend if available
+  let pellets: PelletData[] = [];
+  const apiPellets = (apiResult as { pellets?: { id: string; position: { x: number; y: number; z: number }; collected_at_frame: number | null; spawned_at_frame: number; initial_distance: number }[] }).pellets;
+  if (apiPellets && apiPellets.length > 0) {
+    pellets = apiPellets.map(p => ({
+      id: p.id,
+      position: { x: safeNum(p.position.x), y: safeNum(p.position.y), z: safeNum(p.position.z) },
+      collectedAtFrame: p.collected_at_frame,
+      spawnedAtFrame: p.spawned_at_frame,
+      initialDistance: safeNum(p.initial_distance),
+    }));
+  } else {
+    // Fallback: create dummy pellet data based on pellets collected
+    pellets = Array.from({ length: Math.max(1, apiResult.pellets_collected) }, (_, i) => ({
+      id: `pellet_${i}`,
+      position: { x: 0, y: 1, z: 5 },  // Default position in front of creature
+      collectedAtFrame: i < apiResult.pellets_collected ? Math.floor((i + 1) * frames.length / (apiResult.pellets_collected + 1)) : null,
+      spawnedAtFrame: i === 0 ? 0 : Math.floor(i * frames.length / (apiResult.pellets_collected + 1)),
+      initialDistance: 5,
+    }));
+  }
 
-  // Generate fitness over time from frames (simplified - just interpolate to final)
+  // Use real fitness over time from backend if available
+  const apiFitnessOverTime = (apiResult as { fitness_over_time?: number[] }).fitness_over_time;
+  let fitnessOverTime: number[] = [];
   const safeFitness = safeNum(apiResult.fitness);
-  const fitnessOverTime: number[] = frames.map((_, i) => {
-    // Linear interpolation from 0 to final fitness
-    const progress = frames.length > 1 ? i / (frames.length - 1) : 1;
-    return safeNum(safeFitness * progress);
-  });
+  if (apiFitnessOverTime && apiFitnessOverTime.length > 0) {
+    fitnessOverTime = apiFitnessOverTime.map(f => safeNum(f));
+  } else {
+    // Fallback: generate fitness over time (interpolate to final)
+    fitnessOverTime = frames.map((_, i) => {
+      const progress = frames.length > 1 ? i / (frames.length - 1) : 1;
+      return safeNum(safeFitness * progress);
+    });
+  }
 
   return {
     genome,

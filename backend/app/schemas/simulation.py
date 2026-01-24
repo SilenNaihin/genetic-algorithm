@@ -47,12 +47,11 @@ class SimulationConfig(BaseModel):
     arena_size: float = Field(default=10.0, ge=5.0, le=100.0)
 
     # Fitness function weights
-    fitness_pellet_points: float = Field(default=100.0, ge=0.0)
+    fitness_pellet_points: float = Field(default=20.0, ge=0.0)  # On top of 80 progress = 100 total
     fitness_progress_max: float = Field(default=80.0, ge=0.0)
-    fitness_net_displacement_max: float = Field(default=15.0, ge=0.0)
     fitness_distance_per_unit: float = Field(default=3.0, ge=0.0)
-    fitness_distance_traveled_max: float = Field(default=15.0, ge=0.0)
-    fitness_regression_penalty: float = Field(default=20.0, ge=0.0)
+    fitness_distance_traveled_max: float = Field(default=20.0, ge=0.0)
+    fitness_regression_penalty: float = Field(default=20.0, ge=0.0)  # Only after first collection
 
     # Neural network settings
     use_neural_net: bool = True
@@ -95,10 +94,19 @@ class FitnessBreakdown(BaseModel):
 
     pellet_points: float = 0.0
     progress: float = 0.0
-    net_displacement: float = 0.0
     distance_traveled: float = 0.0
     regression_penalty: float = 0.0
     efficiency_penalty: float = 0.0
+
+
+class PelletResult(BaseModel):
+    """Data about a pellet's position and collection state."""
+
+    id: str
+    position: dict  # {x, y, z}
+    collected_at_frame: int | None = None
+    spawned_at_frame: int
+    initial_distance: float
 
 
 class SimulationResult(BaseModel):
@@ -121,6 +129,12 @@ class SimulationResult(BaseModel):
     # Frame data (only if record_frames=True)
     frame_count: int = 0
     frames: list | None = None  # Flattened frame data if requested
+
+    # Pellet data (for replay visualization)
+    pellets: list[PelletResult] | None = None
+
+    # Fitness over time (for graphing actual fitness progression)
+    fitness_over_time: list[float] | None = None
 
 
 class BatchSimulationRequest(BaseModel):

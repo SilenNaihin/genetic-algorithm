@@ -5,7 +5,7 @@ import { useEvolutionStore, type CardAnimationState } from '../stores/evolutionS
 import * as SimulationService from '../../src/services/SimulationService';
 import * as StorageService from '../../src/services/StorageService';
 import * as SimState from '../lib/simulationState';
-import type { CreatureSimulationResult } from '../../src/simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../../src/types';
 
 // Get showError from store for non-hook context
 const showError = (message: string) => useEvolutionStore.getState().showError(message);
@@ -239,11 +239,17 @@ export function useSimulation() {
 
     // Check if any dying creature is the new longest survivor
     // (We track creatures when they DIE, not while alive)
+    const dyingStreaks = deadCreatures.map(d => d.genome.survivalStreak || 0);
+    const maxDyingStreak = Math.max(...dyingStreaks, 0);
+    if (maxDyingStreak > 0) {
+      console.log(`[Evolution] Dying creatures have survival streaks: max=${maxDyingStreak}, all=${dyingStreaks.filter(s => s > 0).join(',')}`);
+    }
     for (const dead of deadCreatures) {
       const streak = dead.genome.survivalStreak || 0;
       if (streak > 0) {
         const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
         if (streak > currentLongestGens) {
+          console.log(`[Evolution] New longest survivor! streak=${streak} > current=${currentLongestGens}`);
           setLongestSurvivor(dead, streak, currentGen + 1); // Dies at next generation
           StorageService.updateLongestSurvivor(dead, streak, currentGen + 1);
         }
@@ -503,11 +509,20 @@ export function useSimulation() {
             const survivorCount = Math.floor(sortedPrev.length * (1 - currentConfig.cullPercentage));
             const dyingCreatures = sortedPrev.slice(survivorCount);
 
+            // Debug: log survival streaks
+            const allStreaks = previousResults.map(r => r.genome.survivalStreak || 0);
+            const maxStreak = Math.max(...allStreaks, 0);
+            if (maxStreak > 0) {
+              console.log(`[AutoRun] Gen ${currentGen}: population has survivors with streaks up to ${maxStreak}`);
+            }
+
             for (const dead of dyingCreatures) {
               const streak = dead.genome.survivalStreak || 0;
               if (streak > 0) {
                 const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
+                console.log(`[AutoRun] Dying creature has streak=${streak}, current longest=${currentLongestGens}`);
                 if (streak > currentLongestGens) {
+                  console.log(`[AutoRun] New longest survivor! streak=${streak}`);
                   setLongestSurvivor(dead, streak, currentGen + 1);
                   StorageService.updateLongestSurvivor(dead, streak, currentGen + 1);
                 }

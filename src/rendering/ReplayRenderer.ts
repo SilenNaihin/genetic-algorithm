@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createCreatureMesh, updateMuscleMesh } from './CreatureMeshFactory';
-import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../types';
 
 /**
  * Handles 3D rendering for simulation replay.

@@ -18,6 +18,7 @@ from app.schemas.genetics import (
     SelectionConfig,
     DecayConfig,
 )
+from app.schemas.genome import CreatureGenome
 from app.genetics import (
     generate_population,
     evolve_population,
@@ -120,8 +121,28 @@ def evolve_one_generation(request: EvolveRequest):
         generation=request.generation,
     )
 
+    # Debug: Log first genome's survival streak
+    if new_genomes:
+        first = new_genomes[0]
+        print(f"[genetics/evolve] First genome: id={first.get('id')}, streak={first.get('survivalStreak')}, parentIds={first.get('parentIds')}")
+
+    # Explicitly convert dicts to CreatureGenome models to ensure proper serialization
+    genome_models = [CreatureGenome.model_validate(g) for g in new_genomes]
+
+    # Debug: verify the model has the correct value and serialization
+    if genome_models:
+        model = genome_models[0]
+        print(f"[genetics/evolve] First model survivalStreak: {model.survivalStreak}")
+        dumped = model.model_dump(by_alias=True)
+        print(f"[genetics/evolve] Serialized survival_streak: {dumped.get('survival_streak')}")
+
+        # Also check INCOMING genomes to see what frontend sent
+        if request.genomes:
+            incoming = request.genomes[0]
+            print(f"[genetics/evolve] INCOMING first genome survivalStreak: {incoming.survivalStreak}")
+
     return EvolveResponse(
-        genomes=new_genomes,
+        genomes=genome_models,
         generation=request.generation + 1,
         stats=PopulationStats(
             generation=stats.generation,

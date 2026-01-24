@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { TooltipManager, tooltipRow, tooltipTitle } from '../../../src/ui/TooltipManager';
 import { getCreatureName } from '../../../src/ui/CreatureCardRenderer';
-import type { CreatureSimulationResult } from '../../../src/simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../../../src/types';
 
 /**
  * Generates tooltip HTML for a creature card.

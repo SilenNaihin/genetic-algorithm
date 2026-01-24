@@ -6,7 +6,7 @@
  */
 
 import { RemoteStorage } from '../storage/RemoteStorage';
-import type { CreatureSimulationResult, SimulationFrame } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult, SimulationFrame, PelletData } from '../types';
 import type { SimulationConfig, FitnessHistoryEntry } from '../types/simulation';
 import type { CreatureGenome } from '../types/genome';
 import type { SavedRun, CompactCreatureResult } from '../storage/types';
@@ -181,15 +181,18 @@ export function compactCreatureResult(
 /**
  * Load frames for a specific creature (on-demand, for replay)
  * This is called lazily when opening the replay modal, not when loading generations.
+ * Now accepts real pellet data and fitnessOverTime from simulation results.
  */
 export async function loadCreatureFrames(
   creatureId: string,
   genome: CreatureGenome,
   pelletsCollected: number,
   config: SimulationConfig,
-  disqualified: string | null
+  disqualified: string | null,
+  pellets?: PelletData[],
+  fitnessOverTime?: number[]
 ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[] }> {
-  return storage.loadCreatureFrames(creatureId, genome, pelletsCollected, config, disqualified);
+  return storage.loadCreatureFrames(creatureId, genome, pelletsCollected, config, disqualified, pellets, fitnessOverTime);
 }
 
 /**

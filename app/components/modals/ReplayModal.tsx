@@ -10,7 +10,7 @@ import { gatherSensorInputsPure, gatherSensorInputsHybrid, NEURAL_INPUT_SIZE_PUR
 import * as StorageService from '../../../src/services/StorageService';
 import * as ApiClient from '../../../src/services/ApiClient';
 import type { CreatureGenome } from '../../../src/types';
-import type { CreatureSimulationResult } from '../../../src/simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../../../src/types';
 
 // Sensor names for neural info display
 const SENSOR_NAMES = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist', 'time'];
@@ -75,6 +75,13 @@ export function ReplayModal() {
 
     // If frames are already loaded, use them directly
     if (replayResult.frames.length > 0) {
+      console.log('[ReplayModal] Using in-memory frames:', {
+        frameCount: replayResult.frames.length,
+        fitnessOverTimeLength: replayResult.fitnessOverTime?.length,
+        pelletsCount: replayResult.pellets?.length,
+        firstFitness: replayResult.fitnessOverTime?.[0],
+        lastFitness: replayResult.fitnessOverTime?.[replayResult.fitnessOverTime?.length - 1],
+      });
       setLoadedResult(replayResult);
       return;
     }
@@ -83,9 +90,12 @@ export function ReplayModal() {
     const creatureId = replayResult.genome._apiCreatureId;
     if (!creatureId) {
       // No API creature ID - this is a fresh simulation result, use as is
+      console.log('[ReplayModal] Fresh result (no creatureId), using as-is');
       setLoadedResult(replayResult);
       return;
     }
+
+    console.log('[ReplayModal] Loading frames from API for creature:', creatureId);
 
     // Load frames lazily
     setFramesLoading(true);
@@ -96,7 +106,9 @@ export function ReplayModal() {
       replayResult.genome,
       replayResult.pelletsCollected,
       config,
-      replayResult.disqualified
+      replayResult.disqualified,
+      replayResult.pellets,  // Pass real pellet data
+      replayResult.fitnessOverTime  // Pass real fitness over time
     ).then(({ frames, fitnessOverTime }) => {
       setLoadedResult({
         ...replayResult,

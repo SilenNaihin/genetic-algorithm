@@ -291,31 +291,31 @@ class TestCollectionRadius:
         assert small_collected[0].item() == False, "Small node (radius 0.55) should not collect at distance 0.7"
 
 
-class TestSettlingPeriod:
-    """Verify displacement bonus only applies after settling period."""
+class TestDisplacementBonus:
+    """Verify displacement bonus is calculated from distance, not rate."""
 
-    def test_no_displacement_bonus_before_settling(self):
-        """Displacement bonus should be 0 before 0.5 seconds."""
+    def test_displacement_bonus_is_distance_based(self):
+        """Displacement bonus should be the same at different times for same movement."""
         genome = make_test_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
         state = initialize_fitness_state(batch, pellets)
 
-        config = FitnessConfig(net_displacement_max=15.0)
+        config = FitnessConfig(distance_traveled_max=20.0, distance_per_unit=3.0)
 
         # Move creature significantly
-        batch.positions[0, :, 0] += 10.0
+        batch.positions[0, :, 0] += 5.0
         from app.simulation.fitness import update_fitness_state
-        update_fitness_state(batch, state, pellets, config)
+        update_fitness_state(batch, state, pellets)
 
-        # Fitness at t=0.3 (before settling)
+        # Fitness at t=0.3 (early)
         fitness_early = calculate_fitness(batch, pellets, state, simulation_time=0.3, config=config)
 
-        # Fitness at t=0.6 (after settling)
+        # Fitness at t=0.6 (later)
         fitness_late = calculate_fitness(batch, pellets, state, simulation_time=0.6, config=config)
 
-        # Late fitness should be higher due to displacement bonus
-        assert fitness_late[0].item() > fitness_early[0].item()
+        # Distance bonus should be the same at different times - it's based on distance, not time
+        assert abs(fitness_late[0].item() - fitness_early[0].item()) < 0.1
 
 
 class TestMinimumFitness:

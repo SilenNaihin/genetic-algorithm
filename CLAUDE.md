@@ -126,8 +126,8 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-282 frontend tests covering: genetics, genome, simulation, storage, neural networks, brain evolution, math utilities.
-417 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
+175 frontend tests covering: genetics, genome, storage, neural networks, brain evolution, math utilities.
+440 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
 
 ## Global Commands
 
@@ -142,7 +142,7 @@ npm test -- --run  # Run once (no watch)
 - `COMPUTE.md` explains tensor batching, sparse frame storage, physics FPS, and performance
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
-- Fitness: 0-80 progress + 100 collection per pellet + 15 net displacement + 15 distance traveled (all XZ-only)
+- Fitness: 0-80 progress + 20 collection per pellet (100 total) + 0-20 distance traveled - regression penalty (after first collection)
 - Physics FPS: Configurable 15-120 FPS (default 60). Higher = more expressive but more compute
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
   - Pure mode: 7 inputs (no time phase), NN has full control

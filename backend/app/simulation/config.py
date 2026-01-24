@@ -41,12 +41,11 @@ class SimulationConfig:
     arena_size: float = 10.0           # Size of simulation arena
 
     # Fitness function
-    fitness_pellet_points: float = 100.0       # Points per pellet collected
+    fitness_pellet_points: float = 20.0        # Points per pellet (on top of 80 progress = 100 total)
     fitness_progress_max: float = 80.0         # Max points for progress toward pellet
-    fitness_net_displacement_max: float = 15.0 # Max points for net displacement
     fitness_distance_per_unit: float = 3.0     # Points per unit traveled
-    fitness_distance_traveled_max: float = 15.0 # Max points for distance
-    fitness_regression_penalty: float = 20.0   # Max penalty for moving away
+    fitness_distance_traveled_max: float = 20.0 # Max points for distance traveled
+    fitness_regression_penalty: float = 20.0   # Max penalty for moving away (after first collection)
 
     # Neural network settings
     use_neural_net: bool = True                # Enable neural network control
@@ -94,7 +93,6 @@ class SimulationConfig:
             'arenaSize': 'arena_size',
             'fitnessPelletPoints': 'fitness_pellet_points',
             'fitnessProgressMax': 'fitness_progress_max',
-            'fitnessNetDisplacementMax': 'fitness_net_displacement_max',
             'fitnessDistancePerUnit': 'fitness_distance_per_unit',
             'fitnessDistanceTraveledMax': 'fitness_distance_traveled_max',
             'fitnessRegressionPenalty': 'fitness_regression_penalty',

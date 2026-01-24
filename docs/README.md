@@ -48,11 +48,11 @@ src/
 
 ## Fitness Function
 
-Creatures are scored on:
-- **Progress (0-80)**: XZ ground distance from creature's edge toward pellet
-- **Collection (+20)**: Bonus when pellet actually collected
-- **Movement (0-25)**: XZ net displacement over time (discourages flailing)
-- **Regression (-20 max)**: Penalty for moving away (after first pellet)
+Creatures are scored on (all distances measured from creature edge, XZ-only):
+- **Progress (0-80)**: Distance from creature's edge toward current pellet
+- **Collection (+20)**: Bonus when pellet collected (80 progress + 20 collection = 100 total per pellet)
+- **Distance Traveled (0-20)**: Total XZ distance traveled during simulation
+- **Regression (-20 max)**: Penalty for moving away from pellet (only after first pellet collection)
 
 ## Storage
 

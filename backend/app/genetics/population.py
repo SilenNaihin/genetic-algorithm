@@ -506,6 +506,11 @@ def evolve_population(
     target_size = config.population_size
     new_creatures_needed = target_size - len(survivors)
 
+    # Debug: Log survivor info
+    if survivor_genomes:
+        max_streak = max(g.get('survivalStreak', 0) for g in survivor_genomes)
+        print(f"[evolve_population] {len(survivor_genomes)} survivors, max streak: {max_streak}")
+
     # Create new creatures to fill culled slots
     for _ in range(new_creatures_needed):
         use_crossover = config.use_crossover

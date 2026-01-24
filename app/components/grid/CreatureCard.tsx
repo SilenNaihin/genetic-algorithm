@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { CreatureSimulationResult } from '../../../src/simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../../../src/types';
 import { getCreatureName } from '../../../src/ui/CreatureCardRenderer';
 
 // Card size constants matching vanilla app

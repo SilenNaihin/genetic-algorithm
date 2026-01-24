@@ -14,6 +14,7 @@ from app.schemas.simulation import (
     SimulationConfig as ApiSimulationConfig,
     SimulationResult,
     FitnessBreakdown,
+    PelletResult,
 )
 from app.simulation.config import SimulationConfig as EngineConfig
 from app.simulation.tensors import creature_genomes_to_batch, get_center_of_mass
@@ -96,6 +97,10 @@ class PyTorchSimulator:
         # Initialize pellets and fitness state
         pellet_batch = initialize_pellets(batch, arena_size=config.arena_size)
         fitness_state = initialize_fitness_state(batch, pellet_batch)
+
+        # Store initial pellet positions per creature for replay
+        initial_pellet_positions = pellet_batch.positions.clone()
+        initial_pellet_distances = pellet_batch.initial_distances.clone()
 
         # Calculate number of simulation steps based on configurable timestep
         dt = config.time_step
@@ -216,10 +221,6 @@ class PyTorchSimulator:
             breakdown = FitnessBreakdown(
                 pellet_points=_safe_float(pellets_collected * fitness_config.pellet_points),
                 progress=_safe_float(progress_score),
-                net_displacement=_safe_float(min(
-                    net_displacement * fitness_config.distance_per_unit,
-                    fitness_config.net_displacement_max
-                )),
                 distance_traveled=_safe_float(min(
                     distance_traveled * fitness_config.distance_per_unit,
                     fitness_config.distance_traveled_max
@@ -253,6 +254,40 @@ class PyTorchSimulator:
             fitness_val = _safe_float(0.0 if disqualified else fitness_values[i].item())
             activation_val = _safe_float(total_activation[i].item())
 
+            # Build pellet data from simulation's pellet_history
+            pellet_list = []
+            if 'pellet_history' in result and i < len(result['pellet_history']):
+                for pellet_event in result['pellet_history'][i]:
+                    pos = pellet_event['position']
+                    pellet_list.append(PelletResult(
+                        id=pellet_event['id'],
+                        position={
+                            "x": _safe_float(pos[0]),
+                            "y": _safe_float(pos[1]),
+                            "z": _safe_float(pos[2])
+                        },
+                        collected_at_frame=pellet_event['collected_at_frame'],
+                        spawned_at_frame=pellet_event['spawned_at_frame'],
+                        initial_distance=_safe_float(pellet_event['initial_distance']),
+                    ))
+            else:
+                # Fallback: use initial positions if no history
+                init_pos = initial_pellet_positions[i].cpu().tolist()
+                init_dist = _safe_float(initial_pellet_distances[i].item())
+                pellet_list.append(PelletResult(
+                    id="pellet_0",
+                    position={"x": _safe_float(init_pos[0]), "y": _safe_float(init_pos[1]), "z": _safe_float(init_pos[2])},
+                    collected_at_frame=None,
+                    spawned_at_frame=0,
+                    initial_distance=init_dist,
+                ))
+
+            # Build fitness over time from simulation's per-frame fitness
+            fitness_over_time_list = None
+            if config.record_frames and 'fitness_per_frame' in result and frame_count > 0:
+                fitness_tensor = result['fitness_per_frame'][i]  # [F]
+                fitness_over_time_list = [_safe_float(f.item()) for f in fitness_tensor]
+
             results.append(SimulationResult(
                 genome_id=genome_id,
                 fitness=fitness_val,
@@ -265,6 +300,8 @@ class PyTorchSimulator:
                 total_activation=activation_val,
                 frame_count=frame_count,
                 frames=frames,
+                pellets=pellet_list,
+                fitness_over_time=fitness_over_time_list,
             ))
 
         return results
@@ -292,7 +329,6 @@ class PyTorchSimulator:
             arena_size=api_config.arena_size,
             fitness_pellet_points=api_config.fitness_pellet_points,
             fitness_progress_max=api_config.fitness_progress_max,
-            fitness_net_displacement_max=api_config.fitness_net_displacement_max,
             fitness_distance_per_unit=api_config.fitness_distance_per_unit,
             fitness_distance_traveled_max=api_config.fitness_distance_traveled_max,
             fitness_regression_penalty=api_config.fitness_regression_penalty,
@@ -317,7 +353,6 @@ class PyTorchSimulator:
         return FitnessConfig(
             pellet_points=api_config.fitness_pellet_points,
             progress_max=api_config.fitness_progress_max,
-            net_displacement_max=api_config.fitness_net_displacement_max,
             distance_per_unit=api_config.fitness_distance_per_unit,
             distance_traveled_max=api_config.fitness_distance_traveled_max,
             regression_penalty=api_config.fitness_regression_penalty,

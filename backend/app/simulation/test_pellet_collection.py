@@ -102,6 +102,7 @@ class TestPelletCollection:
     def test_collection_when_node_touches_pellet(self):
         """Collection should trigger when node is within collection radius of pellet."""
         # Create creature with known position
+        # Note: genome Y=0.5 becomes actual Y=1.5 after +1 spawn offset
         genome = create_test_genome([
             {'id': 'node_0', 'position': {'x': 5, 'y': 0.5, 'z': 0}, 'size': 0.5, 'friction': 0.5},
             {'id': 'node_1', 'position': {'x': 6, 'y': 0.5, 'z': 0}, 'size': 0.5, 'friction': 0.5},
@@ -111,10 +112,11 @@ class TestPelletCollection:
 
         # Create a pellet right on top of node_0
         # Collection radius = size * 0.5 + 0.35 = 0.25 + 0.35 = 0.6
+        # Creature is at Y=1.5 (genome 0.5 + 1.0 spawn offset)
         pellets = PelletBatch(
             device=batch.device,
             batch_size=1,
-            positions=torch.tensor([[5.0, 0.5, 0.0]]),  # Right at node_0 position
+            positions=torch.tensor([[5.0, 1.5, 0.0]]),  # Right at node_0 position (with +1 offset)
             initial_distances=torch.tensor([0.1]),
             pellet_indices=torch.tensor([0]),
             collected=torch.tensor([False]),
@@ -152,6 +154,7 @@ class TestPelletCollection:
 
     def test_collection_increments_total(self):
         """Collecting a pellet should increment total_collected."""
+        # Note: genome Y=0.5 becomes actual Y=1.5 after +1 spawn offset
         genome = create_test_genome([
             {'id': 'node_0', 'position': {'x': 0, 'y': 0.5, 'z': 0}, 'size': 0.5, 'friction': 0.5},
             {'id': 'node_1', 'position': {'x': 1, 'y': 0.5, 'z': 0}, 'size': 0.5, 'friction': 0.5},
@@ -159,11 +162,11 @@ class TestPelletCollection:
 
         batch = creature_genomes_to_batch([genome])
 
-        # Create pellet right at node position
+        # Create pellet right at node position (with +1 Y offset)
         pellets = PelletBatch(
             device=batch.device,
             batch_size=1,
-            positions=torch.tensor([[0.0, 0.5, 0.0]]),  # At node_0
+            positions=torch.tensor([[0.0, 1.5, 0.0]]),  # At node_0 (Y=1.5 due to spawn offset)
             initial_distances=torch.tensor([7.0]),
             pellet_indices=torch.tensor([0]),
             collected=torch.tensor([False]),
@@ -254,9 +257,9 @@ class TestFitnessWithPellets:
             simulation_time=10.0, config=FitnessConfig()
         )
 
-        # Collecting a pellet should add 100 points (default pellet_points)
+        # Collecting a pellet should add 20 points (default pellet_points - on top of 80 progress = 100 total)
         fitness_diff = fitness_collected[0].item() - fitness_no_collect[0].item()
-        assert fitness_diff >= 95, f"Pellet collection should add ~100 fitness, got {fitness_diff}"
+        assert fitness_diff >= 18, f"Pellet collection should add ~20 fitness, got {fitness_diff}"
 
 
 if __name__ == '__main__':

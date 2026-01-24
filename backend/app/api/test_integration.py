@@ -192,21 +192,6 @@ class TestFitnessPanelConfig:
         assert response_no.status_code == 200
         assert response_high.status_code == 200
 
-    def test_net_displacement_max_caps_bonus(self):
-        """Net displacement max should cap the displacement bonus."""
-        genomes = [make_api_genome("test")]
-
-        # With high max
-        response = client.post("/api/simulation/batch", json={
-            "genomes": genomes,
-            "config": {"fitness_net_displacement_max": 15.0, "simulation_duration": 5.0}
-        })
-
-        assert response.status_code == 200
-        results = extract_results(response)
-        breakdown = results[0]["fitness_breakdown"]
-        assert breakdown["net_displacement"] <= 15.0
-
     def test_distance_traveled_max_caps_bonus(self):
         """Distance traveled max should cap the traveled bonus."""
         genomes = [make_api_genome("test")]
@@ -632,7 +617,6 @@ class TestSimulationConfigAccepted:
             # Fitness panel
             "fitness_pellet_points": 120.0,
             "fitness_progress_max": 100.0,
-            "fitness_net_displacement_max": 20.0,
             "fitness_distance_per_unit": 4.0,
             "fitness_distance_traveled_max": 20.0,
             "fitness_regression_penalty": 25.0,

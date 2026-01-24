@@ -5,7 +5,7 @@ import { useEvolutionStore, useSimulationResults, useConfig, useCardAnimationSta
 import { CreatureCard } from './CreatureCard';
 import { CreatureCardRenderer } from '../../../src/ui/CreatureCardRenderer';
 import { useCreatureTooltip } from './CreatureTooltip';
-import type { CreatureSimulationResult } from '../../../src/simulation/BatchSimulator';
+import type { CreatureSimulationResult } from '../../../src/types';
 
 // Grid constants matching vanilla app
 const GRID_COLS = 10;

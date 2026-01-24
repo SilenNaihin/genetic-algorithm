@@ -135,7 +135,6 @@ class TestSimulationBatchEndpoint:
         breakdown = result["fitness_breakdown"]
         assert "pellet_points" in breakdown
         assert "progress" in breakdown
-        assert "net_displacement" in breakdown
         assert "distance_traveled" in breakdown
 
     def test_batch_simulation_default_config(self, client):

@@ -95,8 +95,6 @@ export function SettingsInfoBox() {
             <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessPelletPoints}</span>
             <span style={{ color: 'var(--text-muted)' }}>Progress Max:</span>
             <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessProgressMax}</span>
-            <span style={{ color: 'var(--text-muted)' }}>Net Disp Max:</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessNetDisplacementMax}</span>
             <span style={{ color: 'var(--text-muted)' }}>Dist/Unit:</span>
             <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessDistancePerUnit}</span>
             <span style={{ color: 'var(--text-muted)' }}>Dist Max:</span>

@@ -23,14 +23,12 @@ from app.simulation.tensors import CreatureBatch, get_center_of_mass, MAX_NODES
 @dataclass
 class FitnessConfig:
     """Configuration for fitness calculation."""
-    pellet_points: float = 100.0        # Points per collected pellet
+    pellet_points: float = 20.0         # Points per collected pellet (on top of 80 progress = 100 total)
     progress_max: float = 80.0          # Max points for progress toward pellet
-    net_displacement_max: float = 15.0  # Max points for net displacement
     distance_per_unit: float = 3.0      # Points per unit traveled
-    distance_traveled_max: float = 15.0 # Max points for distance traveled
-    regression_penalty: float = 20.0    # Penalty for moving away from pellet
+    distance_traveled_max: float = 20.0 # Max points for distance traveled
+    regression_penalty: float = 20.0    # Penalty for moving away from pellet (after first collection)
     efficiency_penalty: float = 0.5     # Penalty for excessive muscle activation
-    target_displacement_rate: float = 1.0  # Units/second for full displacement bonus
     max_allowed_frequency: float = 3.0  # Max muscle frequency before disqualification
     position_threshold: float = 50.0    # Max distance from origin before disqualification
     height_threshold: float = 30.0      # Max height before disqualification
@@ -669,18 +667,17 @@ def calculate_fitness(
     Calculate current fitness for all creatures.
 
     Fitness components:
-    - pellet_points per collected pellet
-    - 0-progress_max for progress toward current pellet
-    - 0-net_displacement_max for net XZ displacement (only after settling period)
-    - 0-distance_traveled_max for total XZ distance
+    - pellet_points per collected pellet (20, on top of 80 progress = 100 total)
+    - 0-progress_max for progress toward current pellet (edge distance)
+    - 0-distance_traveled_max for total XZ distance traveled
     - -efficiency_penalty * total_activation
-    - -regression_penalty for moving away from pellet (after first collection)
+    - -regression_penalty for moving away from pellet (only after first collection)
 
     Args:
         batch: CreatureBatch with current positions
         pellets: PelletBatch with pellet state
         state: FitnessState with tracking data
-        simulation_time: Current simulation time
+        simulation_time: Current simulation time (unused, kept for API compatibility)
         config: FitnessConfig with weights
 
     Returns:
@@ -709,9 +706,9 @@ def calculate_fitness(
     progress = torch.clamp(progress, 0, 1)
     progress_fitness = progress * config.progress_max
 
-    # 3. Regression penalty (only after first pellet collected)
+    # 3. Regression penalty (only after first pellet collection)
     # Penalty when creature moves away from its closest approach to current pellet
-    # Matches TypeScript: penalty scales with regression distance, max when regression = 50% of initial
+    # Penalty scales with regression distance, max when regression = 50% of initial
     has_collected = pellets.total_collected > 0
     regression_dist = current_edge_dist - state.closest_edge_distance
     regression_dist = torch.clamp(regression_dist, min=0)  # Only penalize moving away
@@ -724,32 +721,17 @@ def calculate_fitness(
         torch.zeros_like(regression_ratio)
     )
 
-    # 4. Net displacement bonus (XZ only) - only after settling period (0.5s)
-    dx = com[:, 0] - state.initial_com[:, 0]
-    dz = com[:, 2] - state.initial_com[:, 2]
-    net_displacement = torch.sqrt(dx**2 + dz**2)
-
-    # Rate-based bonus - only apply after settling period (matches TypeScript)
-    if simulation_time > 0.5:
-        displacement_rate = net_displacement / simulation_time
-        displacement_ratio = displacement_rate / config.target_displacement_rate
-        displacement_ratio = torch.clamp(displacement_ratio, 0, 1)
-        displacement_fitness = displacement_ratio * config.net_displacement_max
-    else:
-        displacement_fitness = torch.zeros(B, device=device)
-
-    # 5. Distance traveled bonus (XZ only)
+    # 4. Distance traveled bonus (XZ only)
     distance_fitness = state.distance_traveled * config.distance_per_unit
     distance_fitness = torch.clamp(distance_fitness, 0, config.distance_traveled_max)
 
-    # 6. Efficiency penalty
+    # 5. Efficiency penalty
     efficiency_cost = state.total_activation * config.efficiency_penalty
 
     # Total fitness
     fitness = (
         pellet_fitness
         + progress_fitness
-        + displacement_fitness
         + distance_fitness
         - efficiency_cost
         - regression_penalty

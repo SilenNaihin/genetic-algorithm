@@ -39,12 +39,11 @@ export interface SimulationConfig {
   arenaSize: number;            // Size of simulation arena
 
   // Fitness function (simple model)
-  fitnessPelletPoints: number;          // Points per pellet collected (default 100)
+  fitnessPelletPoints: number;          // Points per pellet collected (default 20, on top of 80 progress = 100 total)
   fitnessProgressMax: number;           // Max points for progress toward pellet (default 80)
-  fitnessNetDisplacementMax: number;    // Max points for net displacement from start (default 15)
   fitnessDistancePerUnit: number;       // Points per unit of distance traveled (default 3)
-  fitnessDistanceTraveledMax: number;   // Max points for distance traveled (default 15)
-  fitnessRegressionPenalty: number;     // Max penalty for moving away after 1st pellet (default 20)
+  fitnessDistanceTraveledMax: number;   // Max points for distance traveled (default 20)
+  fitnessRegressionPenalty: number;     // Max penalty for moving away after 1st pellet collection (default 20)
 
   // Neural network settings (neuroevolution)
   useNeuralNet: boolean;              // Enable neural network control
@@ -89,11 +88,10 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   arenaSize: 10,
 
   // Fitness function defaults
-  fitnessPelletPoints: 100,
+  fitnessPelletPoints: 20,    // On top of 80 progress = 100 total per pellet
   fitnessProgressMax: 80,
-  fitnessNetDisplacementMax: 15,
   fitnessDistancePerUnit: 3,
-  fitnessDistanceTraveledMax: 15,
+  fitnessDistanceTraveledMax: 20,
   fitnessRegressionPenalty: 20,
 
   // Neural network defaults (enabled by default)
@@ -163,4 +161,42 @@ export interface PopulationStats {
   worstFitness: number;
   avgNodes: number;
   avgMuscles: number;
+}
+
+// =============================================================================
+// Simulation Result Types (shared by frontend and backend)
+// =============================================================================
+
+export interface SimulationFrame {
+  time: number;
+  nodePositions: Map<string, Vector3>;
+  centerOfMass: Vector3;
+  activePelletIndex: number;
+}
+
+export type DisqualificationReason =
+  | null  // Not disqualified
+  | 'frequency_exceeded'  // Muscle frequency too high
+  | 'physics_explosion'   // Creature flew off into space
+  | 'nan_position';       // Position became NaN
+
+export interface CreatureSimulationResult {
+  genome: CreatureGenome;
+  frames: SimulationFrame[];
+  finalFitness: number;
+  pelletsCollected: number;
+  distanceTraveled: number;
+  netDisplacement: number;  // Straight-line distance from start to end (metric only, not fitness)
+  closestPelletDistance: number;
+  pellets: PelletData[];
+  fitnessOverTime: number[];
+  disqualified: DisqualificationReason;
+}
+
+export interface PelletData {
+  id: string;
+  position: Vector3;
+  collectedAtFrame: number | null;
+  spawnedAtFrame: number;
+  initialDistance: number;  // Distance from creature edge when pellet spawned
 }

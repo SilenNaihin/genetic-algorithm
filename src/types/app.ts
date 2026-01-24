@@ -3,7 +3,7 @@
  */
 
 import type { SimulationConfig } from './index';
-import type { CreatureSimulationResult } from '../simulation/BatchSimulator';
+import type { CreatureSimulationResult } from './simulation';
 
 // Application state
 export type AppState = 'menu' | 'grid' | 'replay';

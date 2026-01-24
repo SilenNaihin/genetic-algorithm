@@ -37,7 +37,6 @@ export interface ApiSimulationConfig {
   arena_size: number;
   fitness_pellet_points: number;
   fitness_progress_max: number;
-  fitness_net_displacement_max: number;
   fitness_distance_per_unit: number;
   fitness_distance_traveled_max: number;
   fitness_regression_penalty: number;
@@ -60,7 +59,6 @@ export interface ApiSimulationConfig {
 export interface ApiFitnessBreakdown {
   pellet_points: number;
   progress: number;
-  net_displacement: number;
   distance_traveled: number;
   regression_penalty: number;
   efficiency_penalty: number;
@@ -167,7 +165,6 @@ export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
     arena_size: config.arenaSize,
     fitness_pellet_points: config.fitnessPelletPoints,
     fitness_progress_max: config.fitnessProgressMax,
-    fitness_net_displacement_max: config.fitnessNetDisplacementMax,
     fitness_distance_per_unit: config.fitnessDistancePerUnit,
     fitness_distance_traveled_max: config.fitnessDistanceTraveledMax,
     fitness_regression_penalty: config.fitnessRegressionPenalty,
@@ -211,7 +208,6 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
     arenaSize: api.arena_size,
     fitnessPelletPoints: api.fitness_pellet_points,
     fitnessProgressMax: api.fitness_progress_max,
-    fitnessNetDisplacementMax: api.fitness_net_displacement_max,
     fitnessDistancePerUnit: api.fitness_distance_per_unit,
     fitnessDistanceTraveledMax: api.fitness_distance_traveled_max,
     fitnessRegressionPenalty: api.fitness_regression_penalty,
@@ -552,7 +548,15 @@ export async function evolveGenomes(
   );
 
   console.log(`[API] Evolved to generation ${response.generation} from backend`);
-  return response.genomes.map(fromApiGenome);
+  const result = response.genomes.map(fromApiGenome);
+  // Debug: Log survival streaks
+  const streaks = result.map(g => g.survivalStreak || 0);
+  const maxStreak = Math.max(...streaks, 0);
+  const withStreak = streaks.filter(s => s > 0).length;
+  if (maxStreak > 0) {
+    console.log(`[API] Evolved genomes: ${withStreak} with streak > 0, max=${maxStreak}, first genome streak=${result[0]?.survivalStreak}`);
+  }
+  return result;
 }
 
 // -------------------------------------------------------------------

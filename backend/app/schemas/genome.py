@@ -7,7 +7,7 @@ Supports both camelCase (from frontend) and snake_case (Python convention).
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Vector3(BaseModel):
@@ -20,15 +20,12 @@ class Vector3(BaseModel):
 
 class NodeGene(BaseModel):
     """A node (sphere) in the creature's body."""
+    model_config = ConfigDict(populate_by_name=True)
 
     id: str
     position: Vector3
     size: float = Field(default=0.5, ge=0.1, le=2.0)
     friction: float = Field(default=0.5, ge=0.0, le=1.0)
-
-    class Config:
-        # Allow both camelCase and snake_case
-        populate_by_name = True
 
 
 class MuscleGene(BaseModel):
@@ -69,15 +66,7 @@ class MuscleGene(BaseModel):
     distanceBias: float = Field(default=0.0, ge=-1.0, le=1.0, alias='distance_bias')
     distanceStrength: float = Field(default=0.0, ge=0.0, le=1.0, alias='distance_strength')
 
-    class Config:
-        populate_by_name = True
-
-    def model_post_init(self, __context) -> None:
-        """Handle both camelCase and snake_case field names."""
-        # If nodeA/nodeB are None but we have node_a/node_b from alias, use those
-        if self.nodeA is None and hasattr(self, '__pydantic_private__'):
-            # Values may come through alias
-            pass
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class NeuralGenome(BaseModel):
@@ -128,12 +117,12 @@ class CreatureGenome(BaseModel):
     # Color (for visualization, optional)
     color: dict | None = None  # {h, s, l}
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class GenomeConstraints(BaseModel):
     """Constraints for genome generation."""
+    model_config = ConfigDict(populate_by_name=True)
 
     minNodes: int = Field(default=3, ge=2, le=20, alias='min_nodes')
     maxNodes: int = Field(default=8, ge=2, le=20, alias='max_nodes')
@@ -147,6 +136,3 @@ class GenomeConstraints(BaseModel):
     minFrequency: float = Field(default=0.5, ge=0.1, le=3.0, alias='min_frequency')
     maxFrequency: float = Field(default=2.0, ge=0.1, le=5.0, alias='max_frequency')
     maxAmplitude: float = Field(default=0.5, ge=0.1, le=1.0, alias='max_amplitude')
-
-    class Config:
-        populate_by_name = True

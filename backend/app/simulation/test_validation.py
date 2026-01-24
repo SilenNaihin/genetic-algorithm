@@ -611,11 +611,10 @@ class TestPhysicsConstantsParity:
         from app.simulation.config import DEFAULT_CONFIG
 
         # TypeScript fitness defaults (from simulation.ts)
-        assert DEFAULT_CONFIG.fitness_pellet_points == 100.0
+        assert DEFAULT_CONFIG.fitness_pellet_points == 20.0  # On top of 80 progress = 100 total
         assert DEFAULT_CONFIG.fitness_progress_max == 80.0
-        assert DEFAULT_CONFIG.fitness_net_displacement_max == 15.0
         assert DEFAULT_CONFIG.fitness_distance_per_unit == 3.0
-        assert DEFAULT_CONFIG.fitness_distance_traveled_max == 15.0
+        assert DEFAULT_CONFIG.fitness_distance_traveled_max == 20.0
         assert DEFAULT_CONFIG.fitness_regression_penalty == 20.0
 
     def test_neural_config_matches_typescript(self):
