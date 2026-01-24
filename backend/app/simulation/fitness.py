@@ -445,6 +445,7 @@ def update_pellets(
     batch: CreatureBatch,
     pellets: PelletBatch,
     arena_size: float = 50.0,
+    stable_radii: torch.Tensor | None = None,
 ) -> None:
     """
     Update pellet state after collision check.
@@ -457,6 +458,9 @@ def update_pellets(
         batch: CreatureBatch with current positions
         pellets: PelletBatch to update
         arena_size: Arena boundary
+        stable_radii: Optional stable creature radii (from fitness state). If provided,
+                      uses these for consistent distance calculations. If None, calculates
+                      from current positions (legacy behavior).
     """
     # Check for collisions
     newly_collected = check_pellet_collisions(batch, pellets)
@@ -470,8 +474,10 @@ def update_pellets(
         # Increment pellet index for collectors
         pellets.pellet_indices = pellets.pellet_indices + newly_collected.long()
 
-        # Calculate creature radii
-        creature_radii = calculate_creature_xz_radius(batch)
+        # Use stable radii if provided, otherwise calculate from current state
+        # Using stable radii ensures consistent distance calculations that don't
+        # fluctuate with muscle extension/contraction
+        creature_radii = stable_radii if stable_radii is not None else calculate_creature_xz_radius(batch)
 
         # Generate new positions for collectors (with opposite-half spawning)
         new_positions, new_angles = generate_pellet_positions(

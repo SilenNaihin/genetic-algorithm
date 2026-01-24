@@ -1021,7 +1021,8 @@ def simulate_with_fitness(
             )
 
             # Update pellets (spawns new ones for collectors)
-            update_pellets(batch, pellets, arena_size)
+            # Pass stable creature radii for consistent distance calculations
+            update_pellets(batch, pellets, arena_size, stable_radii=fitness_state.creature_radii)
 
             # Record new pellet data for creatures that collected (GPU tensor ops)
             new_pellet_idx = pellet_count  # [B] - next slot
@@ -1483,7 +1484,8 @@ def simulate_with_fitness_neural(
             )
 
             # Update pellets (spawns new ones for collectors)
-            update_pellets(batch, pellets, arena_size)
+            # Pass stable creature radii for consistent distance calculations
+            update_pellets(batch, pellets, arena_size, stable_radii=fitness_state.creature_radii)
 
             # Record new pellet data for creatures that collected (GPU tensor ops)
             new_pellet_idx = torch.clamp(pellet_count, max=max_pellets - 1)
