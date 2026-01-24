@@ -33,9 +33,8 @@ app/                    # Next.js React application
 
 src/                    # Core simulation modules (shared)
 ├── __tests__/          # Vitest tests
-├── core/               # Domain models (Creature, Genome, Pellet)
-├── neural/             # Neural network for neuroevolution
-├── physics/            # Cannon-ES physics (BodyFactory, PhysicsWorld)
+├── core/               # Domain models (Genome only - generates random genomes)
+├── neural/             # Neural network types and initialization
 ├── rendering/          # Three.js visualization (PreviewRenderer, ReplayRenderer)
 ├── services/           # Service layer (SimulationService, StorageService)
 ├── simulation/         # Headless simulation (BatchSimulator)
@@ -61,8 +60,7 @@ backend/                # Python backend (PyTorch physics)
 ### Frontend
 - **Framework**: Next.js 16 + React 19
 - **State**: Zustand
-- **3D**: Three.js
-- **Physics**: Cannon-ES
+- **3D**: Three.js (rendering only - physics runs on backend)
 - **Storage**: IndexedDB
 - **Styling**: Tailwind CSS v4
 - **Testing**: Vitest + happy-dom

@@ -10,6 +10,7 @@ import { FitnessPanel } from './FitnessPanel';
 import { NeuralPanel } from './NeuralPanel';
 import { LoadRunsModal } from '../modals/LoadRunsModal';
 import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
+import { SettingsPopover } from '../ui/SettingsPopover';
 
 /**
  * Main menu screen component.
@@ -231,6 +232,57 @@ export function MenuScreen() {
               />
               Crossover
             </label>
+            {/* Crossover settings gear - only shown when crossover enabled */}
+            {config.useCrossover && config.useNeuralNet && (
+              <SettingsPopover width={200}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                      Method
+                      <InfoTooltip text={TOOLTIPS.neuralCrossoverMethod} />
+                    </div>
+                    <select
+                      value={config.neuralCrossoverMethod}
+                      onChange={(e) => setConfig({ neuralCrossoverMethod: e.target.value as 'interpolation' | 'uniform' | 'sbx' })}
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg-tertiary)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '6px 8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="sbx">SBX (Recommended)</option>
+                      <option value="interpolation">Interpolation</option>
+                      <option value="uniform">Uniform</option>
+                    </select>
+                  </div>
+                  {config.neuralCrossoverMethod === 'sbx' && (
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                        Eta (η)
+                        <InfoTooltip text={TOOLTIPS.sbxEta} />
+                      </div>
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={5}
+                        step={0.5}
+                        value={config.sbxEta}
+                        onChange={(e) => setConfig({ sbxEta: parseFloat(e.target.value) })}
+                        style={{ width: '100%', accentColor: 'var(--accent)' }}
+                      />
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                        {config.sbxEta} {config.sbxEta <= 1 ? '(exploratory)' : config.sbxEta >= 4 ? '(conservative)' : '(balanced)'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </SettingsPopover>
+            )}
           </div>
 
           {/* Crossover ratio slider - only shown when both enabled */}

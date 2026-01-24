@@ -74,6 +74,10 @@ class SimulationConfig(BaseModel):
     max_adaptive_boost: float = Field(default=8.0, ge=2.0, le=32.0)
     improvement_threshold: float = Field(default=5.0, ge=1.0, le=50.0)
 
+    # Crossover method for neural weights
+    neural_crossover_method: Literal['interpolation', 'uniform', 'sbx'] = 'sbx'
+    sbx_eta: float = Field(default=2.0, ge=0.5, le=5.0)
+
     # Disqualification thresholds
     position_threshold: float = Field(default=50.0, ge=10.0)
     height_threshold: float = Field(default=30.0, ge=5.0)

@@ -66,6 +66,10 @@ export interface SimulationConfig {
   maxAdaptiveBoost: number;           // Maximum boost multiplier cap (e.g., 8.0)
   improvementThreshold: number;       // Minimum fitness improvement to count as progress (absolute points)
 
+  // Crossover method for neural weights
+  neuralCrossoverMethod: 'interpolation' | 'uniform' | 'sbx';  // How neural weights are combined during crossover
+  sbxEta: number;                     // SBX distribution index (0.5-5.0, lower = more exploration)
+
   // Frame storage mode for replay capability
   frameStorageMode: 'none' | 'sparse' | 'all';  // none = no replays, sparse = top/bottom only, all = all creatures
   sparseTopCount: number;             // Number of top performers to store frames for (sparse mode)
@@ -123,6 +127,10 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   adaptiveMutationBoost: 2.0,    // Double mutation rate during stagnation
   maxAdaptiveBoost: 8.0,         // Cap at 8x mutation rate
   improvementThreshold: 5.0,     // Need 5+ fitness points improvement to count
+
+  // Crossover method defaults
+  neuralCrossoverMethod: 'sbx',  // SBX produces smoother offspring distribution
+  sbxEta: 2.0,                   // Balanced exploration/exploitation
 
   // Frame storage mode
   frameStorageMode: 'all',       // Store frames for all creatures by default (enables replays)

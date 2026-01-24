@@ -87,7 +87,7 @@
     {
       "id": 5,
       "name": "Crossover Improvements",
-      "status": "pending",
+      "status": "complete",
       "description": "Add SBX crossover option for neural weights",
       "tasks": [
         "Add neuralCrossoverMethod: 'interpolation' | 'uniform' | 'sbx' to SimulationConfig",

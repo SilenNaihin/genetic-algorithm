@@ -54,6 +54,8 @@ def single_point_crossover(
     parent1: dict,
     parent2: dict,
     constraints: GenomeConstraints | None = None,
+    neural_crossover_method: str = 'interpolation',
+    sbx_eta: float = 2.0,
 ) -> dict:
     """
     Single-point crossover on genome properties.
@@ -63,6 +65,8 @@ def single_point_crossover(
         parent1: First parent genome
         parent2: Second parent genome
         constraints: Genome constraints
+        neural_crossover_method: Method for neural weight crossover ('interpolation', 'uniform', 'sbx')
+        sbx_eta: Distribution index for SBX crossover (0.5-5.0)
 
     Returns:
         Child genome
@@ -187,7 +191,13 @@ def single_point_crossover(
     neural2 = parent2.get('neuralGenome') or parent2.get('neural_genome')
 
     if neural1 and neural2:
-        neural_genome = crossover_neural_weights(neural1, neural2)
+        # Use configured crossover method for neural weights
+        if neural_crossover_method == 'uniform':
+            neural_genome = uniform_crossover_neural_weights(neural1, neural2)
+        elif neural_crossover_method == 'sbx':
+            neural_genome = sbx_crossover_neural_weights(neural1, neural2, sbx_eta)
+        else:  # 'interpolation' (default)
+            neural_genome = crossover_neural_weights(neural1, neural2)
         # Adapt if muscle count changed
         if get_output_size(neural_genome) != len(child_muscles):
             neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
@@ -566,6 +576,81 @@ def uniform_crossover_neural_weights(
         new_weights = []
         for i in range(min_len):
             new_weights.append(w1[i] if random.random() < 0.5 else w2[i])
+        for i in range(min_len, len(w1)):
+            new_weights.append(w1[i])
+        result['weights'] = new_weights
+
+    return result
+
+
+def sbx_crossover_neural_weights(
+    parent1: dict,
+    parent2: dict,
+    eta: float = 2.0,
+) -> dict:
+    """
+    Simulated Binary Crossover (SBX) for neural weights.
+
+    SBX simulates single-point crossover on binary strings but for real-valued
+    parameters. It produces offspring that are statistically centered around
+    the parents, with the spread controlled by the eta parameter.
+
+    Reference: Deb & Agrawal (1995) - "Simulated Binary Crossover for
+    Continuous Search Space"
+
+    Args:
+        parent1: First parent's neural genome
+        parent2: Second parent's neural genome
+        eta: Distribution index (0.5-5.0). Lower = more spread, higher = closer to parents.
+             eta=2 is a common default providing balanced exploration.
+
+    Returns:
+        New neural genome with SBX crossed-over weights
+    """
+    result = clone_neural_genome(parent1)
+
+    def sbx_single(p1: float, p2: float, eta_c: float) -> float:
+        """Apply SBX to a single pair of values, returning one child."""
+        # If parents are identical, no crossover needed
+        if abs(p1 - p2) < 1e-14:
+            return p1
+
+        u = random.random()
+
+        # Calculate beta (spread factor) based on random u
+        if u <= 0.5:
+            beta = (2.0 * u) ** (1.0 / (eta_c + 1.0))
+        else:
+            beta = (1.0 / (2.0 * (1.0 - u))) ** (1.0 / (eta_c + 1.0))
+
+        # Generate two children, randomly pick one
+        child1 = 0.5 * ((1 + beta) * p1 + (1 - beta) * p2)
+        child2 = 0.5 * ((1 - beta) * p1 + (1 + beta) * p2)
+
+        return child1 if random.random() < 0.5 else child2
+
+    # Handle new format (separate arrays)
+    for key in ['weights_ih', 'weights_ho', 'biases_h', 'biases_o']:
+        if key in parent1 and key in parent2:
+            w1 = parent1[key]
+            w2 = parent2[key]
+            min_len = min(len(w1), len(w2))
+            new_weights = []
+            for i in range(min_len):
+                new_weights.append(sbx_single(w1[i], w2[i], eta))
+            # If parent1 has more, copy them
+            for i in range(min_len, len(w1)):
+                new_weights.append(w1[i])
+            result[key] = new_weights
+
+    # Handle old format (flat weights array)
+    if 'weights' in parent1 and 'weights' in parent2:
+        w1 = parent1['weights']
+        w2 = parent2['weights']
+        min_len = min(len(w1), len(w2))
+        new_weights = []
+        for i in range(min_len):
+            new_weights.append(sbx_single(w1[i], w2[i], eta))
         for i in range(min_len, len(w1)):
             new_weights.append(w1[i])
         result['weights'] = new_weights

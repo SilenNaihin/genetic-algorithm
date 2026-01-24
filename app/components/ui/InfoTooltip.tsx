@@ -142,6 +142,13 @@ export const TOOLTIPS = {
   maxAdaptiveBoost: 'Maximum boost multiplier cap. Prevents mutation rate from going too high and destroying learned behaviors. Default 8x.',
   improvementThreshold: 'Minimum fitness improvement (in absolute points) to count as real progress. Prevents noise from triggering boost reduction. Default 5 points.',
 
+  // Neural crossover
+  neuralCrossoverMethod: 'How neural network weights are combined when two parents produce offspring.',
+  crossoverInterpolation: 'Linearly blend weights between parents. Each weight = random point between parent values. Simple but always produces values strictly between parents.',
+  crossoverUniform: 'Randomly pick each weight from either parent (50/50). Can be disruptive - child may get mismatched weights that don\'t work well together.',
+  crossoverSbx: 'Simulated Binary Crossover (Deb & Agrawal, 1995). Produces offspring statistically centered around parents but can explore slightly beyond. Smoother distribution than uniform, more flexible than interpolation.',
+  sbxEta: 'Distribution index controlling offspring spread. Low (0.5-1): children can be far from parents (exploration). High (3-5): children stay close to parents (exploitation). Default 2.0 is balanced.',
+
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',
   physicsFPS: 'Physics frames per second. Higher FPS = more expressive movement but more compute. 60 FPS default, 30 FPS for faster runs, 120 FPS for precision.',

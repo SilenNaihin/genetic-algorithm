@@ -73,6 +73,10 @@ class EvolutionConfig:
     use_mutation: bool = True
     use_crossover: bool = True
 
+    # Neural crossover method
+    neural_crossover_method: str = 'sbx'  # 'interpolation', 'uniform', 'sbx'
+    sbx_eta: float = 2.0  # Distribution index for SBX (0.5-5.0)
+
     # Mutation
     mutation_rate: float = 0.1
     mutation_magnitude: float = 0.3
@@ -430,6 +434,8 @@ def evolve_population(
             crossover_rate=config.get('crossover_rate', 0.5),
             use_mutation=config.get('use_mutation', True),
             use_crossover=config.get('use_crossover', True),
+            neural_crossover_method=config.get('neural_crossover_method', 'sbx'),
+            sbx_eta=config.get('sbx_eta', 2.0),
             mutation_rate=config.get('mutation_rate', 0.1),
             mutation_magnitude=config.get('mutation_magnitude', 0.3),
             structural_rate=config.get('structural_rate', 0.1),
@@ -600,7 +606,11 @@ def evolve_population(
                 parent2 = weighted_random_select(survivors, probabilities)
                 attempts += 1
 
-            child = single_point_crossover(parent1, parent2, constraints)
+            child = single_point_crossover(
+                parent1, parent2, constraints,
+                neural_crossover_method=config.neural_crossover_method,
+                sbx_eta=config.sbx_eta
+            )
             # New offspring start at next generation with 0 survival streak
             child['generation'] = next_gen
             child['survivalStreak'] = 0
