@@ -957,21 +957,20 @@ def simulate_with_fitness(
     # Initialize previous COM for velocity calculation
     previous_com = get_center_of_mass(batch)
 
-    # Initialize pellet history tracking per creature
-    # Each entry: {'position': [x,y,z], 'spawned_at_frame': int, 'collected_at_frame': int or None}
-    pellet_history = [[] for _ in range(B)]
+    # GPU-friendly pellet event tracking (avoid CPU transfers in loop)
+    # We'll store events as tensors and convert to history at the end
+    max_pellets = 20  # Buffer for pellet events (typical max ~10 collections per creature)
+    pellet_positions = torch.zeros(B, max_pellets, 3, device=device)
+    pellet_distances = torch.zeros(B, max_pellets, device=device)
+    pellet_spawn_frames = torch.full((B, max_pellets), -1, dtype=torch.long, device=device)
+    pellet_collect_frames = torch.full((B, max_pellets), -1, dtype=torch.long, device=device)
+    pellet_count = torch.zeros(B, dtype=torch.long, device=device)
 
-    # Record initial pellet positions (spawned at frame 0)
-    initial_positions = pellets.positions.cpu().tolist()
-    initial_distances = pellets.initial_distances.cpu().tolist()
-    for i in range(B):
-        pellet_history[i].append({
-            'id': 'pellet_0',
-            'position': initial_positions[i],
-            'spawned_at_frame': 0,
-            'collected_at_frame': None,
-            'initial_distance': initial_distances[i],
-        })
+    # Record initial pellet (index 0 for each creature)
+    pellet_positions[:, 0] = pellets.positions
+    pellet_distances[:, 0] = pellets.initial_distances
+    pellet_spawn_frames[:, 0] = 0
+    pellet_count[:] = 1
 
     frames = []
     fitness_per_frame = []
@@ -991,31 +990,44 @@ def simulate_with_fitness(
         newly_collected = check_pellet_collisions(batch, pellets)
 
         if newly_collected.any():
-            # Record collection frame for each creature that collected
-            collected_indices = torch.where(newly_collected)[0].cpu().tolist()
-            for idx in collected_indices:
-                # Mark the current pellet as collected at this frame
-                if pellet_history[idx]:
-                    pellet_history[idx][-1]['collected_at_frame'] = frame_index
+            # Mark collection frame for current pellets (GPU tensor ops)
+            current_pellet_idx = pellet_count - 1  # [B]
+            # For creatures that collected, update their current pellet's collection frame
+            batch_indices = torch.arange(B, device=device)
+            pellet_collect_frames[batch_indices, current_pellet_idx] = torch.where(
+                newly_collected, torch.tensor(frame_index, device=device),
+                pellet_collect_frames[batch_indices, current_pellet_idx]
+            )
 
             # Update pellets (spawns new ones for collectors)
             update_pellets(batch, pellets, arena_size)
 
-            # Record new pellet positions for creatures that collected
-            new_positions = pellets.positions.cpu().tolist()
-            new_distances = pellets.initial_distances.cpu().tolist()
-            pellet_indices = pellets.pellet_indices.cpu().tolist()
-            for idx in collected_indices:
-                pellet_history[idx].append({
-                    'id': f'pellet_{int(pellet_indices[idx])}',
-                    'position': new_positions[idx],
-                    'spawned_at_frame': frame_index,
-                    'collected_at_frame': None,
-                    'initial_distance': new_distances[idx],
-                })
+            # Record new pellet data for creatures that collected (GPU tensor ops)
+            new_pellet_idx = pellet_count  # [B] - next slot
+            # Clamp to max_pellets - 1 to avoid overflow
+            new_pellet_idx = torch.clamp(new_pellet_idx, max=max_pellets - 1)
+
+            # Store new pellet data only for creatures that collected
+            pellet_positions[batch_indices, new_pellet_idx] = torch.where(
+                newly_collected.unsqueeze(-1),
+                pellets.positions,
+                pellet_positions[batch_indices, new_pellet_idx]
+            )
+            pellet_distances[batch_indices, new_pellet_idx] = torch.where(
+                newly_collected,
+                pellets.initial_distances,
+                pellet_distances[batch_indices, new_pellet_idx]
+            )
+            pellet_spawn_frames[batch_indices, new_pellet_idx] = torch.where(
+                newly_collected,
+                torch.tensor(frame_index, device=device),
+                pellet_spawn_frames[batch_indices, new_pellet_idx]
+            )
+
+            # Increment pellet count for collectors
+            pellet_count = pellet_count + newly_collected.long()
 
             # Reset closest_edge_distance for creatures that collected
-            # New initial distance is already set in update_pellets
             fitness_state.closest_edge_distance = torch.where(
                 newly_collected,
                 pellets.initial_distances,
@@ -1036,6 +1048,27 @@ def simulate_with_fitness(
             )
             fitness_per_frame.append(current_fitness.clone())
             frame_index += 1
+
+    # Convert pellet tensors to history (single CPU transfer at end)
+    pellet_positions_cpu = pellet_positions.cpu().tolist()
+    pellet_distances_cpu = pellet_distances.cpu().tolist()
+    pellet_spawn_frames_cpu = pellet_spawn_frames.cpu().tolist()
+    pellet_collect_frames_cpu = pellet_collect_frames.cpu().tolist()
+    pellet_count_cpu = pellet_count.cpu().tolist()
+
+    pellet_history = []
+    for i in range(B):
+        creature_pellets = []
+        for j in range(pellet_count_cpu[i]):
+            collect_frame = pellet_collect_frames_cpu[i][j]
+            creature_pellets.append({
+                'id': f'pellet_{j}',
+                'position': pellet_positions_cpu[i][j],
+                'spawned_at_frame': pellet_spawn_frames_cpu[i][j],
+                'collected_at_frame': collect_frame if collect_frame >= 0 else None,
+                'initial_distance': pellet_distances_cpu[i][j],
+            })
+        pellet_history.append(creature_pellets)
 
     result = {
         'final_positions': batch.positions.clone(),
@@ -1361,20 +1394,19 @@ def simulate_with_fitness_neural(
     # Initialize previous COM for velocity calculation
     previous_com = get_center_of_mass(batch)
 
-    # Initialize pellet history tracking per creature
-    pellet_history = [[] for _ in range(B)]
+    # GPU-friendly pellet event tracking (avoid CPU transfers in loop)
+    max_pellets = 20  # Buffer for pellet events (typical max ~10 collections per creature)
+    pellet_positions = torch.zeros(B, max_pellets, 3, device=device)
+    pellet_distances = torch.zeros(B, max_pellets, device=device)
+    pellet_spawn_frames = torch.full((B, max_pellets), -1, dtype=torch.long, device=device)
+    pellet_collect_frames = torch.full((B, max_pellets), -1, dtype=torch.long, device=device)
+    pellet_count = torch.zeros(B, dtype=torch.long, device=device)
 
-    # Record initial pellet positions (spawned at frame 0)
-    initial_positions = pellets.positions.cpu().tolist()
-    initial_distances = pellets.initial_distances.cpu().tolist()
-    for i in range(B):
-        pellet_history[i].append({
-            'id': 'pellet_0',
-            'position': initial_positions[i],
-            'spawned_at_frame': 0,
-            'collected_at_frame': None,
-            'initial_distance': initial_distances[i],
-        })
+    # Record initial pellet (index 0 for each creature)
+    pellet_positions[:, 0] = pellets.positions
+    pellet_distances[:, 0] = pellets.initial_distances
+    pellet_spawn_frames[:, 0] = 0
+    pellet_count[:] = 1
 
     # Accumulators
     total_activation = torch.zeros(B, device=device)
@@ -1414,27 +1446,38 @@ def simulate_with_fitness_neural(
         newly_collected = check_pellet_collisions(batch, pellets)
 
         if newly_collected.any():
-            # Record collection frame for each creature that collected
-            collected_indices = torch.where(newly_collected)[0].cpu().tolist()
-            for idx in collected_indices:
-                if pellet_history[idx]:
-                    pellet_history[idx][-1]['collected_at_frame'] = frame_index
+            # Mark collection frame for current pellets (GPU tensor ops)
+            current_pellet_idx = pellet_count - 1  # [B]
+            batch_indices = torch.arange(B, device=device)
+            pellet_collect_frames[batch_indices, current_pellet_idx] = torch.where(
+                newly_collected, torch.tensor(frame_index, device=device),
+                pellet_collect_frames[batch_indices, current_pellet_idx]
+            )
 
             # Update pellets (spawns new ones for collectors)
             update_pellets(batch, pellets, arena_size)
 
-            # Record new pellet positions
-            new_positions = pellets.positions.cpu().tolist()
-            new_distances = pellets.initial_distances.cpu().tolist()
-            pellet_indices = pellets.pellet_indices.cpu().tolist()
-            for idx in collected_indices:
-                pellet_history[idx].append({
-                    'id': f'pellet_{int(pellet_indices[idx])}',
-                    'position': new_positions[idx],
-                    'spawned_at_frame': frame_index,
-                    'collected_at_frame': None,
-                    'initial_distance': new_distances[idx],
-                })
+            # Record new pellet data for creatures that collected (GPU tensor ops)
+            new_pellet_idx = torch.clamp(pellet_count, max=max_pellets - 1)
+
+            pellet_positions[batch_indices, new_pellet_idx] = torch.where(
+                newly_collected.unsqueeze(-1),
+                pellets.positions,
+                pellet_positions[batch_indices, new_pellet_idx]
+            )
+            pellet_distances[batch_indices, new_pellet_idx] = torch.where(
+                newly_collected,
+                pellets.initial_distances,
+                pellet_distances[batch_indices, new_pellet_idx]
+            )
+            pellet_spawn_frames[batch_indices, new_pellet_idx] = torch.where(
+                newly_collected,
+                torch.tensor(frame_index, device=device),
+                pellet_spawn_frames[batch_indices, new_pellet_idx]
+            )
+
+            # Increment pellet count for collectors
+            pellet_count = pellet_count + newly_collected.long()
 
             # Reset closest_edge_distance for creatures that collected
             fitness_state.closest_edge_distance = torch.where(
@@ -1461,6 +1504,27 @@ def simulate_with_fitness_neural(
             activations_per_frame.append(nn_outputs.clone())
 
             frame_index += 1
+
+    # Convert pellet tensors to history (single CPU transfer at end)
+    pellet_positions_cpu = pellet_positions.cpu().tolist()
+    pellet_distances_cpu = pellet_distances.cpu().tolist()
+    pellet_spawn_frames_cpu = pellet_spawn_frames.cpu().tolist()
+    pellet_collect_frames_cpu = pellet_collect_frames.cpu().tolist()
+    pellet_count_cpu = pellet_count.cpu().tolist()
+
+    pellet_history = []
+    for i in range(B):
+        creature_pellets = []
+        for j in range(pellet_count_cpu[i]):
+            collect_frame = pellet_collect_frames_cpu[i][j]
+            creature_pellets.append({
+                'id': f'pellet_{j}',
+                'position': pellet_positions_cpu[i][j],
+                'spawned_at_frame': pellet_spawn_frames_cpu[i][j],
+                'collected_at_frame': collect_frame if collect_frame >= 0 else None,
+                'initial_distance': pellet_distances_cpu[i][j],
+            })
+        pellet_history.append(creature_pellets)
 
     result = {
         'final_positions': batch.positions.clone(),

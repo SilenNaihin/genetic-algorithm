@@ -66,8 +66,8 @@ export interface SimulationConfig {
 export const DEFAULT_CONFIG: SimulationConfig = {
   gravity: -9.8,
   groundFriction: 0.5,
-  timeStep: 1 / 60,
-  physicsFPS: 60,
+  timeStep: 1 / 30,
+  physicsFPS: 30,
   simulationDuration: 10,
 
   populationSize: 100,
