@@ -24,6 +24,7 @@ interface AncestorInfo {
   muscleCount: number;
   color: { h: number; s: number; l: number };
   parentIds: string[];
+  reproductionType?: 'crossover' | 'mutation';
 }
 
 interface FamilyTreeNode {
@@ -250,6 +251,7 @@ export function ReplayModal() {
           muscleCount: ancestor.muscleCount,
           color: ancestor.color || { h: 0.5, s: 0.7, l: 0.5 },
           parentIds: i > 0 ? [`ancestor-${i - 1}`] : [],
+          reproductionType: ancestor.reproductionType,
         },
         parents: [],
       };
@@ -871,11 +873,13 @@ function FamilyTreeDisplay({
     const connector = indent === 0 ? '' : isLast ? '└─ ' : '├─ ';
 
     const knownParents = node.parents.filter((p) => p.creature.generation !== -1);
+    // Get reproduction type from first parent (how this creature was created)
+    const firstParentRepType = knownParents[0]?.creature.reproductionType;
     const relType =
       isRoot && knownParents.length > 0
-        ? knownParents.length === 1
-          ? '(mutated from)'
-          : '(offspring of)'
+        ? firstParentRepType === 'crossover'
+          ? '(crossover from)'
+          : '(mutated from)'
         : null;
 
     const unseenParents = knownParents.filter((p) => !seenIds.has(p.creature.id));

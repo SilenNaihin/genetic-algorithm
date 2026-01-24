@@ -59,6 +59,7 @@ export interface AncestorEntry {
   nodeCount: number;
   muscleCount: number;
   color: HSL;
+  reproductionType?: 'crossover' | 'mutation';
 }
 
 export interface CreatureGenome {

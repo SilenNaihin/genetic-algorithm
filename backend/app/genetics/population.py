@@ -478,18 +478,24 @@ def evolve_population(
             survivor_fitness_map[g['id']] = fitness_scores[i]
 
     def build_ancestry_chain(child: dict, parent1: dict, parent1_fitness: float,
-                             parent2: dict = None, parent2_fitness: float = None):
-        """Build ancestry chain for offspring from parent info."""
+                             parent2: dict = None, parent2_fitness: float = None,
+                             reproduction_type: str = 'mutation'):
+        """Build ancestry chain for offspring from parent info.
+
+        Args:
+            reproduction_type: 'crossover', 'mutation', or 'clone'
+        """
         # Get parent1's existing chain
         chain = list(parent1.get('ancestryChain', []))
 
-        # Add parent1's info
+        # Add parent1's info with reproduction type
         chain.append({
             'generation': parent1.get('generation', 0),
             'fitness': round(parent1_fitness, 1),
             'nodeCount': len(parent1.get('nodes', [])),
             'muscleCount': len(parent1.get('muscles', [])),
             'color': parent1.get('color', {'h': 0.5, 's': 0.7, 'l': 0.5}),
+            'reproductionType': reproduction_type,
         })
 
         # For crossover, add parent2 info as well
@@ -500,6 +506,7 @@ def evolve_population(
                 'nodeCount': len(parent2.get('nodes', [])),
                 'muscleCount': len(parent2.get('muscles', [])),
                 'color': parent2.get('color', {'h': 0.5, 's': 0.7, 'l': 0.5}),
+                'reproductionType': reproduction_type,
             })
 
         # Limit chain length to avoid bloat (keep last 100 ancestors)
@@ -570,7 +577,8 @@ def evolve_population(
             # Build ancestry chain from both parents
             build_ancestry_chain(
                 child, parent1, survivor_fitness_map.get(parent1['id'], 0),
-                parent2, survivor_fitness_map.get(parent2['id'], 0)
+                parent2, survivor_fitness_map.get(parent2['id'], 0),
+                reproduction_type='crossover'
             )
             new_genomes.append(child)
 
@@ -583,18 +591,19 @@ def evolve_population(
             mutated['generation'] = next_gen
             mutated['survivalStreak'] = 0
             # Build ancestry chain from parent
-            build_ancestry_chain(mutated, parent, survivor_fitness_map.get(parent['id'], 0))
+            build_ancestry_chain(mutated, parent, survivor_fitness_map.get(parent['id'], 0),
+                                 reproduction_type='mutation')
             new_genomes.append(mutated)
 
         else:
-            # Just clone
+            # Just clone (no mutation) - clone inherits parent's ancestry directly
             parent = weighted_random_select(survivors, probabilities)
             child = clone_genome(parent, constraints)
             # New offspring start at next generation with 0 survival streak
             child['generation'] = next_gen
             child['survivalStreak'] = 0
-            # Build ancestry chain from parent
-            build_ancestry_chain(child, parent, survivor_fitness_map.get(parent['id'], 0))
+            # Clone inherits parent's ancestry chain unchanged (same creature, new ID)
+            child['ancestryChain'] = list(parent.get('ancestryChain', []))
             new_genomes.append(child)
 
     # Calculate stats
