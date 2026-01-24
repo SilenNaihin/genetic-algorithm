@@ -27,6 +27,33 @@ config.timeStep = 1 / 60;  // Automatically computed
 // Backend receives time_step directly
 ```
 
+## Physics Model
+
+### Ground Friction (Coulomb)
+
+Ground friction uses a force-based Coulomb model, not velocity damping:
+
+```python
+# Friction force = coefficient × normal force
+friction_force = GROUND_FRICTION * mass * |gravity|  # F = μN
+
+# Maximum velocity change per timestep
+max_delta_v = friction_force / mass * dt
+
+# Apply: reduce velocity toward zero, never reverse
+velocity *= (1 - clamp(max_delta_v / speed, 0, 1))
+```
+
+This means creatures can overcome friction with sufficient muscle force, unlike velocity damping which exponentially kills all motion.
+
+### Linear Damping
+
+Air resistance applied to all nodes:
+```python
+damping_factor = (1 - LINEAR_DAMPING) ^ dt  # Time-scaled
+velocity *= damping_factor
+```
+
 ## Tensor Batching
 
 The PyTorch backend processes creatures in parallel using batched tensor operations:
@@ -130,6 +157,17 @@ Each physics step with neural control:
 1. **Sensor gathering**: [B, 7-8] inputs from world state
 2. **Forward pass**: input → hidden → output with activations
 3. **Muscle control**: [B, M] outputs modulate muscle rest lengths
+
+### NN Update Interval
+
+Neural network outputs are cached and reused for multiple physics steps to reduce jitter:
+
+```python
+nn_update_interval = 4  # Default: update every 4 physics steps
+# At 60 FPS physics: 15 NN updates/sec instead of 60
+```
+
+This smooths muscle activation without sacrificing responsiveness. The sensor inputs still change every physics step, but the NN only recomputes outputs periodically.
 
 Neural network sizes:
 | Mode | Inputs | Hidden | Outputs | Parameters |

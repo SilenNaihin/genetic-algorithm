@@ -156,7 +156,7 @@ contraction = base * amplitude * modulation
 Neural network **directly controls** muscle contraction:
 
 ```python
-# Direct neural control
+# Direct neural control (7 inputs, no time_phase)
 nn_output = network.forward(sensors)  # in [-1, 1]
 contraction = nn_output * max_amplitude
 ```
@@ -170,6 +170,8 @@ contraction = nn_output * max_amplitude
 - Random weights = no movement = zero fitness = no selection signal
 - Harder to bootstrap evolution
 - Requires careful initialization
+
+**NN Update Interval:** To reduce jitter, NN outputs are cached for 4 physics steps (15 updates/sec at 60 FPS). This smooths movement without sacrificing responsiveness.
 
 ### Recommendation
 
@@ -292,6 +294,18 @@ Problem: Small weight changes don't affect output!
 1. **Smaller negative bias** (e.g., -0.5 instead of -1.5)
 2. **Leaky activation** that preserves small differences
 3. **Fitness shaping** to reward near-activation attempts
+
+### Efficiency Penalty
+
+The fitness function penalizes excessive muscle activation to encourage efficient movement:
+
+```python
+# Normalized by time AND muscle count
+avg_activation_per_muscle = total_activation / (simulation_time * num_muscles)
+efficiency_cost = (avg_activation_per_muscle / 60) * 10 * efficiency_penalty
+```
+
+**Key:** Normalization ensures creatures with more muscles aren't unfairly penalized. A 15-muscle creature and a 5-muscle creature face the same efficiency pressure per-muscle.
 
 ### Mutation Decay
 

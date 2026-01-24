@@ -503,6 +503,7 @@ def apply_ground_collision(
     batch: CreatureBatch,
     ground_y: float = GROUND_Y,
     restitution: float = GROUND_RESTITUTION,
+    dt: float = TIME_STEP,
 ) -> None:
     """
     Apply ground collision response (in-place).
@@ -554,20 +555,40 @@ def apply_ground_collision(
         batch.velocities[:, :, 1]
     )
 
-    # Apply ground friction to horizontal velocity
-    # Simple model: reduce XZ velocity when in contact with ground
+    # Apply ground friction as Coulomb friction force (not velocity damping)
+    # Friction force opposes motion: F_friction = -sign(v) * mu * N
+    # where N = normal force (mass * gravity for grounded nodes)
     in_contact = below_ground  # Nodes touching ground
-    friction_factor = 1.0 - GROUND_FRICTION * 0.1  # Scale friction effect
+
+    # Calculate friction force magnitude per node
+    # Normal force = mass * |gravity| (we use GRAVITY which is negative)
+    normal_force = batch.masses * abs(GRAVITY)  # [B, N]
+    friction_force_mag = GROUND_FRICTION * normal_force  # [B, N]
+
+    # Current horizontal velocity magnitude
+    vel_x = batch.velocities[:, :, 0]
+    vel_z = batch.velocities[:, :, 2]
+    horiz_speed = torch.sqrt(vel_x ** 2 + vel_z ** 2 + 1e-8)  # [B, N]
+
+    # Friction deceleration = friction_force / mass
+    friction_decel = friction_force_mag / batch.masses.clamp(min=1e-6)  # [B, N]
+
+    # Maximum velocity change from friction this timestep
+    max_friction_delta_v = friction_decel * dt  # [B, N]
+
+    # Apply friction: reduce velocity toward zero, but don't reverse it
+    # If friction would stop the node, just set velocity to zero
+    friction_ratio = torch.clamp(max_friction_delta_v / horiz_speed, 0, 1)  # [B, N]
 
     batch.velocities[:, :, 0] = torch.where(
         in_contact,
-        batch.velocities[:, :, 0] * friction_factor,
-        batch.velocities[:, :, 0]
+        vel_x * (1 - friction_ratio),
+        vel_x
     )
     batch.velocities[:, :, 2] = torch.where(
         in_contact,
-        batch.velocities[:, :, 2] * friction_factor,
-        batch.velocities[:, :, 2]
+        vel_z * (1 - friction_ratio),
+        vel_z
     )
 
 
@@ -677,7 +698,7 @@ def physics_step(
     integrate_euler(batch, total_forces, dt)
 
     # 6. Ground collision
-    apply_ground_collision(batch)
+    apply_ground_collision(batch, dt=dt)
 
 
 @torch.no_grad()
@@ -803,7 +824,7 @@ def physics_step_modulated(
     integrate_euler(batch, total_forces, dt)
 
     # 6. Ground collision
-    apply_ground_collision(batch)
+    apply_ground_collision(batch, dt=dt)
 
     return current_com
 
@@ -1202,7 +1223,7 @@ def physics_step_neural(
     integrate_euler(batch, forces, dt)
 
     # Ground collision
-    apply_ground_collision(batch)
+    apply_ground_collision(batch, dt=dt)
 
     # Compute muscle activation for efficiency penalty
     # Sum of absolute NN outputs for valid muscles
@@ -1328,6 +1349,7 @@ def simulate_with_fitness_neural(
     record_frames: bool = False,
     frame_interval: int = 1,
     arena_size: float = 50.0,
+    nn_update_interval: int = 4,
 ) -> dict:
     """
     Run neural simulation with proper pellet collection tracking.
@@ -1355,6 +1377,7 @@ def simulate_with_fitness_neural(
         record_frames: Whether to record position frames
         frame_interval: Record every N frames (if recording)
         arena_size: Arena size for pellet spawning bounds
+        nn_update_interval: Update NN outputs every N physics steps (reduces jitter)
 
     Returns:
         Dict with:
@@ -1416,33 +1439,38 @@ def simulate_with_fitness_neural(
     time = 0.0
     frame_index = 0
 
+    # Cache for NN outputs (updated every nn_update_interval steps)
+    nn_outputs = None
+
     for step in range(num_steps):
-        # 1. Gather sensor inputs (uses current pellet positions)
-        sensor_inputs = gather_sensor_inputs(
-            batch, pellets.positions, previous_com, time, mode=mode
-        )
+        # 1. Update NN outputs only every nn_update_interval steps (reduces jitter)
+        if step % nn_update_interval == 0 or nn_outputs is None:
+            # Gather sensor inputs (uses current pellet positions)
+            sensor_inputs = gather_sensor_inputs(
+                batch, pellets.positions, previous_com, time, mode=mode
+            )
 
-        # 2. Forward pass through NN
-        if mode == 'pure':
-            nn_outputs = neural_network.forward_with_dead_zone(sensor_inputs, dead_zone)
-        else:
-            nn_outputs = neural_network.forward(sensor_inputs)
+            # Forward pass through NN
+            if mode == 'pure':
+                nn_outputs = neural_network.forward_with_dead_zone(sensor_inputs, dead_zone)
+            else:
+                nn_outputs = neural_network.forward(sensor_inputs)
 
-        # 3. Physics step with neural control
+        # 2. Physics step with neural control (uses cached nn_outputs)
         current_com, step_activation = physics_step_neural(
             batch, base_rest_lengths, nn_outputs, time, mode, dt, gravity
         )
 
-        # 4. Accumulate activation
+        # 3. Accumulate activation
         total_activation += step_activation
 
-        # 5. Update fitness state (distance traveled, closest edge distance)
+        # 4. Update fitness state (distance traveled, closest edge distance)
         update_fitness_state(batch, fitness_state, pellets, fitness_config)
 
-        # 6. Also track total activation in fitness state
+        # 5. Also track total activation in fitness state
         fitness_state.total_activation += step_activation
 
-        # 7. Check for pellet collisions and spawn new pellets
+        # 6. Check for pellet collisions and spawn new pellets
         newly_collected = check_pellet_collisions(batch, pellets)
 
         if newly_collected.any():

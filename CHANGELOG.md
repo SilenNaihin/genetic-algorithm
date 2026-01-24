@@ -4,6 +4,15 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Fixed
+- **Ground Friction Physics**: Changed from broken velocity damping to proper Coulomb friction model
+  - Before: Multiplicative damping (98.8% velocity loss/sec) killed all motion
+  - After: Force-based friction that can be overcome by muscle forces
+  - Creatures can now actually push against the ground and move
+- **NN Update Jitter**: Added `nn_update_interval` (default 4) to reduce jitter
+  - NN outputs cached and reused between updates (15 updates/sec instead of 60)
+  - Smoother creature movement in neural modes
+
 ### Added
 - **Configurable Physics FPS**: Control simulation fidelity with 15-120 FPS physics
   - Higher FPS = more expressive movement, better muscle resolution

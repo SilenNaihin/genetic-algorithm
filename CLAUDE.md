@@ -96,6 +96,7 @@ backend/                # Python backend (PyTorch physics)
 - Interface tests preferred over unit tests
 - Neural genome topology adapts when muscle count changes (`adaptNeuralTopology`)
 - Output biases default negative (-0.5) for GA optimization
+- Prefer Tailwind CSS classes for new component styling (avoid inline styles where possible)
 
 ## What NOT to Do
 
@@ -144,10 +145,11 @@ npm test -- --run  # Run once (no watch)
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
 - Fitness: 0-80 progress + 20 collection per pellet (100 total) + 0-20 distance traveled - regression penalty (after first collection)
-- Physics FPS: Configurable 15-120 FPS (default 60). Higher = more expressive but more compute
+- Physics FPS: Configurable 15-120 FPS (default 30). Higher = more expressive but more compute
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
   - Pure mode: 7 inputs (no time phase), NN has full control
   - Hybrid mode: 8 inputs (with time phase), NN modulates base oscillation
   - GA-optimized: negative output biases (-0.5), uniform weights, dead zone threshold
-  - Efficiency penalty discourages excessive muscle activation
+  - Efficiency penalty: normalized by time AND muscle count (creatures with more muscles aren't penalized more)
+  - NN update interval: outputs cached for 4 physics steps to reduce jitter (15 updates/sec)
   - BrainEvolutionPanel visualizes weight changes across generations

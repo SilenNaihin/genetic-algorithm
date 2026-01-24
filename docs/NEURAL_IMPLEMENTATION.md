@@ -63,6 +63,19 @@ nn_output = network.forward(sensors)  # in [-1, 1]
 contraction = nn_output * amplitude
 ```
 
+**Note:** Pure mode uses 7 inputs (no time_phase), giving the NN full control without external rhythm.
+
+### NN Update Interval
+
+To reduce jitter, neural network outputs are cached and reused for multiple physics steps:
+
+```python
+nn_update_interval = 4  # Update every 4 physics steps
+# At 60 FPS physics: NN updates 15 times/sec instead of 60
+```
+
+This smooths muscle activation without sacrificing responsiveness.
+
 ---
 
 ## Batched Forward Pass
