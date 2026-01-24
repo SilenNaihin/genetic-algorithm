@@ -471,12 +471,50 @@ def evolve_population(
         if g['id'] in survivor_ids
     ]
 
-    # Survivors pass through with incremented survivalStreak and updated generation
+    # Map survivor ID to fitness for ancestry building
+    survivor_fitness_map = {}
+    for i, g in enumerate(genomes):
+        if g['id'] in survivor_ids:
+            survivor_fitness_map[g['id']] = fitness_scores[i]
+
+    def build_ancestry_chain(child: dict, parent1: dict, parent1_fitness: float,
+                             parent2: dict = None, parent2_fitness: float = None):
+        """Build ancestry chain for offspring from parent info."""
+        # Get parent1's existing chain
+        chain = list(parent1.get('ancestryChain', []))
+
+        # Add parent1's info
+        chain.append({
+            'generation': parent1.get('generation', 0),
+            'fitness': round(parent1_fitness, 1),
+            'nodeCount': len(parent1.get('nodes', [])),
+            'muscleCount': len(parent1.get('muscles', [])),
+            'color': parent1.get('color', {'h': 0.5, 's': 0.7, 'l': 0.5}),
+        })
+
+        # For crossover, add parent2 info as well
+        if parent2 and parent2_fitness is not None:
+            chain.append({
+                'generation': parent2.get('generation', 0),
+                'fitness': round(parent2_fitness, 1),
+                'nodeCount': len(parent2.get('nodes', [])),
+                'muscleCount': len(parent2.get('muscles', [])),
+                'color': parent2.get('color', {'h': 0.5, 's': 0.7, 'l': 0.5}),
+            })
+
+        # Limit chain length to avoid bloat (keep last 100 ancestors)
+        if len(chain) > 100:
+            chain = chain[-100:]
+
+        child['ancestryChain'] = chain
+
+    # Survivors pass through with incremented survivalStreak (keep birth generation)
     next_gen = generation + 1
     survivor_genomes = []
     for genome in survivors:
         new_genome = dict(genome)
-        new_genome['generation'] = next_gen
+        # Keep original generation (birth gen) for ancestry tracking
+        # new_genome['generation'] = next_gen  # REMOVED - don't update birth gen
         new_genome['survivalStreak'] = genome.get('survivalStreak', 0) + 1
         survivor_genomes.append(new_genome)
 
@@ -506,11 +544,6 @@ def evolve_population(
     target_size = config.population_size
     new_creatures_needed = target_size - len(survivors)
 
-    # Debug: Log survivor info
-    if survivor_genomes:
-        max_streak = max(g.get('survivalStreak', 0) for g in survivor_genomes)
-        print(f"[evolve_population] {len(survivor_genomes)} survivors, max streak: {max_streak}")
-
     # Create new creatures to fill culled slots
     for _ in range(new_creatures_needed):
         use_crossover = config.use_crossover
@@ -534,6 +567,11 @@ def evolve_population(
             # New offspring start at next generation with 0 survival streak
             child['generation'] = next_gen
             child['survivalStreak'] = 0
+            # Build ancestry chain from both parents
+            build_ancestry_chain(
+                child, parent1, survivor_fitness_map.get(parent1['id'], 0),
+                parent2, survivor_fitness_map.get(parent2['id'], 0)
+            )
             new_genomes.append(child)
 
         elif use_mutation:
@@ -544,6 +582,8 @@ def evolve_population(
             # New offspring start at next generation with 0 survival streak
             mutated['generation'] = next_gen
             mutated['survivalStreak'] = 0
+            # Build ancestry chain from parent
+            build_ancestry_chain(mutated, parent, survivor_fitness_map.get(parent['id'], 0))
             new_genomes.append(mutated)
 
         else:
@@ -553,6 +593,8 @@ def evolve_population(
             # New offspring start at next generation with 0 survival streak
             child['generation'] = next_gen
             child['survivalStreak'] = 0
+            # Build ancestry chain from parent
+            build_ancestry_chain(child, parent, survivor_fitness_map.get(parent['id'], 0))
             new_genomes.append(child)
 
     # Calculate stats

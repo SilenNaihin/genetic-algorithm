@@ -154,6 +154,14 @@ function apiResultToCreatureResult(
     });
   }
 
+  // Use real activations per frame from backend if available (neural creatures only)
+  let activationsPerFrame: number[][] | undefined;
+  if (apiResult.activations_per_frame && apiResult.activations_per_frame.length > 0) {
+    activationsPerFrame = apiResult.activations_per_frame.map(frameActivations =>
+      frameActivations.map(a => safeNum(a))
+    );
+  }
+
   return {
     genome,
     frames,
@@ -165,6 +173,7 @@ function apiResultToCreatureResult(
     pellets,
     fitnessOverTime,
     disqualified: apiResult.disqualified_reason as DisqualificationReason,
+    activationsPerFrame,
   };
 }
 
