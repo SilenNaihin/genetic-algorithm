@@ -303,46 +303,72 @@ export class NeuralVisualizer {
     _hidden: number[],
     outputs: number[]
   ): void {
-    // Use extracted weights if available, otherwise use uniform weight visualization
     const weights = this.weights;
 
     // Draw input -> hidden connections
     for (let i = 0; i < inputY.length; i++) {
       for (let h = 0; h < hiddenY.length; h++) {
-        // Use actual weight magnitude if available, otherwise show structure with uniform weight
-        const weight = weights ? Math.abs(weights.weightsIH[i]?.[h] ?? 0) : 0.3;
-        this.drawConnection(ctx, layerX[0], inputY[i], layerX[1], hiddenY[h], weight);
+        const weight = weights?.weightsIH[i]?.[h] ?? 0;
+        this.drawWeightedConnection(ctx, layerX[0], inputY[i], layerX[1], hiddenY[h], weight);
       }
     }
 
-    // Draw hidden -> output connections - highlight based on output activation
+    // Draw hidden -> output connections
     for (let h = 0; h < hiddenY.length; h++) {
       for (let o = 0; o < outputY.length; o++) {
-        // Use actual weight magnitude, modulated by output activation for visual feedback
-        const baseWeight = weights ? Math.abs(weights.weightsHO[h]?.[o] ?? 0) : 0.3;
-        const outputMag = Math.abs(outputs[o] || 0);
-        // Blend weight with output activation for dynamic visualization
-        const activation = baseWeight * 0.5 + outputMag * 0.5;
-        this.drawConnection(ctx, layerX[1], hiddenY[h], layerX[2], outputY[o], activation);
+        const weight = weights?.weightsHO[h]?.[o] ?? 0;
+        // Modulate by output activation for dynamic feedback
+        const outputAct = outputs[o] || 0;
+        this.drawWeightedConnection(ctx, layerX[1], hiddenY[h], layerX[2], outputY[o], weight, outputAct);
       }
     }
   }
 
-  private drawConnection(
+  /**
+   * Draw a connection line with color based on weight sign and thickness based on magnitude.
+   * - Positive weights: green/cyan
+   * - Negative weights: red/magenta
+   * - Stronger weights: thicker lines, higher opacity
+   */
+  private drawWeightedConnection(
     ctx: CanvasRenderingContext2D,
     x1: number, y1: number,
     x2: number, y2: number,
-    activation: number
+    weight: number,
+    outputActivation?: number
   ): void {
-    // Color based on activation strength
-    const alpha = Math.min(0.8, 0.1 + activation * 0.7);
-    const hue = activation > 0.5 ? 120 : 200; // Green for strong, blue for weak
+    const magnitude = Math.abs(weight);
+    const isPositive = weight >= 0;
+
+    // Skip very weak connections to reduce visual noise
+    if (magnitude < 0.05) return;
+
+    // Normalize magnitude (weights typically in [-2, 2] range)
+    const normalizedMag = Math.min(magnitude / 1.5, 1);
+
+    // Color: green/cyan for positive, red/magenta for negative
+    // Saturation and lightness increase with magnitude
+    const hue = isPositive ? 160 : 0;  // Cyan-ish for positive, red for negative
+    const saturation = 50 + normalizedMag * 40;
+    const lightness = 35 + normalizedMag * 25;
+
+    // Alpha based on magnitude - stronger weights more visible
+    let alpha = 0.2 + normalizedMag * 0.6;
+
+    // If output activation provided, boost alpha when active
+    if (outputActivation !== undefined) {
+      const actMag = Math.abs(outputActivation);
+      alpha = Math.min(0.9, alpha + actMag * 0.3);
+    }
+
+    // Line width scales with magnitude
+    const lineWidth = 0.5 + normalizedMag * 2.5;
 
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
-    ctx.strokeStyle = `hsla(${hue}, 60%, 50%, ${alpha})`;
-    ctx.lineWidth = 0.5 + activation * 1.5;
+    ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+    ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
 
@@ -359,23 +385,46 @@ export class NeuralVisualizer {
       const y = yPositions[i];
       const activation = activations[i] || 0;
 
-      // Node fill color based on activation
-      // Tanh range: [-1, 1] -> map to color
-      const normalizedAct = (activation + 1) / 2; // Map [-1,1] to [0,1]
-      const hue = normalizedAct * 120; // Red (0) to Green (120)
-      const saturation = 70;
-      const lightness = 30 + Math.abs(activation) * 30;
+      // Node fill color based on activation sign and magnitude
+      // Positive: green/cyan, Negative: red/orange, Zero: gray
+      const magnitude = Math.abs(activation);
+      let hue: number;
+      let saturation: number;
+      let lightness: number;
 
-      // Draw node
+      if (magnitude < 0.05) {
+        // Near zero - neutral gray
+        hue = 0;
+        saturation = 0;
+        lightness = 40;
+      } else if (activation > 0) {
+        // Positive - green to cyan
+        hue = 140;
+        saturation = 60 + magnitude * 30;
+        lightness = 35 + magnitude * 25;
+      } else {
+        // Negative - red to orange
+        hue = 15;
+        saturation = 60 + magnitude * 30;
+        lightness = 35 + magnitude * 25;
+      }
+
+      // Draw node with slight glow for active nodes
+      if (magnitude > 0.3) {
+        ctx.beginPath();
+        ctx.arc(x, y, nodeRadius + 2, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
+        ctx.fill();
+      }
+
+      // Main node
       ctx.beginPath();
       ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
       ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
       ctx.fill();
-      ctx.strokeStyle = '#444';
+      ctx.strokeStyle = '#555';
       ctx.lineWidth = 1;
       ctx.stroke();
-
-      // Activation values are now drawn in drawLabels for output nodes
     }
   }
 
@@ -386,37 +435,52 @@ export class NeuralVisualizer {
     outputY: number[],
     outputs: number[]
   ): void {
-    ctx.font = '8px sans-serif';
-    ctx.fillStyle = '#666';
+    // Use pixel-aligned coordinates for crisp text
+    const pixelAlign = (n: number) => Math.round(n) + 0.5;
+
+    // Crisp font rendering
+    ctx.textBaseline = 'middle';
+    ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#888';
 
     // Input labels (abbreviated sensor names)
     const shortNames = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist', 'time'];
     ctx.textAlign = 'right';
     for (let i = 0; i < inputY.length && i < shortNames.length; i++) {
-      ctx.fillText(shortNames[i], layerX[0] - 10, inputY[i] + 3);
+      ctx.fillText(shortNames[i], pixelAlign(layerX[0] - 10), pixelAlign(inputY[i]));
     }
 
-    // Output labels: muscle ID (nodes it connects) and activation value
+    // Output labels: muscle ID and activation value with color coding
     ctx.textAlign = 'left';
+    ctx.font = '9px ui-monospace, monospace';
     for (let i = 0; i < outputY.length; i++) {
       const muscleId = this.muscleNames[i] || `M${i}`;
       const activation = outputs[i] || 0;
-      // Show muscle ID (which nodes it connects, e.g. "1-3") and activation
-      ctx.fillStyle = '#888';
-      ctx.font = '8px monospace';
-      ctx.fillText(muscleId, layerX[2] + 10, outputY[i] + 3);
-      // Show activation value slightly dimmer
-      ctx.fillStyle = '#666';
-      ctx.fillText(activation.toFixed(1), layerX[2] + 34, outputY[i] + 3);
+
+      // Muscle ID
+      ctx.fillStyle = '#999';
+      ctx.fillText(muscleId, pixelAlign(layerX[2] + 10), pixelAlign(outputY[i]));
+
+      // Activation value - color coded
+      const actMag = Math.abs(activation);
+      if (actMag < 0.1) {
+        ctx.fillStyle = '#555';
+      } else if (activation > 0) {
+        ctx.fillStyle = `hsl(140, 60%, ${45 + actMag * 20}%)`;
+      } else {
+        ctx.fillStyle = `hsl(15, 60%, ${45 + actMag * 20}%)`;
+      }
+      ctx.fillText(activation.toFixed(2), pixelAlign(layerX[2] + 32), pixelAlign(outputY[i]));
     }
 
     // Layer titles
-    ctx.fillStyle = '#888';
-    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Input', layerX[0], 12);
-    ctx.fillText('Hidden', layerX[1], 12);
-    ctx.fillText('Output', layerX[2], 12);
+    ctx.textBaseline = 'top';
+    ctx.fillText('Input', pixelAlign(layerX[0]), 4);
+    ctx.fillText('Hidden', pixelAlign(layerX[1]), 4);
+    ctx.fillText('Output', pixelAlign(layerX[2]), 4);
   }
 
   /**
