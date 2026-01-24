@@ -19,6 +19,7 @@ import { GenerationJumpModal } from '../modals/GenerationJumpModal';
  */
 export function GridView() {
   const simulationProgress = useEvolutionStore((s) => s.simulationProgress);
+  const evolutionStep = useEvolutionStore((s) => s.evolutionStep);
   const isAutoRunning = useIsAutoRunning();
 
   // Animated progress counter
@@ -71,9 +72,11 @@ export function GridView() {
   const progressPercent = simulationProgress
     ? Math.round((displayCount / simulationProgress.total) * 100)
     : 0;
+  // Text depends on which step we're in
+  const progressLabel = evolutionStep === 'mutate' ? 'Mutating' : 'Simulating';
   const progressText = simulationProgress
-    ? `Simulating creature ${displayCount}/${simulationProgress.total}...`
-    : 'Simulating creatures...';
+    ? `${progressLabel} creature ${displayCount}/${simulationProgress.total}...`
+    : `${progressLabel} creatures...`;
 
   return (
     <div style={{ display: 'block', width: '100%', height: '100%', position: 'relative' }}>
