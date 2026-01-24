@@ -9,7 +9,7 @@ import { PreviewCanvas } from './PreviewCanvas';
 import { FitnessPanel } from './FitnessPanel';
 import { NeuralPanel } from './NeuralPanel';
 import { LoadRunsModal } from '../modals/LoadRunsModal';
-import { TOOLTIPS } from '../ui/InfoTooltip';
+import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
 
 /**
  * Main menu screen component.
@@ -156,30 +156,35 @@ export function MenuScreen() {
           borderRadius: '8px',
         }}>
           {/* Selection method */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Selection:</span>
-            <select
-              value={config.selectionMethod}
-              onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
-              style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                color: 'var(--text-primary)',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-              title={
-                config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
-                config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
-                TOOLTIPS.selectionRank
-              }
-            >
-              <option value="rank">Rank</option>
-              <option value="tournament">Tournament</option>
-              <option value="truncation">Truncation</option>
-            </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Selection</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <select
+                value={config.selectionMethod}
+                onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="rank">Rank</option>
+                <option value="tournament">Tournament</option>
+                <option value="truncation">Truncation</option>
+              </select>
+              <InfoTooltip
+                text={
+                  config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
+                  config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
+                  TOOLTIPS.selectionRank
+                }
+                width={280}
+              />
+            </div>
           </div>
 
           {/* Tournament size - only shown when tournament selected */}

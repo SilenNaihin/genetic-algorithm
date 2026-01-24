@@ -130,11 +130,10 @@ export const TOOLTIPS = {
   cullPercentage: 'Fraction of population replaced each generation. 50% means bottom half dies and is replaced by offspring of top half.',
 
   // Selection methods
-  selectionMethod: 'How parents are chosen for breeding. Different methods have different selection pressure (how strongly fitness affects reproduction).',
-  selectionTruncation: 'Truncation: Strictly keeps top performers. High selection pressure - only the best survive. Fast convergence but may lose diversity. Good for well-defined fitness landscapes.',
-  selectionTournament: 'Tournament: Randomly picks N creatures and keeps the best. Tunable pressure via tournament size. Larger tournaments = higher pressure. Good balance of exploration and exploitation.',
-  selectionRank: 'Rank: Selection probability based on fitness rank, not raw value. Best creature has highest chance, but even low-ranked creatures can reproduce. Maintains diversity, prevents premature convergence.',
-  tournamentSize: 'Number of contestants per tournament. Larger = higher selection pressure (best creatures win more often). 2-3 for exploration, 5-7 for faster convergence.',
+  selectionTruncation: 'Sort all creatures by fitness, keep the top N%. Simple and fast but harsh - creatures just below the cutoff are discarded even if nearly as good. Can lose diversity quickly.',
+  selectionTournament: 'Randomly pick N creatures, the fittest wins and gets to breed. Repeat until enough parents selected. Gives weaker creatures a chance if they avoid strong competitors. Tournament size controls pressure.',
+  selectionRank: 'Sort by fitness and assign breeding probability by rank (1st place gets most chances, last place fewest). Unlike truncation, even low-ranked creatures can reproduce. Maintains diversity while favoring the fit.',
+  tournamentSize: 'How many creatures compete in each tournament. Size 2 = weak pressure (50% chance the best wins). Size 5+ = strong pressure (best almost always wins). Lower for exploration, higher for exploitation.',
 
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',
