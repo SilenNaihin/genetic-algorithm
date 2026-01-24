@@ -58,6 +58,16 @@ export function MenuScreen() {
           marginBottom: '24px'
         }}>
           <ParamSlider
+            name="Population"
+            value={config.populationSize}
+            displayValue={String(config.populationSize)}
+            min={10}
+            max={1000}
+            step={10}
+            tooltip={TOOLTIPS.populationSize}
+            onChange={(v) => setConfig({ populationSize: v })}
+          />
+          <ParamSlider
             name="Gravity"
             value={config.gravity}
             displayValue={String(config.gravity)}
