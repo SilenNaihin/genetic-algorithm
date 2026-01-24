@@ -239,7 +239,11 @@ export function MenuScreen() {
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
                       Method
-                      <InfoTooltip text={TOOLTIPS.neuralCrossoverMethod} />
+                      <InfoTooltip text={
+                        config.neuralCrossoverMethod === 'sbx' ? TOOLTIPS.crossoverSbx :
+                        config.neuralCrossoverMethod === 'uniform' ? TOOLTIPS.crossoverUniform :
+                        TOOLTIPS.crossoverInterpolation
+                      } />
                     </div>
                     <select
                       value={config.neuralCrossoverMethod}
@@ -255,7 +259,7 @@ export function MenuScreen() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="sbx">SBX (Recommended)</option>
+                      <option value="sbx">SBX</option>
                       <option value="interpolation">Interpolation</option>
                       <option value="uniform">Uniform</option>
                     </select>

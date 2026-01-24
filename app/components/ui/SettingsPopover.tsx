@@ -1,11 +1,18 @@
 'use client';
 
-import { useState, useRef, useEffect, ReactNode } from 'react';
+import { useState, useRef, useEffect, ReactNode, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 interface SettingsPopoverProps {
   children: ReactNode;
   width?: number;
+}
+
+interface PopoverPosition {
+  top: number;
+  left: number;
+  arrowLeft: number;
+  showAbove: boolean;
 }
 
 /**
@@ -14,33 +21,70 @@ interface SettingsPopoverProps {
  */
 export function SettingsPopover({ children, width = 220 }: SettingsPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<PopoverPosition | null>(null);
   const iconRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Calculate position when opening
-  useEffect(() => {
-    if (isOpen && iconRef.current) {
-      const rect = iconRef.current.getBoundingClientRect();
-      const popoverHeight = 200; // Estimate
+  const calculatePosition = useCallback(() => {
+    if (!iconRef.current || !popoverRef.current) return;
 
-      // Position below the icon, centered
-      let top = rect.bottom + 8;
-      let left = rect.left + rect.width / 2 - width / 2;
+    const iconRect = iconRef.current.getBoundingClientRect();
+    const popoverRect = popoverRef.current.getBoundingClientRect();
+    const popoverHeight = popoverRect.height || 150;
+    const arrowSize = 8;
+    const gap = 4;
 
-      // Keep within viewport
-      if (left < 10) left = 10;
-      if (left + width > window.innerWidth - 10) {
-        left = window.innerWidth - width - 10;
-      }
-      if (top + popoverHeight > window.innerHeight - 10) {
-        // Position above instead
-        top = rect.top - popoverHeight - 8;
-      }
+    // Center the popover horizontally on the icon
+    const iconCenterX = iconRect.left + iconRect.width / 2;
+    let left = iconCenterX - width / 2;
 
-      setPosition({ top, left });
+    // Keep within viewport horizontally
+    const margin = 10;
+    if (left < margin) left = margin;
+    if (left + width > window.innerWidth - margin) {
+      left = window.innerWidth - width - margin;
     }
-  }, [isOpen, width]);
+
+    // Arrow points to the icon center
+    const arrowLeft = Math.max(12, Math.min(width - 12, iconCenterX - left));
+
+    // Determine if we should show above or below
+    const spaceBelow = window.innerHeight - iconRect.bottom;
+    const spaceAbove = iconRect.top;
+    const showAbove = spaceBelow < popoverHeight + arrowSize + gap + margin && spaceAbove > spaceBelow;
+
+    let top: number;
+    if (showAbove) {
+      top = iconRect.top - popoverHeight - arrowSize - gap;
+    } else {
+      top = iconRect.bottom + arrowSize + gap;
+    }
+
+    setPosition({ top, left, arrowLeft, showAbove });
+  }, [width]);
+
+  // Calculate position when opening and on scroll/resize
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Initial calculation after render
+    requestAnimationFrame(calculatePosition);
+
+    window.addEventListener('scroll', calculatePosition, true);
+    window.addEventListener('resize', calculatePosition);
+
+    // Watch for content size changes
+    const observer = new ResizeObserver(calculatePosition);
+    if (popoverRef.current) {
+      observer.observe(popoverRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', calculatePosition, true);
+      window.removeEventListener('resize', calculatePosition);
+      observer.disconnect();
+    };
+  }, [isOpen, calculatePosition]);
 
   // Close on click outside
   useEffect(() => {
@@ -98,18 +142,18 @@ export function SettingsPopover({ children, width = 220 }: SettingsPopoverProps)
         title="Settings"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
           <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
       </button>
 
-      {isOpen && position && typeof document !== 'undefined' && createPortal(
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <div
           ref={popoverRef}
           style={{
             position: 'fixed',
-            top: position.top,
-            left: position.left,
+            top: position?.top ?? -9999,
+            left: position?.left ?? -9999,
             width,
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
@@ -117,8 +161,24 @@ export function SettingsPopover({ children, width = 220 }: SettingsPopoverProps)
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
             padding: '12px',
             zIndex: 10000,
+            visibility: position ? 'visible' : 'hidden',
           }}
         >
+          {/* Arrow pointing to the icon */}
+          {position && (
+            <div
+              style={{
+                position: 'absolute',
+                left: position.arrowLeft - 6,
+                ...(position.showAbove
+                  ? { bottom: -6, borderTop: '6px solid var(--bg-secondary)', borderLeft: '6px solid transparent', borderRight: '6px solid transparent' }
+                  : { top: -6, borderBottom: '6px solid var(--bg-secondary)', borderLeft: '6px solid transparent', borderRight: '6px solid transparent' }
+                ),
+                width: 0,
+                height: 0,
+              }}
+            />
+          )}
           {children}
         </div>,
         document.body
