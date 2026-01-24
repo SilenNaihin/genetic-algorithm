@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { useEvolutionStore, useIsAutoRunning } from '../../stores/evolutionStore';
 import { ControlPanel } from './ControlPanel';
 import { StatsPanel } from './StatsPanel';
@@ -20,12 +21,58 @@ export function GridView() {
   const simulationProgress = useEvolutionStore((s) => s.simulationProgress);
   const isAutoRunning = useIsAutoRunning();
 
+  // Animated progress counter
+  const [animatedCount, setAnimatedCount] = useState(0);
+  const animationRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  // Animate progress from 0 to total when simulation starts
+  useEffect(() => {
+    if (simulationProgress) {
+      const { total } = simulationProgress;
+      // Reset and start animation
+      setAnimatedCount(0);
+      startTimeRef.current = performance.now();
+
+      // Quick animation duration (matches the 800ms delay in runSimulateStep)
+      const estimatedDuration = 750;
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTimeRef.current;
+        const progress = Math.min(elapsed / estimatedDuration, 1);
+
+        // Ease out quad: starts fast, slows down toward end
+        const eased = 1 - (1 - progress) * (1 - progress);
+
+        // Animate to 100%
+        const targetCount = Math.floor(eased * total);
+        setAnimatedCount(targetCount);
+
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+
+      return () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      };
+    } else {
+      // Reset when simulation ends
+      setAnimatedCount(0);
+    }
+  }, [simulationProgress]);
+
   // Calculate progress percentage for step-by-step mode
+  const displayCount = simulationProgress ? animatedCount : 0;
   const progressPercent = simulationProgress
-    ? Math.round((simulationProgress.completed / simulationProgress.total) * 100)
+    ? Math.round((displayCount / simulationProgress.total) * 100)
     : 0;
   const progressText = simulationProgress
-    ? `Simulating creature ${simulationProgress.completed}/${simulationProgress.total}...`
+    ? `Simulating creature ${displayCount}/${simulationProgress.total}...`
     : 'Simulating creatures...';
 
   return (

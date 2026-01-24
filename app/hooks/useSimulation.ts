@@ -232,15 +232,23 @@ export function useSimulation() {
   ]);
 
   /**
-   * Run the mutate step with 3-phase animation:
-   * Phase 1: Mark bottom 50% as dead (600ms)
-   * Phase 2: Fade out dead cards (400ms)
-   * Phase 3: Spawn new offspring from parent positions (600ms)
+   * Run the mutate step with animation + backend call in parallel:
+   * 1. Start backend call immediately
+   * 2. Run culling animation (mark dead, fade out) while backend processes
+   * 3. When both complete, show real creatures with fitness hidden
+   * 4. Spawn animation for offspring
+   * 5. Wait for user to click "Simulate" to reveal fitness
    */
   const runMutateStep = useCallback(async (fastMode: boolean = false) => {
     const currentResults = useEvolutionStore.getState().simulationResults;
     const currentGen = useEvolutionStore.getState().generation;
     const currentConfig = useEvolutionStore.getState().config;
+
+    const runId = StorageService.getCurrentRunId();
+    if (!runId) {
+      showError('No active run');
+      return;
+    }
 
     // Sort current results by fitness to find bottom cullPercentage%
     const sortedResults = [...currentResults].sort((a, b) => {
@@ -278,6 +286,9 @@ export function useSimulation() {
       survivorPositions.push(getGridPosition(i));
     }
 
+    // === START BACKEND CALL IMMEDIATELY (runs in parallel with animation) ===
+    const backendPromise = Api.evolutionStep(runId);
+
     // === PHASE 1: Mark dead creatures with red border (600ms) ===
     if (!fastMode) {
       const animStates = new Map<string, CardAnimationState>();
@@ -314,21 +325,31 @@ export function useSimulation() {
       await delay(FADE_OUT_DELAY);
     }
 
-    // === PHASE 3: Call backend evolution step ===
-    setEvolutionStep('simulate');
-    const runId = StorageService.getCurrentRunId();
-    if (!runId) {
-      showError('No active run');
-      return;
+    // === WAIT FOR BACKEND TO COMPLETE ===
+    // Show progress if backend is still running after animation completes
+    if (!fastMode) {
+      setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
     }
-
-    const response = await Api.evolutionStep(runId);
+    const response = await backendPromise;
+    setSimulationProgress(null);
     const newResults = response.creatures.map(apiCreatureToResult);
 
-    // Set up animation states for spawn animation
+    // Store the real fitness values but display with fitness hidden
+    // We'll store actual fitness in a separate field and show NaN until "Simulate" is clicked
+    const resultsWithHiddenFitness = newResults.map((result) => ({
+      ...result,
+      _actualFitness: result.finalFitness, // Store real fitness
+      finalFitness: NaN, // Hide fitness until Simulate clicked
+    }));
+
+    // Update generation info
+    setGeneration(response.generation);
+    setMaxGeneration(response.generation);
+
+    // === PHASE 3: Show real creatures with spawn animation ===
     if (!fastMode) {
       const newAnimStates = new Map<string, CardAnimationState>();
-      for (const result of newResults) {
+      for (const result of resultsWithHiddenFitness) {
         const isSurvivor = (result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
 
         let spawnFromX: number | null = null;
@@ -351,16 +372,14 @@ export function useSimulation() {
       setCardAnimationStates(newAnimStates);
     }
 
-    setSimulationResults(newResults);
-    setGeneration(response.generation);
-    setMaxGeneration(response.generation);
+    setSimulationResults(resultsWithHiddenFitness);
 
     if (!fastMode) {
       await delay(50);
 
       // Clear spawning state to trigger animation
       const transitionAnimStates = new Map<string, CardAnimationState>();
-      for (const result of newResults) {
+      for (const result of resultsWithHiddenFitness) {
         const isSurvivor = (result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
         transitionAnimStates.set(result.genome.id, {
           isDead: false,
@@ -375,8 +394,39 @@ export function useSimulation() {
       await delay(SPAWN_DELAY);
     }
 
+    // Transition to simulate step - wait for user to click Simulate to reveal fitness
+    setEvolutionStep('simulate');
+  }, [setGeneration, setMaxGeneration, setSimulationResults, setEvolutionStep, setCardAnimationStates, setLongestSurvivor, setSimulationProgress]);
+
+  /**
+   * Run the simulate step: show progress animation then reveal fitness values.
+   * Data is already loaded during mutate - this is just a visual effect.
+   */
+  const runSimulateStep = useCallback(async (fastMode: boolean = false) => {
+    const currentResults = useEvolutionStore.getState().simulationResults;
+    const currentConfig = useEvolutionStore.getState().config;
+
+    // Show quick progress animation (data already loaded, this is just for UX)
+    if (!fastMode) {
+      setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
+      await delay(800); // Quick animation duration
+      setSimulationProgress(null);
+    }
+
+    // Reveal the actual fitness values (stored in _actualFitness during mutate)
+    const resultsWithFitness = currentResults.map((result) => ({
+      ...result,
+      finalFitness: (result as CreatureSimulationResult & { _actualFitness?: number })._actualFitness ?? result.finalFitness,
+    }));
+
+    setSimulationResults(resultsWithFitness);
+
+    // Clear animation states (offspring are no longer "new")
+    clearCardAnimationStates();
+
+    // Transition to sort step
     setEvolutionStep('sort');
-  }, [setGeneration, setMaxGeneration, setSimulationResults, setEvolutionStep, setCardAnimationStates, setLongestSurvivor]);
+  }, [setSimulationResults, setEvolutionStep, clearCardAnimationStates, setSimulationProgress]);
 
   /**
    * Run the sort step (reorder by fitness with animation, record history)
@@ -418,6 +468,7 @@ export function useSimulation() {
 
   /**
    * Execute one step in the evolution cycle.
+   * Manual step-through flow: idle → mutate → simulate → sort → idle
    */
   const executeNextStep = useCallback(async () => {
     const currentStep = useEvolutionStore.getState().evolutionStep;
@@ -425,12 +476,15 @@ export function useSimulation() {
     if (currentStep === 'idle') {
       setEvolutionStep('mutate');
       await runMutateStep();
-      // runMutateStep sets evolutionStep to 'sort' when done
+      // runMutateStep sets evolutionStep to 'simulate' when done
+    } else if (currentStep === 'simulate') {
+      await runSimulateStep();
+      // runSimulateStep sets evolutionStep to 'sort' when done
     } else if (currentStep === 'sort') {
       await runSortStep();
       // runSortStep sets evolutionStep to 'idle' when done
     }
-  }, [setEvolutionStep, runMutateStep, runSortStep]);
+  }, [setEvolutionStep, runMutateStep, runSimulateStep, runSortStep]);
 
   /**
    * Auto-run for a specific number of generations
