@@ -19,6 +19,9 @@
 - [NEURAL_IMPLEMENTATION.md](./NEURAL_IMPLEMENTATION.md) - Implementation checklist
 - [NEAT_FUTURE.md](./NEAT_FUTURE.md) - Topology evolution roadmap
 
+### Simulation & Fitness
+- [FITNESS.md](./FITNESS.md) - Fitness calculation system, known gotchas, and past bugs
+
 ## Architecture
 
 ```
@@ -48,11 +51,13 @@ src/
 
 ## Fitness Function
 
-Creatures are scored on (all distances measured from creature edge, XZ-only):
-- **Progress (0-80)**: Distance from creature's edge toward current pellet
-- **Collection (+20)**: Bonus when pellet collected (80 progress + 20 collection = 100 total per pellet)
+See [FITNESS.md](./FITNESS.md) for complete documentation.
+
+**Summary** (all distances XZ-only, measured from creature edge):
+- **Banked (100/pellet)**: Each collected pellet banks 100 pts (80 progress + 20 bonus)
+- **Progress (0-80)**: Progress toward current uncollected pellet
 - **Distance Traveled (0-20)**: Total XZ distance traveled during simulation
-- **Regression (-20 max)**: Penalty for moving away from pellet (only after first pellet collection)
+- **Regression (-20 max)**: Penalty for moving away from pellet (only after first collection)
 
 ## Storage
 

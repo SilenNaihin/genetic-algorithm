@@ -142,10 +142,13 @@ npm test -- --run  # Run once (no watch)
 
 - `genetics-prd.json` tracks the genetics system overhaul - check status before implementing GA features
 - `COMPUTE.md` explains tensor batching, sparse frame storage, physics FPS, and performance
+- `docs/FITNESS.md` documents the fitness system, known gotchas, and past bugs - READ THIS before modifying fitness
 - RunStorage handles IndexedDB persistence for runs/generations
 - Creatures have genomes with nodes (spheres) and muscles (springs)
-- Fitness: 0-80 progress + 20 collection per pellet (100 total) + 0-20 distance traveled - regression penalty (after first collection)
-- Physics FPS: Configurable 15-120 FPS (default 30). Higher = more expressive but more compute
+- Fitness: 100 per collected pellet (80 progress banked + 20 bonus) + 0-80 current progress + 0-20 distance - penalties
+  - IMPORTANT: Progress is banked when pellet collected, not reset to 0
+  - IMPORTANT: All distance calculations must use same stable creature radius (from fitness_state)
+- Physics FPS: Configurable 15-120 FPS (default 60). Higher = more expressive but more compute
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
   - Pure mode: 7 inputs (no time phase), NN has full control
   - Hybrid mode: 8 inputs (with time phase), NN modulates base oscillation

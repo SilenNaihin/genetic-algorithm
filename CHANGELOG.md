@@ -5,6 +5,16 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Fixed
+- **Fitness Progress Banking**: Fixed pellet collection causing fitness to DROP instead of increase
+  - Before: Collecting pellet reset progress to 0 (fitness 80 → 20)
+  - After: Each pellet banks full 100 pts (80 progress + 20 bonus)
+  - See `docs/FITNESS.md` for detailed fitness system documentation
+- **Fitness Radius Consistency**: Fixed false regression penalties when creature stayed still
+  - `update_pellets` and `calculate_fitness` now use same stable creature radius
+  - Prevents muscle oscillation from triggering phantom regression
+- **Best/Longest Survivor Replay**: Fixed replay showing death generation instead of best performance
+  - Added dedicated API endpoints for best creature and longest survivor
+  - Frames now load from generation with highest fitness
 - **Ground Friction Physics**: Changed from broken velocity damping to proper Coulomb friction model
   - Before: Multiplicative damping (98.8% velocity loss/sec) killed all motion
   - After: Force-based friction that can be overcome by muscle forces
