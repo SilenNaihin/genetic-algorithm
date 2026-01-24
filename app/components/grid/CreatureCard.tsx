@@ -21,6 +21,7 @@ export interface CreatureCardProps {
   onHover?: (event: React.MouseEvent) => void;
   onLeave?: () => void;
   renderToCanvas: (result: CreatureSimulationResult, canvas: HTMLCanvasElement) => void;
+  stackDepth?: number; // Number of creatures stacked in this cell (1 = no stack)
 }
 
 /**
@@ -41,6 +42,7 @@ export function CreatureCard({
   onHover,
   onLeave,
   renderToCanvas,
+  stackDepth = 1,
 }: CreatureCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -49,6 +51,7 @@ export function CreatureCard({
   const hasFitness = !isNaN(result.finalFitness) && isFinite(result.finalFitness);
   const fitnessText = hasFitness ? result.finalFitness.toFixed(0) : '...';
   const creatureName = getCreatureName(result.genome);
+  const isStacked = stackDepth > 1;
 
   // Build CSS class list
   const classNames = ['creature-card'];
@@ -112,8 +115,24 @@ export function CreatureCard({
         // Hover states handled via CSS, but we still apply z-index
         zIndex: isHovered && !isDead && !isFadingOut ? 10 : 1,
         transform: isHovered && !isDead && !isFadingOut ? 'scale(1.05)' : undefined,
+        // Allow stack badge to overflow
+        overflow: isStacked ? 'visible' : undefined,
       }}
     >
+      {/* Stacked shadow cards (offset behind main card) */}
+      {isStacked && (
+        <>
+          <div
+            className="absolute inset-0 rounded bg-[#1a1a24] border border-[#2a2a3a]"
+            style={{ transform: 'translate(4px, 4px)', zIndex: -2 }}
+          />
+          <div
+            className="absolute inset-0 rounded bg-[#1e1e2a] border border-[#2a2a3a]"
+            style={{ transform: 'translate(2px, 2px)', zIndex: -1 }}
+          />
+        </>
+      )}
+
       {/* Canvas for creature thumbnail */}
       <canvas
         ref={canvasRef}
@@ -159,6 +178,16 @@ export function CreatureCard({
       >
         {fitnessText}
       </span>
+
+      {/* Stack count badge (bottom-left, slightly outside frame) */}
+      {isStacked && (
+        <span
+          className="absolute text-[10px] font-bold text-[#9ca3af] bg-[#1a1a24] px-1.5 py-0.5 rounded z-20"
+          style={{ bottom: '-8px', left: '-8px' }}
+        >
+          ×{stackDepth}
+        </span>
+      )}
     </div>
   );
 }

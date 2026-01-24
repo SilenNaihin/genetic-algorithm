@@ -8,7 +8,7 @@ import type { CreatureSimulationResult } from '../../../src/types';
 /**
  * Generates tooltip HTML for a creature card.
  */
-function generateTooltipHTML(result: CreatureSimulationResult, rank?: number): string {
+function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, stackDepth?: number): string {
   const genome = result.genome;
   const creatureName = getCreatureName(genome);
   const avgStiffness = genome.muscles.length > 0
@@ -17,6 +17,7 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number): s
   const avgFrequency = genome.muscles.length > 0
     ? genome.muscles.reduce((sum, m) => sum + m.frequency, 0) / genome.muscles.length
     : 0;
+  const isStacked = stackDepth && stackDepth > 1;
 
   const fitness = isNaN(result.finalFitness) ? 0 : result.finalFitness;
 
@@ -43,9 +44,10 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number): s
                       `Crossover (${parentCount} parents)`;
 
   const rankStr = rank !== undefined ? `#${rank}` : '';
+  const stackInfo = isStacked ? `<span style="color: #6b7280; font-size: 11px; margin-left: 6px;">(${stackDepth} stacked)</span>` : '';
 
   return `
-    ${tooltipTitle(creatureName, rankStr)}
+    ${tooltipTitle(creatureName, rankStr)}${stackInfo}
 
     ${result.disqualified ? `
       <div style="margin-bottom: 8px; padding: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; border-radius: 4px;">
@@ -98,8 +100,8 @@ export function useCreatureTooltip() {
     };
   }, []);
 
-  const showTooltip = (result: CreatureSimulationResult, targetRect: DOMRect, rank?: number) => {
-    const html = generateTooltipHTML(result, rank);
+  const showTooltip = (result: CreatureSimulationResult, targetRect: DOMRect, rank?: number, stackDepth?: number) => {
+    const html = generateTooltipHTML(result, rank, stackDepth);
     managerRef.current?.show(html, targetRect);
   };
 
