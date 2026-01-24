@@ -588,6 +588,8 @@ def evolve_population(
     new_creatures_needed = target_size - len(survivors)
 
     # Create new creatures to fill culled slots
+    # Standard GA flow: selection → crossover (optional) → mutation (optional)
+    # Both operators can apply to the same offspring
     for _ in range(new_creatures_needed):
         use_crossover = config.use_crossover
         use_mutation = config.use_mutation
@@ -611,40 +613,35 @@ def evolve_population(
                 neural_crossover_method=config.neural_crossover_method,
                 sbx_eta=config.sbx_eta
             )
-            # New offspring start at next generation with 0 survival streak
-            child['generation'] = next_gen
-            child['survivalStreak'] = 0
+            reproduction_type = 'crossover'
             # Build ancestry chain from both parents
             build_ancestry_chain(
                 child, parent1, survivor_fitness_map.get(parent1['id'], 0),
                 parent2, survivor_fitness_map.get(parent2['id'], 0),
-                reproduction_type='crossover'
+                reproduction_type=reproduction_type
             )
-            new_genomes.append(child)
-
-        elif use_mutation:
-            # Clone + mutate
-            parent = weighted_random_select(survivors, probabilities)
-            child = clone_genome(parent, constraints)
-            mutated = mutate_genome(child, mutation_config, constraints)
-            # New offspring start at next generation with 0 survival streak
-            mutated['generation'] = next_gen
-            mutated['survivalStreak'] = 0
-            # Build ancestry chain from parent
-            build_ancestry_chain(mutated, parent, survivor_fitness_map.get(parent['id'], 0),
-                                 reproduction_type='mutation')
-            new_genomes.append(mutated)
-
         else:
-            # Just clone (no mutation) - clone inherits parent's ancestry directly
+            # Clone from single parent
             parent = weighted_random_select(survivors, probabilities)
             child = clone_genome(parent, constraints)
-            # New offspring start at next generation with 0 survival streak
-            child['generation'] = next_gen
-            child['survivalStreak'] = 0
-            # Clone inherits parent's ancestry chain unchanged (same creature, new ID)
+            reproduction_type = 'clone'
+            # Clone inherits parent's ancestry chain
             child['ancestryChain'] = list(parent.get('ancestryChain', []))
-            new_genomes.append(child)
+
+        # Apply mutation to offspring (whether from crossover or clone)
+        # This is standard GA behavior - mutation happens AFTER crossover
+        if use_mutation:
+            child = mutate_genome(child, mutation_config, constraints)
+            # Update reproduction type if mutation was the only operator
+            if reproduction_type == 'clone':
+                reproduction_type = 'mutation'
+                build_ancestry_chain(child, parent, survivor_fitness_map.get(parent['id'], 0),
+                                     reproduction_type=reproduction_type)
+
+        # New offspring start at next generation with 0 survival streak
+        child['generation'] = next_gen
+        child['survivalStreak'] = 0
+        new_genomes.append(child)
 
     # Calculate stats
     stats = get_population_stats(genomes, fitness_scores, generation)
