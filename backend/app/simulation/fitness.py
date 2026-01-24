@@ -23,7 +23,7 @@ from app.simulation.tensors import CreatureBatch, get_center_of_mass, MAX_NODES
 @dataclass
 class FitnessConfig:
     """Configuration for fitness calculation."""
-    pellet_points: float = 20.0         # Points per collected pellet (on top of 80 progress = 100 total)
+    pellet_points: float = 20.0         # Bonus points for collecting pellet (banked progress 80 + bonus 20 = 100 total)
     progress_max: float = 80.0          # Max points for progress toward pellet
     distance_per_unit: float = 3.0      # Points per unit traveled
     distance_traveled_max: float = 20.0 # Max points for distance traveled
@@ -726,10 +726,10 @@ def calculate_fitness(
     Calculate current fitness for all creatures.
 
     Fitness components:
-    - pellet_points per collected pellet (20, on top of 80 progress = 100 total)
-    - 0-progress_max for progress toward current pellet (edge distance)
+    - 100 per collected pellet (progress_max 80 + pellet_points 20, banked when collected)
+    - 0-progress_max for progress toward current (uncollected) pellet
     - 0-distance_traveled_max for total XZ distance traveled
-    - -efficiency_penalty * total_activation
+    - -efficiency_penalty * normalized_activation
     - -regression_penalty for moving away from pellet (only after first collection)
 
     Args:
@@ -753,8 +753,9 @@ def calculate_fitness(
 
     com = get_center_of_mass(batch)
 
-    # 1. Base: pellet_points per collected pellet
-    pellet_fitness = pellets.total_collected.float() * config.pellet_points
+    # 1. Base: Each collected pellet gave FULL progress (80) + collection bonus (20) = 100 pts
+    # The progress toward the collected pellet is "banked" when collected
+    pellet_fitness = pellets.total_collected.float() * (config.pellet_points + config.progress_max)
 
     # 2. Progress toward current pellet (0-progress_max)
     # Use stable initial radius to prevent oscillation from causing wild fitness swings

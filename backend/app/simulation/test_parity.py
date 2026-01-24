@@ -411,13 +411,16 @@ class TestFitnessComponents:
     """Verify all fitness components match TypeScript."""
 
     def test_pellet_points(self):
-        """Each collected pellet should add pellet_points to fitness."""
+        """Each collected pellet banks full points: pellet_points + progress_max."""
         genome = make_test_creature()
         batch = creature_genomes_to_batch([genome])
         pellets = initialize_pellets(batch, seed=42)
         state = initialize_fitness_state(batch, pellets)
 
-        config = FitnessConfig(pellet_points=100.0)
+        # Use default config: pellet_points=20, progress_max=80
+        # Each collected pellet should bank 100 points (20 bonus + 80 progress)
+        config = FitnessConfig()
+        points_per_pellet = config.pellet_points + config.progress_max  # 100
 
         # 0 pellets
         pellets.total_collected[0] = 0
@@ -431,12 +434,12 @@ class TestFitnessComponents:
         pellets.total_collected[0] = 3
         fitness3 = calculate_fitness(batch, pellets, state, simulation_time=1.0, config=config)
 
-        # Differences should be exactly pellet_points
+        # Differences should be exactly points_per_pellet (banked progress + bonus)
         diff_01 = fitness1[0].item() - fitness0[0].item()
         diff_13 = fitness3[0].item() - fitness1[0].item()
 
-        assert abs(diff_01 - 100.0) < 0.01
-        assert abs(diff_13 - 200.0) < 0.01
+        assert abs(diff_01 - points_per_pellet) < 0.01, f"Expected {points_per_pellet}, got {diff_01}"
+        assert abs(diff_13 - 2 * points_per_pellet) < 0.01, f"Expected {2 * points_per_pellet}, got {diff_13}"
 
 
 if __name__ == "__main__":
