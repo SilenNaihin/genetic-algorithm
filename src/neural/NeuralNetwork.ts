@@ -1,17 +1,17 @@
 /**
  * Simple feedforward neural network for neuroevolution.
  *
+ * NOTE: This class is kept for TESTING ONLY. Production code uses:
+ * - Backend (PyTorch) for actual simulation forward pass
+ * - initializeNeuralGenome() for random weight generation (inlined, no class dependency)
+ * - extractWeightMatrices() in NeuralVisualizer for UI (pure data transformation)
+ *
  * Architecture: Input -> Hidden (tanh) -> Output (tanh)
  *
- * Weights are evolved through genetic algorithms, NOT trained with gradients.
- * Initialization is optimized for GA evolution:
- * - Small uniform weights (not Gaussian - no gradient assumptions)
- * - Zero output biases (neutral state, inside dead zone in pure mode)
+ * Weight format (flat array):
+ * [input->hidden weights, hidden biases, hidden->output weights, output biases]
  *
- * This class provides:
- * - Forward pass computation
- * - Weight serialization (to/from flat array for evolution)
- * - Activation recording (for visualization)
+ * This matches the backend's weight serialization format for parity testing.
  */
 
 import { ActivationType, getActivation } from './activations';

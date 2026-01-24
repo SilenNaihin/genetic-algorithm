@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  NeuralNetwork,
   tanh,
   relu,
   sigmoid,
   getActivation,
   applyActivation,
   initializeNeuralGenome,
-  createNetworkFromGenome,
   cloneNeuralGenome,
   calculateWeightCount,
   validateNeuralGenome,
@@ -16,7 +14,22 @@ import {
   SENSOR_NAMES,
   DEFAULT_NEURAL_CONFIG
 } from '../neural';
-import type { NeuralNetworkConfig, NeuralGenomeData, NeuralConfig } from '../neural';
+import type { NeuralGenomeData, NeuralConfig } from '../neural';
+// NeuralNetwork class is kept for testing weight format parity with backend
+import { NeuralNetwork } from '../neural/NeuralNetwork';
+import type { NeuralNetworkConfig } from '../neural/NeuralNetwork';
+
+/**
+ * Create a NeuralNetwork from genome data (for testing).
+ * Production code doesn't need this - backend handles forward pass.
+ */
+function createNetworkFromGenome(data: NeuralGenomeData): NeuralNetwork {
+  const config: NeuralNetworkConfig = {
+    ...data.topology,
+    activation: data.activation
+  };
+  return NeuralNetwork.fromWeights(data.weights, config);
+}
 
 describe('Neural Network Module', () => {
   describe('Activation Functions', () => {

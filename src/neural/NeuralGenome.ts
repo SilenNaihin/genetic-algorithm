@@ -6,7 +6,6 @@
  */
 
 import { ActivationType } from './activations';
-import { NeuralNetwork, NeuralNetworkConfig } from './NeuralNetwork';
 
 /**
  * Neural network topology specification.
@@ -106,8 +105,17 @@ export const SENSOR_NAMES_HYBRID = [
 /** @deprecated Use SENSOR_NAMES_PURE or SENSOR_NAMES_HYBRID */
 export const SENSOR_NAMES = SENSOR_NAMES_HYBRID;
 
+/** Default bias for output neurons - neutral state */
+const DEFAULT_OUTPUT_BIAS = 0.0;
+
 /**
  * Create a new neural genome with GA-optimized initialized weights.
+ * Generates random weights directly without NeuralNetwork class dependency.
+ *
+ * Weight initialization for genetic algorithms:
+ * - Uniform random weights in [-0.5, 0.5] (simpler search space than Gaussian)
+ * - Zero hidden biases
+ * - Zero output biases (neutral starting state)
  *
  * @param numMuscles Number of output neurons (one per muscle)
  * @param config Neural network configuration
@@ -117,38 +125,46 @@ export function initializeNeuralGenome(
   numMuscles: number,
   config: NeuralConfig = DEFAULT_NEURAL_CONFIG
 ): NeuralGenomeData {
-  // Use mode-specific input size
   const inputSize = getInputSizeForMode(config.neuralMode);
+  const hiddenSize = config.hiddenSize;
+  const outputSize = numMuscles;
 
   const topology: NeuralTopology = {
     inputSize,
-    hiddenSize: config.hiddenSize,
-    outputSize: numMuscles
+    hiddenSize,
+    outputSize
   };
 
-  // Create network with GA-optimized initialization
-  const networkConfig: NeuralNetworkConfig = {
-    ...topology,
-    activation: config.activation
-  };
-  const network = NeuralNetwork.initialize(networkConfig);
+  // Generate weights as flat array in same order as NeuralNetwork:
+  // [input->hidden weights, hidden biases, hidden->output weights, output biases]
+  const weights: number[] = [];
+  const weightRange = 0.5;
+
+  // Input -> Hidden weights (inputSize * hiddenSize)
+  for (let i = 0; i < inputSize * hiddenSize; i++) {
+    weights.push((Math.random() - 0.5) * 2 * weightRange);
+  }
+
+  // Hidden biases (hiddenSize) - start at 0
+  for (let i = 0; i < hiddenSize; i++) {
+    weights.push(0);
+  }
+
+  // Hidden -> Output weights (hiddenSize * outputSize)
+  for (let i = 0; i < hiddenSize * outputSize; i++) {
+    weights.push((Math.random() - 0.5) * 2 * weightRange);
+  }
+
+  // Output biases (outputSize) - start at 0 (neutral)
+  for (let i = 0; i < outputSize; i++) {
+    weights.push(DEFAULT_OUTPUT_BIAS);
+  }
 
   return {
-    weights: network.toWeights(),
+    weights,
     topology,
     activation: config.activation
   };
-}
-
-/**
- * Create a neural network from genome data.
- */
-export function createNetworkFromGenome(data: NeuralGenomeData): NeuralNetwork {
-  const config: NeuralNetworkConfig = {
-    ...data.topology,
-    activation: data.activation
-  };
-  return NeuralNetwork.fromWeights(data.weights, config);
 }
 
 /**

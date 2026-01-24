@@ -1,9 +1,12 @@
 /**
  * Neural network module for neuroevolution.
  *
- * This module provides neural network control for creatures as an alternative
- * to the oscillator-based control system. Weights are evolved through genetic
- * algorithms (mutation, crossover), not trained with gradients.
+ * This module provides types and utilities for neural network-controlled creatures.
+ * The actual neural network forward pass happens on the backend (PyTorch).
+ * Frontend only needs:
+ * - Types for genome data
+ * - Weight initialization for preview creatures
+ * - Activation functions for visualization fallback
  *
  * @see docs/NEURAL.md for full documentation
  */
@@ -18,11 +21,7 @@ export {
   applyActivation
 } from './activations';
 
-// Neural network class
-export { NeuralNetwork, DEFAULT_OUTPUT_BIAS } from './NeuralNetwork';
-export type { NeuralNetworkConfig, ForwardResult } from './NeuralNetwork';
-
-// Genome data structures
+// Genome data structures and utilities
 export type {
   NeuralTopology,
   NeuralGenomeData,
@@ -38,7 +37,6 @@ export {
   SENSOR_NAMES_HYBRID,
   getInputSizeForMode,
   initializeNeuralGenome,
-  createNetworkFromGenome,
   cloneNeuralGenome,
   calculateWeightCount,
   validateNeuralGenome,
