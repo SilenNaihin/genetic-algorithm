@@ -421,6 +421,14 @@ async def run_generation(
         run.best_creature_id = best_creature[0]["id"]
         run.best_creature_generation = current_gen
 
+    # Update longest survivor tracking
+    for genome in genomes:
+        streak = genome.get("survivalStreak", genome.get("survival_streak", 0))
+        if streak > run.longest_survivor_streak:
+            run.longest_survivor_streak = streak
+            run.longest_survivor_id = genome["id"]
+            run.longest_survivor_generation = current_gen
+
     await db.commit()
 
     # Build creature data for frontend display
