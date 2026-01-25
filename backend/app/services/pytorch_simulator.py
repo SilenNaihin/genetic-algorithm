@@ -126,6 +126,7 @@ class PyTorchSimulator:
                 neural_mode=config.neural_mode,
                 hidden_size=config.neural_hidden_size,
                 activation=config.neural_activation,
+                time_encoding=config.time_encoding,
             )
 
             network = BatchedNeuralNetwork.from_genomes(
@@ -153,6 +154,8 @@ class PyTorchSimulator:
                 record_frames=config.record_frames,
                 frame_interval=frame_interval,
                 arena_size=config.arena_size,
+                time_encoding=config.time_encoding,
+                max_time=config.simulation_duration,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:
@@ -299,13 +302,22 @@ class PyTorchSimulator:
                 fitness_over_time_list = [_safe_float(f.item()) for f in fitness_tensor]
 
             # Build activations per frame from simulation's per-frame neural outputs
+            # Format: list of {inputs, hidden, outputs} dicts for each frame
             activations_per_frame_list = None
             if config.record_frames and 'activations_per_frame' in result and frame_count > 0:
-                activations_tensor = result['activations_per_frame'][i]  # [F, M]
-                activations_per_frame_list = [
-                    [_safe_float(a.item()) for a in frame_activations]
-                    for frame_activations in activations_tensor
-                ]
+                act_data = result['activations_per_frame']
+                # act_data is {inputs: [B, F, I], hidden: [B, F, H], outputs: [B, F, O]}
+                inputs_tensor = act_data['inputs'][i]   # [F, I]
+                hidden_tensor = act_data['hidden'][i]   # [F, H]
+                outputs_tensor = act_data['outputs'][i]  # [F, O]
+
+                activations_per_frame_list = []
+                for f in range(inputs_tensor.shape[0]):
+                    activations_per_frame_list.append({
+                        'inputs': [_safe_float(v.item()) for v in inputs_tensor[f]],
+                        'hidden': [_safe_float(v.item()) for v in hidden_tensor[f]],
+                        'outputs': [_safe_float(v.item()) for v in outputs_tensor[f]],
+                    })
 
             results.append(SimulationResult(
                 genome_id=genome_id,

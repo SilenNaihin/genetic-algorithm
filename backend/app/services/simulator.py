@@ -3,10 +3,16 @@ Simulation service for running physics simulations.
 
 This module provides the main SimulatorService used by API endpoints.
 It delegates to PyTorchSimulator for actual batched physics computation.
+
+Supports optional GPU backend proxy via GPU_BACKEND_URL environment variable.
+When set, simulation requests are forwarded to a remote GPU server.
 """
 
+import os
 import time
 from typing import Any
+
+import httpx
 
 from app.schemas.simulation import (
     SimulationConfig,
@@ -15,6 +21,9 @@ from app.schemas.simulation import (
     BatchSimulationResponse,
 )
 from app.services.pytorch_simulator import PyTorchSimulator
+
+# Remote GPU backend URL (e.g., "http://localhost:9000" via SSH tunnel)
+GPU_BACKEND_URL = os.getenv("GPU_BACKEND_URL")
 
 
 class SimulatorService:

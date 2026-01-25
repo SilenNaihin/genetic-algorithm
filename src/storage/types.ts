@@ -4,7 +4,7 @@
  * Shared types for storage implementations.
  */
 
-import type { PelletData, SimulationFrame } from '../types';
+import type { PelletData, SimulationFrame, FrameActivations } from '../types';
 import type { SimulationConfig, CreatureGenome, FitnessHistoryEntry, Vector3 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 
@@ -39,7 +39,7 @@ export interface CompactCreatureResult {
   disqualified: string | null;
   frames: number[][];  // Compact: [[time, x1,y1,z1, x2,y2,z2, ...], ...]
   pelletData: { position: Vector3; collectedAtFrame: number | null }[];
-  activationsPerFrame?: number[][];  // Neural network outputs per frame [frame][muscle]
+  activationsPerFrame?: FrameActivations[];  // Full neural network activations per frame
 }
 
 /**

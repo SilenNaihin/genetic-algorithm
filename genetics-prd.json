@@ -125,25 +125,6 @@
     },
     {
       "id": 7,
-      "name": "Time Bonus",
-      "status": "pending",
-      "description": "Add time bonus for faster pellet collection",
-      "tasks": [
-        "Add fitnessTimeBonus parameter (default 20)",
-        "Add fitnessTimeBonusScale (seconds for full bonus, default 5)",
-        "Calculate time bonus: bonus * (1 - timeToCollect/scale)",
-        "Update fitness calculation in BatchSimulator",
-        "Add UI controls"
-      ],
-      "files": [
-        "src/types/simulation.ts",
-        "src/simulation/BatchSimulator.ts",
-        "src/main.ts"
-      ],
-      "test_focus": "Faster collectors should score higher"
-    },
-    {
-      "id": 8,
       "name": "Proprioception Inputs",
       "status": "pending",
       "description": "Add body-sensing inputs to neural network (muscle strain, node velocities, ground contact)",
@@ -167,26 +148,7 @@
       "test_focus": "With proprioception, creatures should develop smoother gaits and better balance"
     },
     {
-      "id": 9,
-      "name": "Efficiency Penalty Ramp",
-      "status": "pending",
-      "description": "Make efficiency penalty ramp up over generations",
-      "tasks": [
-        "Add efficiencyPenaltyStartGen (default 100)",
-        "Add efficiencyPenaltyRampGens (default 100)",
-        "Calculate effective penalty: 0 before startGen, linear ramp to full over rampGens",
-        "Update fitness calculation in BatchSimulator",
-        "Add UI controls for start gen and ramp duration"
-      ],
-      "files": [
-        "src/types/simulation.ts",
-        "src/simulation/BatchSimulator.ts",
-        "src/main.ts"
-      ],
-      "test_focus": "Early generations should explore freely, later generations penalized for inefficiency"
-    },
-    {
-      "id": 10,
+      "id": 8,
       "name": "Speciation (Basic)",
       "status": "pending",
       "description": "Implement basic speciation for diversity protection",
@@ -208,7 +170,7 @@
       "test_focus": "Multiple species should coexist with different strategies"
     },
     {
-      "id": 11,
+      "id": 9,
       "name": "UI Panel Expansion",
       "status": "pending",
       "description": "Expand neural settings panel to accommodate new parameters",
@@ -217,8 +179,7 @@
         "Section 1: Network (mode, hidden size, activation, output bias)",
         "Section 2: Mutation (rate decay start/end/gens, adaptive toggle)",
         "Section 3: Selection (method, tournament size, fitness sharing)",
-        "Section 4: Fitness (time bonus, efficiency ramp)",
-        "Section 5: Advanced (proprioception, speciation)",
+        "Section 4: Advanced (proprioception, speciation)",
         "Make panel scrollable or use tabs"
       ],
       "files": [
@@ -228,7 +189,7 @@
       "test_focus": "All parameters accessible and well-organized"
     },
     {
-      "id": 12,
+      "id": 10,
       "name": "API-First Architecture",
       "status": "pending",
       "description": "Prepare for headless NAS by exposing all parameters via API",
@@ -247,11 +208,11 @@
       "test_focus": "Headless runs should complete and return results"
     },
     {
-      "id": 13,
+      "id": 11,
       "name": "Neural Architecture Search (NAS)",
       "status": "pending",
       "description": "Automated parameter optimization via grid search and Bayesian optimization",
-      "depends_on": "Phase 12 (API-First)",
+      "depends_on": "Phase 10 (API-First)",
       "tasks": [
         "Define NASConfig with parameter ranges to search",
         "Implement grid search over discrete parameter combinations",
@@ -270,11 +231,11 @@
       "test_focus": "NAS should find better parameters than defaults"
     },
     {
-      "id": 14,
+      "id": 12,
       "name": "Human-in-the-Loop Parameter Tweaking",
       "status": "pending",
       "description": "Allow mid-run parameter changes to guide evolution manually",
-      "depends_on": "Phase 12 (API-First)",
+      "depends_on": "Phase 10 (API-First)",
       "tasks": [
         "Identify tweakable parameters: mutation rate, crossover rate, selection pressure, fitness weights",
         "Identify non-tweakable parameters: network topology, input size (require restart)",
@@ -295,7 +256,7 @@
       "notes": "This enables 'playing god' - watching evolution and nudging parameters when stuck. Storage complexity: each run stores array of ParameterChangeEvents."
     },
     {
-      "id": 15,
+      "id": 13,
       "name": "NEAT Foundation",
       "status": "pending",
       "description": "Implement NEAT gene representation and structural mutations",
@@ -308,7 +269,7 @@
         "Implement mutateAddConnection()",
         "Implement mutateAddNode()",
         "Add NEAT crossover by gene alignment",
-        "Integrate with speciation (Phase 10)"
+        "Integrate with speciation (Phase 8)"
       ],
       "files": [
         "src/neural/NEATGenome.ts (new)",
@@ -381,8 +342,39 @@
     "One phase at a time - test before moving on",
     "Update documentation after each phase",
     "Add tests for new genetics functions",
-    "Keep UI changes minimal until Phase 11",
+    "Keep UI changes minimal until Phase 9",
     "Maintain backward compatibility with existing saved runs",
     "GPU acceleration handled in separate chat"
-  ]
+  ],
+  "if_we_plateau": {
+    "description": "Lower-priority features to try if evolution stagnates. These add explicit selection pressure for behaviors already implicitly selected for, so may over-constrain the solution space.",
+    "features": [
+      {
+        "name": "Time Bonus",
+        "description": "Add time bonus for faster pellet collection",
+        "rationale": "Breaks ties between creatures that collect same number of pellets. Adds continuous gradient to discrete pellet count.",
+        "concern": "Already implicitly selected for - faster creatures collect MORE pellets in same time. May double-count same trait.",
+        "tasks": [
+          "Add fitnessTimeBonus parameter (default 20)",
+          "Add fitnessTimeBonusScale (seconds for full bonus, default 5)",
+          "Calculate time bonus: bonus * (1 - timeToCollect/scale)",
+          "Update fitness calculation in backend",
+          "Add UI controls"
+        ]
+      },
+      {
+        "name": "Efficiency Penalty Ramp",
+        "description": "Make efficiency penalty ramp up over generations",
+        "rationale": "Let creatures explore freely early, then penalize inefficiency later. Prevents premature convergence to efficient-but-bad solutions.",
+        "concern": "Adds complexity. May be better to just run with no penalty initially and enable it manually if needed.",
+        "tasks": [
+          "Add efficiencyPenaltyStartGen (default 100)",
+          "Add efficiencyPenaltyRampGens (default 100)",
+          "Calculate effective penalty: 0 before startGen, linear ramp to full over rampGens",
+          "Update fitness calculation in backend",
+          "Add UI controls for start gen and ramp duration"
+        ]
+      }
+    ]
+  }
 }

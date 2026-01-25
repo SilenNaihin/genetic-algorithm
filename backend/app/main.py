@@ -48,7 +48,18 @@ app.include_router(genetics.router, prefix="/api/genetics", tags=["genetics"])
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "0.1.0"}
+    import os
+    import torch
+
+    gpu_backend_url = os.getenv("GPU_BACKEND_URL")
+
+    return {
+        "status": "healthy",
+        "version": "0.1.0",
+        "device": "cuda" if torch.cuda.is_available() else "cpu",
+        "gpu_backend_url": gpu_backend_url,
+        "mode": "proxy" if gpu_backend_url else "local",
+    }
 
 
 @app.get("/")
