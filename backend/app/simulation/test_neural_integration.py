@@ -97,34 +97,30 @@ class TestNeuralRestLengths:
         """In pure mode, positive NN output contracts muscle."""
         batch = create_test_batch(5)
         base_rest_lengths = batch.spring_rest_length.clone()
-        amplitude = batch.spring_amplitude
 
         nn_outputs = torch.ones(5, 15)  # All outputs = 1
         rest_lengths = compute_neural_rest_lengths(
             batch, base_rest_lengths, nn_outputs, time=0.0, mode='pure'
         )
 
-        # Contraction = nn_output * amplitude = 1.0 * 0.3 = 0.3
-        # rest_length = base * (1 - 0.3) = base * 0.7
-        expected = base_rest_lengths * (1 - amplitude)
-        # Only compare valid muscles
+        # Pure mode: contraction = nn_output directly (no amplitude scaling)
+        # Contraction = 1.0, rest_length = base * (1 - 1) = 0, clamped to 0.01
         valid_mask = batch.spring_mask.bool()
-        assert torch.allclose(rest_lengths[valid_mask], expected[valid_mask], atol=1e-5)
+        assert torch.allclose(rest_lengths[valid_mask], torch.full_like(rest_lengths[valid_mask], 0.01), atol=1e-5)
 
     def test_pure_mode_negative_output_extends(self):
         """In pure mode, negative NN output extends muscle."""
         batch = create_test_batch(5)
         base_rest_lengths = batch.spring_rest_length.clone()
-        amplitude = batch.spring_amplitude
 
         nn_outputs = -torch.ones(5, 15)  # All outputs = -1
         rest_lengths = compute_neural_rest_lengths(
             batch, base_rest_lengths, nn_outputs, time=0.0, mode='pure'
         )
 
-        # Contraction = -1.0 * 0.3 = -0.3
-        # rest_length = base * (1 - (-0.3)) = base * 1.3
-        expected = base_rest_lengths * (1 + amplitude)
+        # Pure mode: contraction = nn_output directly (no amplitude scaling)
+        # Contraction = -1.0, rest_length = base * (1 - (-1)) = base * 2
+        expected = base_rest_lengths * 2
         valid_mask = batch.spring_mask.bool()
         assert torch.allclose(rest_lengths[valid_mask], expected[valid_mask], atol=1e-5)
 

@@ -1161,8 +1161,9 @@ def compute_neural_rest_lengths(
 
     if mode == 'pure':
         # Pure mode: NN directly controls contraction
-        # NN output is already in [-1, 1], map to contraction
-        contraction = nn_outputs * amplitude
+        # NN output [-1, 1] maps directly to contraction (no amplitude scaling)
+        # rest_length clamp at 0.01 provides physics safety boundary
+        contraction = nn_outputs
     else:
         # Hybrid mode: NN modulates base oscillator
         base_contraction = torch.sin(time * effective_freq * 2 * math.pi + phase)
