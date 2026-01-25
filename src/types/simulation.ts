@@ -75,6 +75,11 @@ export interface SimulationConfig {
   useFitnessSharing: boolean;         // Enable fitness sharing to penalize similar creatures
   sharingRadius: number;              // Genome distance threshold for sharing (0.1-2.0)
 
+  // Speciation (diversity protection)
+  useSpeciation: boolean;             // Enable speciation to group creatures by similarity
+  compatibilityThreshold: number;     // Genome distance threshold for same species (0.1-3.0)
+  minSpeciesSize: number;             // Minimum survivors per species (1-20)
+
   // Proprioception (body-sensing inputs)
   useProprioception: boolean;         // Enable body-sensing inputs (muscle strain, node velocities, ground contact)
   proprioceptionInputs: 'strain' | 'velocity' | 'ground' | 'all';  // Which proprioception inputs to include
@@ -145,6 +150,11 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Fitness sharing defaults
   useFitnessSharing: false,      // Off by default - enable to maintain diversity
   sharingRadius: 0.5,            // Moderate sharing radius
+
+  // Speciation defaults
+  useSpeciation: false,          // Off by default - enable to protect diverse solutions
+  compatibilityThreshold: 1.0,   // Genome distance threshold for same species
+  minSpeciesSize: 2,             // Minimum survivors per species
 
   // Proprioception defaults
   useProprioception: false,      // Off by default - experimental feature

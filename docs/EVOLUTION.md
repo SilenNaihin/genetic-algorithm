@@ -246,6 +246,82 @@ With sharing (3 similar to A):
   Creature B: shared_fitness = 95 / 1 = 95 → survives!
 ```
 
+## Speciation
+
+Speciation (inspired by NEAT - Stanley & Miikkulainen, 2002) groups creatures by genome similarity. Selection happens within each species, protecting diverse solutions from being outcompeted.
+
+### How It Works
+
+1. **Assign genomes to species** based on neural genome distance
+2. **Select survivors within each species** (each species keeps its top N%)
+3. **Combine survivors** from all species for breeding
+
+This differs from fitness sharing:
+- **Fitness sharing**: Penalizes similarity (reduces fitness of clones)
+- **Speciation**: Guarantees diversity (each species survives independently)
+
+### Species Assignment
+
+```python
+def assign_species(genomes, fitness_scores, compatibility_threshold):
+    species_list = []
+    for genome, fitness in zip(genomes, fitness_scores):
+        # Try to find compatible species
+        for species in species_list:
+            if distance(genome, species.representative) < compatibility_threshold:
+                species.add(genome, fitness)
+                break
+        else:
+            # Create new species
+            species_list.append(Species(genome))
+    return species_list
+```
+
+### Within-Species Selection
+
+Each species uses truncation selection internally:
+- Sort members by fitness
+- Keep top N% (determined by survival_rate)
+- At least `min_species_size` members survive (prevents extinction)
+
+### Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `useSpeciation` | `false` | Enable/disable speciation |
+| `compatibilityThreshold` | `1.0` | Genome distance threshold for same species |
+| `minSpeciesSize` | `2` | Minimum survivors per species |
+
+**Compatibility threshold guidelines:**
+- **0.3 - 0.5** (low): Many small species, strong diversity protection
+- **1.0** (default): Balanced species formation
+- **1.5 - 3.0** (high): Few large species, weaker diversity protection
+
+### When to Use
+
+- **Exploring multiple strategies** - Protects different approaches from competing
+- **Complex fitness landscapes** - Multiple local optima should coexist
+- **Combined with fitness sharing** - Speciation for structure, sharing for fine-grained diversity
+
+### Example
+
+```
+Without speciation (truncation selection):
+  Population: [A1, A2, A3, B1]  (A-type fitness: 100, B-type fitness: 60)
+  Survivors: [A1, A2]          (B-type goes extinct!)
+
+With speciation:
+  Species A: [A1, A2, A3] → keeps [A1, A2] (top 66%)
+  Species B: [B1] → keeps [B1] (min_species_size=1)
+  Survivors: [A1, A2, B1]      (B-type survives!)
+```
+
+### Limitations (Not Implemented Yet)
+
+- **Species persistence**: Species are recreated each generation (no tracking across generations)
+- **Stagnation culling**: Species that don't improve aren't removed
+- **Species visualization**: No UI to show species count or distribution
+
 ## Configuration Reference
 
 | Parameter | Default | Description |
@@ -265,6 +341,9 @@ With sharing (3 similar to A):
 | `weightMutationDecay` | `'linear'` | Decay schedule for weight mutation |
 | `useFitnessSharing` | `false` | Enable fitness sharing for diversity |
 | `sharingRadius` | `0.5` | Genome distance threshold for sharing |
+| `useSpeciation` | `false` | Enable speciation for diversity protection |
+| `compatibilityThreshold` | `1.0` | Genome distance threshold for same species |
+| `minSpeciesSize` | `2` | Minimum survivors per species |
 
 ## Recommended Configurations
 

@@ -153,27 +153,16 @@
     },
     {
       "id": 8,
-      "name": "NEAT Foundation",
+      "name": "NEAT",
       "status": "pending",
-      "description": "Implement NEAT gene representation and structural mutations",
-      "see_also": "docs/NEAT.md",
-      "tasks": [
-        "Define ConnectionGene and NodeGene interfaces",
-        "Implement global innovation counter",
-        "Implement NEATGenome creation with minimal topology",
-        "Implement NEATNetwork.fromGenome() with topological sort",
-        "Implement mutateAddConnection()",
-        "Implement mutateAddNode()",
-        "Add NEAT crossover by gene alignment",
-        "Integrate with speciation (Phase 9)"
-      ],
-      "files": [
-        "src/neural/NEATGenome.ts (new)",
-        "src/neural/NEATNetwork.ts (new)",
-        "src/genetics/NEATMutation.ts (new)",
-        "src/genetics/NEATCrossover.ts (new)"
-      ],
-      "test_focus": "NEAT networks should grow topology over generations"
+      "description": "Implement NEAT (NeuroEvolution of Augmenting Topologies) - topology evolution",
+      "see_also": "neat-prd.json",
+      "depends_on": "Phase 10 (Speciation)",
+      "phases": {
+        "phase_1": "Feedforward NEAT - complete implementation",
+        "phase_2": "Recurrent NEAT - add temporal memory (future)"
+      },
+      "test_focus": "NEAT networks should grow topology over generations, species should form"
     },
     {
       "id": 9,
@@ -252,22 +241,27 @@
     {
       "id": 10,
       "name": "Speciation (Basic)",
-      "status": "pending",
-      "description": "Implement basic speciation for diversity protection",
+      "status": "complete",
+      "description": "Implement basic speciation for diversity protection. Prerequisite for NEAT.",
+      "note": "Design distance_fn as pluggable parameter so NEAT can use neat_genome_distance()",
       "tasks": [
-        "Define Species interface",
+        "Define Species dataclass",
         "Add useSpeciation: boolean to SimulationConfig",
         "Add compatibilityThreshold parameter",
-        "Implement species assignment based on genome distance",
-        "Implement within-species selection",
-        "Add species stagnation tracking and culling",
+        "Add minSpeciesSize parameter",
+        "Implement assign_species() with pluggable distance_fn parameter",
+        "Implement select_within_species()",
+        "Integrate into evolve_population()",
+        "Add UI toggle and settings",
         "Visualize species count in stats panel"
       ],
       "files": [
+        "backend/app/genetics/speciation.py (new)",
+        "backend/app/genetics/population.py",
+        "backend/app/schemas/genetics.py",
+        "backend/app/schemas/simulation.py",
         "src/types/simulation.ts",
-        "src/genetics/Speciation.ts (new)",
-        "src/genetics/Population.ts",
-        "src/main.ts"
+        "app/components/menu/MenuScreen.tsx"
       ],
       "test_focus": "Multiple species should coexist with different strategies"
     },

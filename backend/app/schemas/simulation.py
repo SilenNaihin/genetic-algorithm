@@ -83,6 +83,11 @@ class SimulationConfig(BaseModel):
     use_fitness_sharing: bool = False
     sharing_radius: float = Field(default=0.5, ge=0.1, le=2.0)
 
+    # Speciation (diversity protection)
+    use_speciation: bool = False
+    compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
+    min_species_size: int = Field(default=2, ge=1, le=20)
+
     # Proprioception (body-sensing inputs)
     use_proprioception: bool = False
     proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'

@@ -206,8 +206,8 @@ export function MenuScreen() {
             />
           )}
 
-          {/* Evolution mode checkboxes */}
-          <div style={{ display: 'flex', gap: '16px' }}>
+          {/* Evolution mode - Mutation/Crossover stack */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
               <input
                 type="checkbox"
@@ -220,121 +220,167 @@ export function MenuScreen() {
               />
               Mutation
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-              <input
-                type="checkbox"
-                checked={config.useCrossover}
-                onChange={(e) => {
-                  if (!e.target.checked && !config.useMutation) return;
-                  setConfig({ useCrossover: e.target.checked });
-                }}
-                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-              />
-              Crossover
-            </label>
-            {/* Crossover settings gear - only shown when crossover enabled */}
-            {config.useCrossover && config.useNeuralNet && (
-              <SettingsPopover width={200}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                      Method
-                      <InfoTooltip text={
-                        config.neuralCrossoverMethod === 'sbx' ? TOOLTIPS.crossoverSbx :
-                        config.neuralCrossoverMethod === 'uniform' ? TOOLTIPS.crossoverUniform :
-                        TOOLTIPS.crossoverInterpolation
-                      } />
-                    </div>
-                    <select
-                      value={config.neuralCrossoverMethod}
-                      onChange={(e) => setConfig({ neuralCrossoverMethod: e.target.value as 'interpolation' | 'uniform' | 'sbx' })}
-                      style={{
-                        width: '100%',
-                        background: 'var(--bg-tertiary)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        padding: '6px 8px',
-                        color: 'var(--text-primary)',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <option value="sbx">SBX</option>
-                      <option value="interpolation">Interpolation</option>
-                      <option value="uniform">Uniform</option>
-                    </select>
-                  </div>
-                  {config.neuralCrossoverMethod === 'sbx' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={config.useCrossover}
+                  onChange={(e) => {
+                    if (!e.target.checked && !config.useMutation) return;
+                    setConfig({ useCrossover: e.target.checked });
+                  }}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                />
+                Crossover
+              </label>
+              {/* Crossover settings gear - only shown when crossover enabled */}
+              {config.useCrossover && config.useNeuralNet && (
+                <SettingsPopover width={200}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                        Eta (η)
-                        <InfoTooltip text={TOOLTIPS.sbxEta} />
+                        Method
+                        <InfoTooltip text={
+                          config.neuralCrossoverMethod === 'sbx' ? TOOLTIPS.crossoverSbx :
+                          config.neuralCrossoverMethod === 'uniform' ? TOOLTIPS.crossoverUniform :
+                          TOOLTIPS.crossoverInterpolation
+                        } />
+                      </div>
+                      <select
+                        value={config.neuralCrossoverMethod}
+                        onChange={(e) => setConfig({ neuralCrossoverMethod: e.target.value as 'interpolation' | 'uniform' | 'sbx' })}
+                        style={{
+                          width: '100%',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '4px',
+                          padding: '6px 8px',
+                          color: 'var(--text-primary)',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="sbx">SBX</option>
+                        <option value="interpolation">Interpolation</option>
+                        <option value="uniform">Uniform</option>
+                      </select>
+                    </div>
+                    {config.neuralCrossoverMethod === 'sbx' && (
+                      <div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                          Eta (η)
+                          <InfoTooltip text={TOOLTIPS.sbxEta} />
+                        </div>
+                        <input
+                          type="range"
+                          min={0.5}
+                          max={5}
+                          step={0.5}
+                          value={config.sbxEta}
+                          onChange={(e) => setConfig({ sbxEta: parseFloat(e.target.value) })}
+                          style={{ width: '100%', accentColor: 'var(--accent)' }}
+                        />
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                          {config.sbxEta} {config.sbxEta <= 1 ? '(exploratory)' : config.sbxEta >= 4 ? '(conservative)' : '(balanced)'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </SettingsPopover>
+              )}
+            </div>
+          </div>
+
+          {/* Crossover ratio slider - only shown when both mutation and crossover enabled */}
+          {config.useMutation && config.useCrossover && (
+            <ParamSlider
+              name="Cross/Mut Ratio"
+              value={config.crossoverRate * 100}
+              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
+              min={0}
+              max={100}
+              tooltip={TOOLTIPS.crossoverRate}
+              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
+              width="160px"
+            />
+          )}
+
+          {/* Diversity stack - Sharing/Speciation */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={config.useFitnessSharing}
+                  onChange={(e) => setConfig({ useFitnessSharing: e.target.checked })}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                />
+                Sharing
+                <InfoTooltip text={TOOLTIPS.fitnessSharing} width={280} />
+              </label>
+              {/* Sharing settings gear - only shown when sharing enabled */}
+              {config.useFitnessSharing && (
+                <SettingsPopover width={200}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                        Sharing Radius
+                        <InfoTooltip text={TOOLTIPS.sharingRadius} />
                       </div>
                       <input
                         type="range"
-                        min={0.5}
-                        max={5}
-                        step={0.5}
-                        value={config.sbxEta}
-                        onChange={(e) => setConfig({ sbxEta: parseFloat(e.target.value) })}
+                        min={0.1}
+                        max={2.0}
+                        step={0.1}
+                        value={config.sharingRadius}
+                        onChange={(e) => setConfig({ sharingRadius: parseFloat(e.target.value) })}
                         style={{ width: '100%', accentColor: 'var(--accent)' }}
                       />
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                        {config.sbxEta} {config.sbxEta <= 1 ? '(exploratory)' : config.sbxEta >= 4 ? '(conservative)' : '(balanced)'}
+                        {config.sharingRadius.toFixed(1)} {config.sharingRadius <= 0.3 ? '(narrow)' : config.sharingRadius >= 1.0 ? '(wide)' : '(balanced)'}
                       </div>
                     </div>
-                  )}
-                </div>
-              </SettingsPopover>
-            )}
-            {/* Crossover ratio slider - only shown when both mutation and crossover enabled */}
-            {config.useMutation && config.useCrossover && (
-              <ParamSlider
-                name="Cross/Mut Ratio"
-                value={config.crossoverRate * 100}
-                displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
-                min={0}
-                max={100}
-                tooltip={TOOLTIPS.crossoverRate}
-                onChange={(v) => setConfig({ crossoverRate: v / 100 })}
-                width="160px"
-              />
-            )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-              <input
-                type="checkbox"
-                checked={config.useFitnessSharing}
-                onChange={(e) => setConfig({ useFitnessSharing: e.target.checked })}
-                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-              />
-              Sharing
-              <InfoTooltip text={TOOLTIPS.fitnessSharing} width={280} />
-            </label>
-            {/* Sharing settings gear - only shown when sharing enabled */}
-            {config.useFitnessSharing && (
-              <SettingsPopover width={200}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                      Sharing Radius
-                      <InfoTooltip text={TOOLTIPS.sharingRadius} />
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={2.0}
-                      step={0.1}
-                      value={config.sharingRadius}
-                      onChange={(e) => setConfig({ sharingRadius: parseFloat(e.target.value) })}
-                      style={{ width: '100%', accentColor: 'var(--accent)' }}
-                    />
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      {config.sharingRadius.toFixed(1)} {config.sharingRadius <= 0.3 ? '(narrow)' : config.sharingRadius >= 1.0 ? '(wide)' : '(balanced)'}
+                  </div>
+                </SettingsPopover>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={config.useSpeciation}
+                  onChange={(e) => setConfig({ useSpeciation: e.target.checked })}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                />
+                Speciation
+                <InfoTooltip text={TOOLTIPS.speciation} width={280} />
+              </label>
+              {/* Speciation settings gear - only shown when speciation enabled */}
+              {config.useSpeciation && (
+                <SettingsPopover width={200}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                        Compatibility Threshold
+                        <InfoTooltip text={TOOLTIPS.compatibilityThreshold} />
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={3.0}
+                        step={0.1}
+                        value={config.compatibilityThreshold}
+                        onChange={(e) => setConfig({ compatibilityThreshold: parseFloat(e.target.value) })}
+                        style={{ width: '100%', accentColor: 'var(--accent)' }}
+                      />
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                        {config.compatibilityThreshold.toFixed(1)} {config.compatibilityThreshold <= 0.5 ? '(many species)' : config.compatibilityThreshold >= 2.0 ? '(few species)' : '(balanced)'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </SettingsPopover>
-            )}
+                </SettingsPopover>
+              )}
+            </div>
           </div>
 
           {/* Replay Storage */}

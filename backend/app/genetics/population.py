@@ -29,6 +29,7 @@ from .crossover import (
     initialize_neural_genome,
 )
 from .fitness_sharing import apply_fitness_sharing
+from .speciation import apply_speciation
 from app.neural.network import get_input_size
 
 
@@ -82,6 +83,11 @@ class EvolutionConfig:
     # Fitness sharing (diversity maintenance)
     use_fitness_sharing: bool = False
     sharing_radius: float = 0.5  # Genome distance threshold
+
+    # Speciation (diversity protection)
+    use_speciation: bool = False
+    compatibility_threshold: float = 1.0  # Genome distance for same species
+    min_species_size: int = 2  # Minimum survivors per species
 
     # Mutation
     mutation_rate: float = 0.1
@@ -468,6 +474,9 @@ def evolve_population(
             sbx_eta=config.get('sbx_eta', 2.0),
             use_fitness_sharing=config.get('use_fitness_sharing', False),
             sharing_radius=config.get('sharing_radius', 0.5),
+            use_speciation=config.get('use_speciation', False),
+            compatibility_threshold=config.get('compatibility_threshold', 1.0),
+            min_species_size=config.get('min_species_size', 2),
             mutation_rate=config.get('mutation_rate', 0.1),
             mutation_magnitude=config.get('mutation_magnitude', 0.3),
             structural_rate=config.get('structural_rate', 0.1),
@@ -519,7 +528,18 @@ def evolve_population(
     survival_rate = 1 - config.cull_percentage
     num_survivors = max(1, int(len(genomes) * survival_rate))
 
-    if config.selection_method == 'truncation':
+    # Apply speciation if enabled (replaces normal selection with within-species selection)
+    if config.use_speciation:
+        # Speciation groups creatures by genome similarity
+        # Selection happens within each species, protecting diverse solutions
+        survivors, _species_list = apply_speciation(
+            genomes,
+            selection_fitness,
+            config.compatibility_threshold,
+            survival_rate,
+            config.min_species_size,
+        )
+    elif config.selection_method == 'truncation':
         # Strict cutoff - only top performers survive
         result = truncation_selection(genomes, selection_fitness, survival_rate)
         survivors = result.survivors

@@ -50,6 +50,15 @@ from .population import (
     evolve_population,
 )
 
+from .speciation import (
+    Species,
+    DistanceFunction,
+    assign_species,
+    select_within_species,
+    apply_speciation,
+    get_species_stats,
+)
+
 __all__ = [
     # Selection
     'SelectionResult',
@@ -89,4 +98,11 @@ __all__ = [
     'generate_population',
     'get_population_stats',
     'evolve_population',
+    # Speciation
+    'Species',
+    'DistanceFunction',
+    'assign_species',
+    'select_within_species',
+    'apply_speciation',
+    'get_species_stats',
 ]

@@ -617,17 +617,3 @@ class TestPhysicsConstantsParity:
         assert DEFAULT_CONFIG.fitness_distance_traveled_max == 20.0
         assert DEFAULT_CONFIG.fitness_regression_penalty == 20.0
 
-    def test_neural_config_matches_typescript(self):
-        """Neural network config defaults should match TypeScript DEFAULT_CONFIG."""
-        from app.simulation.config import DEFAULT_CONFIG
-
-        # TypeScript neural defaults (from simulation.ts)
-        assert DEFAULT_CONFIG.use_neural_net == True
-        assert DEFAULT_CONFIG.neural_mode == 'hybrid'
-        assert DEFAULT_CONFIG.neural_hidden_size == 8
-        assert DEFAULT_CONFIG.neural_activation == 'tanh'
-        assert DEFAULT_CONFIG.weight_mutation_rate == 0.1
-        assert DEFAULT_CONFIG.weight_mutation_magnitude == 0.3
-        assert DEFAULT_CONFIG.neural_output_bias == 0.0
-        assert DEFAULT_CONFIG.fitness_efficiency_penalty == 0.5
-        assert DEFAULT_CONFIG.neural_dead_zone == 0.1

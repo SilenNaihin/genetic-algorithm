@@ -66,6 +66,11 @@ class EvolutionConfig(BaseModel):
     # Constraints
     constraints: GenomeConstraints = Field(default_factory=GenomeConstraints)
 
+    # Speciation (diversity protection)
+    use_speciation: bool = False
+    compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
+    min_species_size: int = Field(default=2, ge=1, le=20)
+
     # Neural network
     use_neural_net: bool = True
     neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)

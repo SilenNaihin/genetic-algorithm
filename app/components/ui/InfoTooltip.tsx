@@ -154,6 +154,10 @@ export const TOOLTIPS = {
   fitnessSharing: 'Fitness sharing (Goldberg & Richardson, 1987) maintains population diversity by penalizing creatures that are too similar. Each creature\'s fitness is divided by the number of similar creatures in its "niche". This prevents the population from converging to a single solution and encourages exploration of different strategies.',
   sharingRadius: 'Distance threshold for considering two creatures "similar". Creatures within this genome distance share fitness rewards. Lower values (0.1-0.3): only very similar creatures share, preserves more unique solutions. Higher values (0.5-1.0): broader sharing, stronger diversity pressure. Based on neural weight distance.',
 
+  // Speciation
+  speciation: 'Speciation groups creatures by genome similarity. Selection happens within each species, protecting diverse solutions from being outcompeted. Unlike fitness sharing which penalizes similarity, speciation guarantees each distinct strategy survives. Inspired by NEAT (Stanley & Miikkulainen, 2002).',
+  compatibilityThreshold: 'Genome distance threshold for species membership. Lower values (0.3-0.5): many small species, strong diversity. Higher values (1.5-3.0): few large species, weak diversity. Creatures beyond this distance from all species representatives form new species.',
+
   // Proprioception (body-sensing)
   proprioception: 'Add body-sensing inputs to the neural network. Creatures can sense their own body state: muscle strain (stretch/compression), node velocities (how fast body parts move), and ground contact (which nodes touch ground). Experimental feature that increases network input size based on creature topology.',
   proprioceptionInputs: 'Which proprioception inputs to include. Input count depends on creature topology (varies with mutations). Strain: 1 per muscle. Velocity: 3 per node (xyz). Ground: 1 per node. All: combined. More inputs = richer sensing but harder to evolve. Unused slots (from padding to max) are masked to 0.',
