@@ -125,7 +125,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   neuralHiddenSize: 8,
   neuralActivation: 'tanh',
   weightMutationRate: 0.2,
-  weightMutationMagnitude: 0.3,
+  weightMutationMagnitude: 0.05,
   weightMutationDecay: 'linear',
   neuralOutputBias: -0.1,        // Slight negative bias so muscles must evolve to activate
   fitnessEfficiencyPenalty: 0.1, // Subtle penalty for excessive activation

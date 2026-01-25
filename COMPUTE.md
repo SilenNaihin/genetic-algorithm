@@ -192,6 +192,24 @@ Neural network sizes:
 
 With M=15 muscles, hidden=8: ~200 parameters per creature.
 
+### Weight Mutation Magnitude
+
+In high-dimensional spaces, Gaussian mutation magnitude (σ) has a non-obvious effect:
+
+```
+E[‖θ' - θ‖] ≈ σ × √d    (where d = number of parameters)
+```
+
+With ~200 parameters:
+| σ (magnitude) | Expected displacement |
+|---------------|----------------------|
+| 0.3 | 4.2 (too large!) |
+| 0.1 | 1.4 |
+| **0.05** (default) | **0.7** |
+| 0.02 | 0.28 (fine-tuning) |
+
+**Why σ=0.05?** Literature (NEAT, OpenAI ES) uses σ=0.01-0.05. Larger values cause random search behavior instead of gradient-like optimization.
+
 ## Optimization Tips
 
 1. **For fast exploration**: 15-30 FPS, 5-10s duration

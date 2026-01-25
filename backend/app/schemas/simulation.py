@@ -62,7 +62,7 @@ class SimulationConfig(BaseModel):
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
     neural_activation: str = Field(default='tanh')
     weight_mutation_rate: float = Field(default=0.2, ge=0.0, le=1.0)
-    weight_mutation_magnitude: float = Field(default=0.3, ge=0.0, le=2.0)
+    weight_mutation_magnitude: float = Field(default=0.05, ge=0.0, le=2.0)
     weight_mutation_decay: Literal['off', 'linear', 'exponential'] = 'linear'
     neural_output_bias: float = Field(default=-0.1, ge=-2.0, le=2.0)
     fitness_efficiency_penalty: float = Field(default=0.1, ge=0.0, le=5.0)
