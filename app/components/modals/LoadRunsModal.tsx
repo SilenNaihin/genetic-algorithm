@@ -1,11 +1,21 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useEvolutionStore } from '../../stores/evolutionStore';
 import { Modal } from '../common/Modal';
 import * as StorageService from '../../../src/services/StorageService';
 import type { SavedRun } from '../../../src/storage/types';
+
+type SortOption = 'date-desc' | 'date-asc' | 'generations' | 'fitness' | 'name';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'date-desc', label: 'Newest First' },
+  { value: 'date-asc', label: 'Oldest First' },
+  { value: 'generations', label: 'Most Generations' },
+  { value: 'fitness', label: 'Best Fitness' },
+  { value: 'name', label: 'Name (A-Z)' },
+];
 
 /**
  * Modal for loading saved evolution runs.
@@ -19,6 +29,7 @@ export function LoadRunsModal() {
   const [runs, setRuns] = useState<SavedRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
 
   // Load runs when modal opens
   useEffect(() => {
@@ -42,6 +53,29 @@ export function LoadRunsModal() {
     fetchRuns();
   }, [loadModalOpen]);
 
+  // Sort runs based on selected option
+  const sortedRuns = useMemo(() => {
+    const getBestFitness = (run: SavedRun) =>
+      run.bestCreature?.result?.fitness ?? -Infinity;
+
+    return [...runs].sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          return b.startTime - a.startTime;
+        case 'date-asc':
+          return a.startTime - b.startTime;
+        case 'generations':
+          return b.generationCount - a.generationCount;
+        case 'fitness':
+          return getBestFitness(b) - getBestFitness(a);
+        case 'name':
+          return (a.name || '').localeCompare(b.name || '');
+        default:
+          return 0;
+      }
+    });
+  }, [runs, sortBy]);
+
   const handleClose = () => {
     setLoadModalOpen(false);
   };
@@ -63,13 +97,51 @@ export function LoadRunsModal() {
 
   return (
     <Modal isOpen={loadModalOpen} onClose={handleClose} title="Load Saved Run" maxWidth="800px">
+      {/* Sort controls */}
+      {!loading && !error && runs.length > 1 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px',
+            paddingLeft: '4px',
+          }}
+        >
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              color: 'var(--text)',
+              fontSize: '12px',
+              padding: '4px 8px',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+            {runs.length} run{runs.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+
       <div
         id="runs-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
           gap: '16px',
-          maxHeight: '60vh',
+          maxHeight: '55vh',
           overflowY: 'auto',
           padding: '4px',
         }}
@@ -115,7 +187,7 @@ export function LoadRunsModal() {
 
         {!loading &&
           !error &&
-          runs.map((run) => (
+          sortedRuns.map((run) => (
             <RunCard
               key={run.id}
               run={run}
@@ -145,12 +217,6 @@ function RunCard({ run, onLoad, onDelete }: RunCardProps) {
     date.toLocaleDateString() +
     ' ' +
     date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // Get best fitness from fitness history if available
-  const bestFitness =
-    run.fitnessHistory && run.fitnessHistory.length > 0
-      ? Math.max(...run.fitnessHistory.map((h) => h.best))
-      : null;
 
   const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
@@ -245,12 +311,19 @@ function RunCard({ run, onLoad, onDelete }: RunCardProps) {
       {/* Gen count and date - single line like vanilla */}
       <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
         Gen {run.generationCount - 1} | {dateStr}
-        {bestFitness !== null && <span> | Best: {bestFitness.toFixed(1)}</span>}
       </div>
 
       {/* Config summary - matches vanilla + duration */}
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-        Gravity: {run.config.gravity} | Mut: {Math.round((run.config.mutationRate || 0.1) * 100)}% | {run.config.simulationDuration}s
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+        <span>Gravity: {run.config.gravity} | Mut: {Math.round((run.config.mutationRate || 0.1) * 100)}%</span>
+        <span>
+          {run.config.simulationDuration}s
+          {run.bestCreature?.result?.fitness != null && (
+            <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>
+              {run.bestCreature.result.fitness.toFixed(0)}
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );

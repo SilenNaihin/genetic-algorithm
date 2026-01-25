@@ -26,7 +26,18 @@ function apiRunToSavedRun(apiRun: Api.ApiRun): SavedRun {
     // These would need separate API calls to fully populate
     fitnessHistory: undefined,
     creatureTypeHistory: undefined,
-    bestCreature: undefined,
+    // Partial bestCreature with just fitness for list view sorting/display
+    bestCreature: apiRun.best_fitness > 0 ? {
+      result: {
+        genome: {} as never, // Not needed for list view
+        fitness: apiRun.best_fitness,
+        pellets: 0,
+        disqualified: null,
+        frames: [],
+        pelletData: [],
+      },
+      generation: apiRun.best_creature_generation ?? 0,
+    } : undefined,
     longestSurvivor: undefined,
   };
 }
