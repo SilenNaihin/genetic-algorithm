@@ -142,7 +142,7 @@ Proprioception adds body-sensing inputs so creatures can sense their own body st
 |------|---------------------|-------------|
 | `strain` | 1 per muscle | Muscle strain: (currentLength - restLength) / restLength |
 | `velocity` | 3 per node (xyz) | Normalized velocity vector per node |
-| `ground` | 1 per node | Ground contact: 1 if nodeY < threshold, 0 otherwise |
+| `ground` | 1 per node | Ground contact: 1 if node bottom (Y - radius) ≤ ground, 0 otherwise |
 | `all` | All combined | strain + velocity + ground |
 
 **Dynamic Input Size:**
@@ -165,7 +165,7 @@ all tensor:      [B, 47]
 - Creatures with fewer nodes/muscles have sparse inputs (many zeros)
 - Muscle strain is clamped to [-1, 1] for numerical stability
 - Node velocities are normalized by max_velocity=10.0
-- Ground contact threshold is 0.15 (slightly above 0 for node radius)
+- Ground contact checks node bottom (Y - radius) ≤ 0, accounting for node size
 - Neural network must learn to use relevant inputs and ignore padding zeros
 
 ### Weight Count
