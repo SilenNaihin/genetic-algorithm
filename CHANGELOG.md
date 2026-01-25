@@ -5,6 +5,14 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Added
+- **Proprioception Inputs**: Body-sensing inputs for neural networks (Phase 7)
+  - Muscle strain: (currentLength - restLength) / restLength per muscle (15 inputs)
+  - Node velocities: normalized xyz velocity per node (24 inputs)
+  - Ground contact: binary contact per node (8 inputs)
+  - Combined "all" mode: 47 additional inputs
+  - Configurable via UI toggle and input type selector
+  - Dynamic input sizing based on proprioception settings
+  - 35 comprehensive edge case tests for numerical stability
 - **Time Encoding Options**: Configurable time input for neural networks
   - `none`: 7 inputs (no time) - default for pure mode
   - `sin`: 8 inputs (sin(2πt)) - rhythmic timing

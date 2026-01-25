@@ -113,6 +113,8 @@ The number of inputs varies based on time encoding:
 
 ### Sensor Inputs
 
+**Base Inputs (always present, 7 inputs):**
+
 | Input | Range | Description |
 |-------|-------|-------------|
 | `pellet_dir_x` | [-1, 1] | X component of unit vector to pellet |
@@ -122,8 +124,49 @@ The number of inputs varies based on time encoding:
 | `velocity_y` | [-1, 1] | Y component of creature velocity (normalized) |
 | `velocity_z` | [-1, 1] | Z component of creature velocity (normalized) |
 | `pellet_dist` | [0, 1] | Normalized distance to pellet (0=at pellet, 1=far) |
+
+**Time Encoding (optional, 0-2 inputs):**
+
+| Input | Range | Description |
+|-------|-------|-------------|
 | `time_1` | [-1, 1] | sin(2πt) - rhythmic timing (if encoding includes sin) |
 | `time_2` | [-1, 1] or [0, 1] | cos(2πt) for cyclic, t/maxTime for sin_raw |
+
+### Proprioception Inputs (Experimental)
+
+Proprioception adds body-sensing inputs so creatures can sense their own body state. When enabled, these inputs are concatenated after the base + time inputs.
+
+**Proprioception Types:**
+
+| Type | Inputs per creature | Description |
+|------|---------------------|-------------|
+| `strain` | 1 per muscle | Muscle strain: (currentLength - restLength) / restLength |
+| `velocity` | 3 per node (xyz) | Normalized velocity vector per node |
+| `ground` | 1 per node | Ground contact: 1 if nodeY < threshold, 0 otherwise |
+| `all` | All combined | strain + velocity + ground |
+
+**Dynamic Input Size:**
+
+The number of meaningful proprioception inputs depends on creature topology, which varies through mutations:
+- A creature with 3 nodes and 2 muscles: 2 strain + 9 velocity + 3 ground = 14 inputs
+- A creature with 8 nodes and 10 muscles: 10 strain + 24 velocity + 8 ground = 42 inputs
+
+For batching uniformity, tensors are sized to MAX values (MAX_MUSCLES=15, MAX_NODES=8). Unused slots are masked to 0.
+
+**Tensor sizes (for batching):**
+```
+strain tensor:   [B, MAX_MUSCLES]     = [B, 15]
+velocity tensor: [B, MAX_NODES * 3]  = [B, 24]
+ground tensor:   [B, MAX_NODES]      = [B, 8]
+all tensor:      [B, 47]
+```
+
+**Usage Notes:**
+- Creatures with fewer nodes/muscles have sparse inputs (many zeros)
+- Muscle strain is clamped to [-1, 1] for numerical stability
+- Node velocities are normalized by max_velocity=10.0
+- Ground contact threshold is 0.15 (slightly above 0 for node radius)
+- Neural network must learn to use relevant inputs and ignore padding zeros
 
 ### Weight Count
 
@@ -601,6 +644,8 @@ function rankBasedSelection(population: Creature[]): Creature {
 | `sharingThreshold` | number | 3.0 | Genome distance below which creatures share fitness |
 | `selectionMethod` | enum | 'truncation' | 'truncation', 'tournament', or 'rank' |
 | `tournamentSize` | number | 5 | Number of contestants per tournament (if tournament selection) |
+| `useProprioception` | boolean | false | Enable body-sensing inputs (experimental) |
+| `proprioceptionInputs` | enum | 'all' | 'strain', 'velocity', 'ground', or 'all' |
 
 ### Configuration Schema
 
@@ -624,6 +669,10 @@ class SimulationConfig(BaseModel):
     # Selection
     selection_method: Literal['truncation', 'tournament'] = 'truncation'
     tournament_size: int = 5
+
+    # Proprioception (body-sensing)
+    use_proprioception: bool = False
+    proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'
 ```
 
 ---
@@ -787,9 +836,11 @@ See `docs/NEAT_IMPLEMENTATION.md` (future) for details.
 | Component | File |
 |-----------|------|
 | Network class | `backend/app/neural/network.py` |
+| Sensor gathering | `backend/app/neural/sensors.py` |
+| Proprioception inputs | `backend/app/neural/sensors.py` |
 | Genome storage | `backend/app/schemas/genome.py` |
 | Weight mutation | `backend/app/genetics/mutation.py` |
 | Weight crossover | `backend/app/genetics/crossover.py` |
-| Sensor gathering | `backend/app/simulation/physics.py` |
+| Physics integration | `backend/app/simulation/physics.py` |
 
 Uses **batched PyTorch tensors** for parallel neural network evaluation across all creatures simultaneously.

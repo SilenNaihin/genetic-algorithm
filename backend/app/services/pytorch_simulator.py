@@ -127,6 +127,8 @@ class PyTorchSimulator:
                 hidden_size=config.neural_hidden_size,
                 activation=config.neural_activation,
                 time_encoding=config.time_encoding,
+                use_proprioception=config.use_proprioception,
+                proprioception_inputs=config.proprioception_inputs,
             )
 
             network = BatchedNeuralNetwork.from_genomes(
@@ -156,6 +158,8 @@ class PyTorchSimulator:
                 arena_size=config.arena_size,
                 time_encoding=config.time_encoding,
                 max_time=config.simulation_duration,
+                use_proprioception=config.use_proprioception,
+                proprioception_inputs=config.proprioception_inputs,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:

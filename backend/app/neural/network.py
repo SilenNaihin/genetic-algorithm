@@ -23,8 +23,18 @@ NEURAL_INPUT_SIZE_BASE = 7  # pellet_dir(3) + velocity_dir(3) + distance(1)
 # - 'raw': +1 = 8
 # - 'cyclic': +2 = 9 (sin + cos for unique cycle position)
 # - 'sin_raw': +2 = 9 (sin for rhythm + raw for progress)
+#
+# Proprioception adds topology-dependent inputs:
+# - 'strain': MAX_MUSCLES inputs (1 per muscle)
+# - 'velocity': MAX_NODES * 3 inputs (3 per node)
+# - 'ground': MAX_NODES inputs (1 per node)
+# - 'all': MAX_MUSCLES + MAX_NODES * 4 inputs
+
+# Import MAX sizes from tensors for proprioception calculation
+from app.simulation.tensors import MAX_NODES, MAX_MUSCLES
 
 TimeEncoding = Literal['none', 'cyclic', 'sin', 'raw', 'sin_raw']
+ProprioceptionInputs = Literal['strain', 'velocity', 'ground', 'all']
 
 
 @dataclass
@@ -38,29 +48,75 @@ class NeuralConfig:
     weight_mutation_magnitude: float = 0.3
     output_bias: float = DEFAULT_OUTPUT_BIAS
     dead_zone: float = 0.1  # Pure mode only
-    time_encoding: TimeEncoding = 'cyclic'  # Hybrid mode time encoding
+    time_encoding: TimeEncoding = 'cyclic'  # Time encoding method
+    use_proprioception: bool = False  # Enable body-sensing inputs
+    proprioception_inputs: ProprioceptionInputs = 'all'  # Which proprioception inputs
 
 
-def get_input_size(mode: Literal['hybrid', 'pure'], time_encoding: TimeEncoding = 'cyclic') -> int:
+def get_input_size(
+    mode: Literal['hybrid', 'pure'],
+    time_encoding: TimeEncoding = 'cyclic',
+    use_proprioception: bool = False,
+    proprioception_inputs: ProprioceptionInputs = 'all',
+) -> int:
     """
-    Get input size based on neural mode and time encoding.
+    Get input size based on neural mode, time encoding, and proprioception.
 
-    Time encoding options (apply to both modes):
-      - none: 7 inputs (no time)
-      - sin: 7 + 1 = 8 (original behavior)
-      - raw: 7 + 1 = 8 (linear 0→1)
-      - cyclic: 7 + 2 = 9 (sin and cos for unique cycle position)
-      - sin_raw: 7 + 2 = 9 (sin for rhythm + raw for progress)
+    Base inputs (always present): 7
+      - pellet_direction (3)
+      - velocity_direction (3)
+      - pellet_distance (1)
 
-    Default: pure='none', hybrid='cyclic'
+    Time encoding options (add 0-2 inputs):
+      - none: +0 = 7 (no time)
+      - sin: +1 = 8 (original behavior)
+      - raw: +1 = 8 (linear 0→1)
+      - cyclic: +2 = 9 (sin and cos for unique cycle position)
+      - sin_raw: +2 = 9 (sin for rhythm + raw for progress)
+
+    Proprioception options (add topology-dependent inputs):
+      - strain: +MAX_MUSCLES (muscle stretch/compression)
+      - velocity: +MAX_NODES*3 (node velocities xyz)
+      - ground: +MAX_NODES (ground contact binary)
+      - all: +MAX_MUSCLES + MAX_NODES*4 (all of the above)
+
+    Note: Proprioception uses MAX values for batching uniformity.
+    Invalid muscles/nodes are masked to 0.
     """
+    # Start with base inputs
+    base = NEURAL_INPUT_SIZE_BASE  # 7
+
+    # Add time encoding inputs
     if time_encoding == 'none':
-        return NEURAL_INPUT_SIZE_BASE  # 7
+        time_inputs = 0
+    elif time_encoding in ('cyclic', 'sin_raw'):
+        time_inputs = 2
+    else:  # sin, raw
+        time_inputs = 1
 
-    if time_encoding in ('cyclic', 'sin_raw'):
-        return NEURAL_INPUT_SIZE_BASE + 2  # 9 (two time inputs)
+    # Add proprioception inputs
+    if use_proprioception:
+        prop_inputs = get_proprioception_input_count(proprioception_inputs)
     else:
-        return NEURAL_INPUT_SIZE_BASE + 1  # 8 (sin or raw)
+        prop_inputs = 0
+
+    return base + time_inputs + prop_inputs
+
+
+def get_proprioception_input_count(proprioception_inputs: ProprioceptionInputs) -> int:
+    """
+    Get the number of proprioception inputs based on type.
+
+    Uses MAX values for consistent batching - actual creature values are masked.
+    """
+    if proprioception_inputs == 'strain':
+        return MAX_MUSCLES  # 15
+    elif proprioception_inputs == 'velocity':
+        return MAX_NODES * 3  # 8 * 3 = 24
+    elif proprioception_inputs == 'ground':
+        return MAX_NODES  # 8
+    else:  # 'all'
+        return MAX_MUSCLES + MAX_NODES * 3 + MAX_NODES  # 15 + 24 + 8 = 47
 
 
 def calculate_weight_count(input_size: int, hidden_size: int, output_size: int) -> int:
@@ -254,7 +310,12 @@ class BatchedNeuralNetwork:
             device: Target device
         """
         batch_size = len(neural_genomes)
-        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        input_size = get_input_size(
+            config.neural_mode,
+            config.time_encoding,
+            config.use_proprioception,
+            config.proprioception_inputs,
+        )
         hidden_size = config.hidden_size
 
         network = cls(
@@ -331,7 +392,12 @@ class BatchedNeuralNetwork:
         - Hidden biases: 0
         - Output biases: DEFAULT_OUTPUT_BIAS (-0.5)
         """
-        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        input_size = get_input_size(
+            config.neural_mode,
+            config.time_encoding,
+            config.use_proprioception,
+            config.proprioception_inputs,
+        )
         hidden_size = config.hidden_size
 
         network = cls(

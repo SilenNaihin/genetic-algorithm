@@ -83,6 +83,10 @@ class SimulationConfig(BaseModel):
     use_fitness_sharing: bool = False
     sharing_radius: float = Field(default=0.5, ge=0.1, le=2.0)
 
+    # Proprioception (body-sensing inputs)
+    use_proprioception: bool = False
+    proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'
+
     # Disqualification thresholds
     position_threshold: float = Field(default=50.0, ge=10.0)
     height_threshold: float = Field(default=30.0, ge=5.0)

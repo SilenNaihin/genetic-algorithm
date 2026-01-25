@@ -126,7 +126,7 @@
     {
       "id": 7,
       "name": "Proprioception Inputs",
-      "status": "pending",
+      "status": "complete",
       "description": "Add body-sensing inputs to neural network (muscle strain, node velocities, ground contact)",
       "tasks": [
         "Add useProprioception: boolean to SimulationConfig",
@@ -141,9 +141,13 @@
       ],
       "files": [
         "src/types/simulation.ts",
-        "src/simulation/BatchSimulator.ts",
-        "src/neural/NeuralGenome.ts",
-        "src/main.ts"
+        "backend/app/schemas/simulation.py",
+        "backend/app/neural/sensors.py",
+        "backend/app/neural/network.py",
+        "backend/app/simulation/physics.py",
+        "backend/app/services/pytorch_simulator.py",
+        "app/components/menu/NeuralPanel.tsx",
+        "app/components/ui/InfoTooltip.tsx"
       ],
       "test_focus": "With proprioception, creatures should develop smoother gaits and better balance"
     },

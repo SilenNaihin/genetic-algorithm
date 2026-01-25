@@ -58,6 +58,9 @@ class SimulationConfig:
     neural_output_bias: float = 0.0            # Initial output neuron bias (0 = neutral/dead zone)
     fitness_efficiency_penalty: float = 0.5    # Penalty per unit of muscle activation
     neural_dead_zone: float = 0.1              # Dead zone threshold for pure mode
+    time_encoding: Literal['none', 'cyclic', 'sin', 'raw', 'sin_raw'] = 'none'  # Time encoding
+    use_proprioception: bool = False           # Enable body-sensing inputs
+    proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'
 
     # Disqualification thresholds
     position_threshold: float = 50.0           # Max distance from origin
@@ -106,6 +109,9 @@ class SimulationConfig:
             'neuralOutputBias': 'neural_output_bias',
             'fitnessEfficiencyPenalty': 'fitness_efficiency_penalty',
             'neuralDeadZone': 'neural_dead_zone',
+            'timeEncoding': 'time_encoding',
+            'useProprioception': 'use_proprioception',
+            'proprioceptionInputs': 'proprioception_inputs',
             'positionThreshold': 'position_threshold',
             'heightThreshold': 'height_threshold',
             'pelletCollectionRadius': 'pellet_collection_radius',

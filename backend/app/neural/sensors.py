@@ -5,19 +5,29 @@ Computes sensor inputs for all creatures in parallel:
 - Pellet direction (3D unit vector toward pellet)
 - Velocity direction (3D unit vector of movement)
 - Pellet distance (normalized 0-1)
-- Time encoding (hybrid mode only):
+- Time encoding (optional):
   - cyclic: sin(2πt), cos(2πt) - unique value for every point in cycle
   - sin: sin(2πt) - original behavior
   - raw: t / maxTime - linear 0→1
+- Proprioception (body-sensing, optional):
+  - Muscle strain: (currentLength - restLength) / restLength per muscle
+  - Node velocities: normalized velocity vector per node (3 values per node)
+  - Ground contact: 1 if nodeY < threshold, 0 otherwise per node
 """
 
 import torch
 import math
 from typing import Literal
 
-from app.simulation.tensors import CreatureBatch, get_center_of_mass
+from app.simulation.tensors import CreatureBatch, get_center_of_mass, MAX_MUSCLES, MAX_NODES
 from app.simulation.physics import MAX_PELLET_DISTANCE
 from app.neural.network import TimeEncoding
+
+# Proprioception input types
+ProprioceptionInputs = Literal['strain', 'velocity', 'ground', 'all']
+
+# Ground contact threshold (nodes below this Y value are considered touching ground)
+GROUND_CONTACT_THRESHOLD = 0.15  # Slightly above 0 to account for node radius
 
 
 @torch.no_grad()
@@ -255,3 +265,216 @@ def compute_normalized_distance_for_nn(
     to_pellet = pellet_positions - com  # [B, 3]
     dist = torch.norm(to_pellet, dim=1)  # [B]
     return (dist / max_pellet_distance).clamp(0, 1)  # [B]
+
+
+# =============================================================================
+# Proprioception Inputs (Body-Sensing)
+# =============================================================================
+
+@torch.no_grad()
+def compute_muscle_strain(
+    batch: CreatureBatch,
+    base_rest_lengths: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Compute muscle strain for each muscle: (currentLength - restLength) / restLength.
+
+    Strain is positive when muscle is stretched, negative when compressed.
+    Output is clamped to [-1, 1] for stability.
+
+    Args:
+        batch: CreatureBatch with current node positions
+        base_rest_lengths: [B, MAX_MUSCLES] original rest lengths
+
+    Returns:
+        strain: [B, MAX_MUSCLES] normalized strain values in [-1, 1]
+    """
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        return torch.zeros(0, MAX_MUSCLES, device=device)
+
+    # Get positions of spring endpoints
+    idx_a = batch.spring_node_a.unsqueeze(-1).expand(-1, -1, 3)  # [B, M, 3]
+    idx_b = batch.spring_node_b.unsqueeze(-1).expand(-1, -1, 3)  # [B, M, 3]
+
+    pos_a = torch.gather(batch.positions, 1, idx_a)  # [B, M, 3]
+    pos_b = torch.gather(batch.positions, 1, idx_b)  # [B, M, 3]
+
+    # Current length of each spring
+    delta = pos_b - pos_a  # [B, M, 3]
+    current_length = torch.norm(delta, dim=2)  # [B, M]
+
+    # Strain = (current - rest) / rest
+    # Avoid division by zero
+    safe_rest = base_rest_lengths.clamp(min=1e-6)
+    strain = (current_length - base_rest_lengths) / safe_rest
+
+    # Clamp to [-1, 1] for numerical stability
+    strain = strain.clamp(-1.0, 1.0)
+
+    # Apply spring mask (padding muscles get strain=0)
+    strain = strain * batch.spring_mask
+
+    return strain  # [B, MAX_MUSCLES]
+
+
+@torch.no_grad()
+def compute_node_velocities(
+    batch: CreatureBatch,
+    max_velocity: float = 10.0,
+) -> torch.Tensor:
+    """
+    Compute normalized velocity vector for each node.
+
+    Returns 3 values per node (vx, vy, vz) normalized by max_velocity.
+    Output is clamped to [-1, 1].
+
+    Args:
+        batch: CreatureBatch with current velocities
+        max_velocity: Maximum velocity for normalization
+
+    Returns:
+        velocities: [B, MAX_NODES, 3] normalized velocity vectors
+    """
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        return torch.zeros(0, MAX_NODES, 3, device=device)
+
+    # Normalize velocities by max_velocity
+    normalized = batch.velocities / max_velocity  # [B, MAX_NODES, 3]
+
+    # Clamp to [-1, 1]
+    normalized = normalized.clamp(-1.0, 1.0)
+
+    # Apply node mask (padding nodes get velocity=0)
+    normalized = normalized * batch.node_mask.unsqueeze(-1)
+
+    return normalized  # [B, MAX_NODES, 3]
+
+
+@torch.no_grad()
+def compute_ground_contact(
+    batch: CreatureBatch,
+    ground_threshold: float = GROUND_CONTACT_THRESHOLD,
+) -> torch.Tensor:
+    """
+    Compute ground contact for each node: 1 if touching ground, 0 otherwise.
+
+    A node is considered touching ground if its Y position is below the threshold.
+
+    Args:
+        batch: CreatureBatch with current positions
+        ground_threshold: Y position threshold for ground contact
+
+    Returns:
+        contact: [B, MAX_NODES] binary contact values (0 or 1)
+    """
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        return torch.zeros(0, MAX_NODES, device=device)
+
+    # Check if node Y position is below threshold
+    y_positions = batch.positions[:, :, 1]  # [B, MAX_NODES]
+    contact = (y_positions < ground_threshold).float()  # [B, MAX_NODES]
+
+    # Apply node mask (padding nodes get contact=0)
+    contact = contact * batch.node_mask
+
+    return contact  # [B, MAX_NODES]
+
+
+@torch.no_grad()
+def gather_proprioception_inputs(
+    batch: CreatureBatch,
+    base_rest_lengths: torch.Tensor,
+    proprioception_type: ProprioceptionInputs = 'all',
+    num_nodes: int = MAX_NODES,
+    num_muscles: int = MAX_MUSCLES,
+) -> torch.Tensor:
+    """
+    Gather proprioception inputs based on selected type.
+
+    Input sizes depend on proprioception_type and creature topology:
+    - 'strain': num_muscles inputs (1 per muscle)
+    - 'velocity': num_nodes * 3 inputs (3 per node)
+    - 'ground': num_nodes inputs (1 per node)
+    - 'all': num_muscles + num_nodes * 3 + num_nodes inputs
+
+    NOTE: This returns MAX_MUSCLES + MAX_NODES * 4 values for batching uniformity.
+    The actual values used depend on the creature's topology.
+
+    Args:
+        batch: CreatureBatch with current state
+        base_rest_lengths: [B, MAX_MUSCLES] original rest lengths
+        proprioception_type: Which inputs to include
+        num_nodes: Number of nodes (for documentation, uses MAX_NODES internally)
+        num_muscles: Number of muscles (for documentation, uses MAX_MUSCLES internally)
+
+    Returns:
+        inputs: [B, prop_input_size] proprioception inputs
+            - strain-only: [B, MAX_MUSCLES]
+            - velocity-only: [B, MAX_NODES * 3]
+            - ground-only: [B, MAX_NODES]
+            - all: [B, MAX_MUSCLES + MAX_NODES * 3 + MAX_NODES]
+    """
+    B = batch.batch_size
+    device = batch.device
+
+    if B == 0:
+        if proprioception_type == 'strain':
+            return torch.zeros(0, MAX_MUSCLES, device=device)
+        elif proprioception_type == 'velocity':
+            return torch.zeros(0, MAX_NODES * 3, device=device)
+        elif proprioception_type == 'ground':
+            return torch.zeros(0, MAX_NODES, device=device)
+        else:  # 'all'
+            return torch.zeros(0, MAX_MUSCLES + MAX_NODES * 4, device=device)
+
+    inputs_list = []
+
+    if proprioception_type in ('strain', 'all'):
+        strain = compute_muscle_strain(batch, base_rest_lengths)  # [B, MAX_MUSCLES]
+        inputs_list.append(strain)
+
+    if proprioception_type in ('velocity', 'all'):
+        velocities = compute_node_velocities(batch)  # [B, MAX_NODES, 3]
+        velocities_flat = velocities.reshape(B, MAX_NODES * 3)  # [B, MAX_NODES * 3]
+        inputs_list.append(velocities_flat)
+
+    if proprioception_type in ('ground', 'all'):
+        contact = compute_ground_contact(batch)  # [B, MAX_NODES]
+        inputs_list.append(contact)
+
+    return torch.cat(inputs_list, dim=1)  # [B, prop_input_size]
+
+
+def get_proprioception_input_size(
+    proprioception_type: ProprioceptionInputs,
+    num_nodes: int = MAX_NODES,
+    num_muscles: int = MAX_MUSCLES,
+) -> int:
+    """
+    Calculate the number of proprioception inputs based on type and topology.
+
+    Args:
+        proprioception_type: Which inputs to include
+        num_nodes: Number of nodes in the creature
+        num_muscles: Number of muscles in the creature
+
+    Returns:
+        Number of proprioception inputs
+    """
+    if proprioception_type == 'strain':
+        return num_muscles
+    elif proprioception_type == 'velocity':
+        return num_nodes * 3
+    elif proprioception_type == 'ground':
+        return num_nodes
+    else:  # 'all'
+        return num_muscles + num_nodes * 3 + num_nodes

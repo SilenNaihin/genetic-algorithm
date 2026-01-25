@@ -75,6 +75,10 @@ export interface SimulationConfig {
   useFitnessSharing: boolean;         // Enable fitness sharing to penalize similar creatures
   sharingRadius: number;              // Genome distance threshold for sharing (0.1-2.0)
 
+  // Proprioception (body-sensing inputs)
+  useProprioception: boolean;         // Enable body-sensing inputs (muscle strain, node velocities, ground contact)
+  proprioceptionInputs: 'strain' | 'velocity' | 'ground' | 'all';  // Which proprioception inputs to include
+
   // Frame storage mode for replay capability
   frameStorageMode: 'none' | 'sparse' | 'all';  // none = no replays, sparse = top/bottom only, all = all creatures
   sparseTopCount: number;             // Number of top performers to store frames for (sparse mode)
@@ -141,6 +145,10 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Fitness sharing defaults
   useFitnessSharing: false,      // Off by default - enable to maintain diversity
   sharingRadius: 0.5,            // Moderate sharing radius
+
+  // Proprioception defaults
+  useProprioception: false,      // Off by default - experimental feature
+  proprioceptionInputs: 'all',   // Include all proprioception inputs when enabled
 
   // Frame storage mode
   frameStorageMode: 'all',       // Store frames for all creatures by default (enables replays)

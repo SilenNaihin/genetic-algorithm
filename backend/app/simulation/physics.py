@@ -1358,6 +1358,8 @@ def simulate_with_fitness_neural(
     nn_update_interval: int = 4,
     time_encoding: str = 'cyclic',
     max_time: float = 20.0,
+    use_proprioception: bool = False,
+    proprioception_inputs: str = 'all',
 ) -> dict:
     """
     Run neural simulation with proper pellet collection tracking.
@@ -1406,7 +1408,7 @@ def simulate_with_fitness_neural(
         update_fitness_state,
         calculate_fitness,
     )
-    from app.neural.sensors import gather_sensor_inputs
+    from app.neural.sensors import gather_sensor_inputs, gather_proprioception_inputs
 
     B = batch.batch_size
     device = batch.device
@@ -1458,11 +1460,18 @@ def simulate_with_fitness_neural(
     for step in range(num_steps):
         # 1. Update NN outputs only every nn_update_interval steps (reduces jitter)
         if step % nn_update_interval == 0 or nn_outputs is None:
-            # Gather sensor inputs (uses current pellet positions)
+            # Gather base sensor inputs (uses current pellet positions)
             sensor_inputs = gather_sensor_inputs(
                 batch, pellets.positions, previous_com, time, mode=mode,
                 time_encoding=time_encoding, max_time=max_time
             )
+
+            # Add proprioception inputs if enabled
+            if use_proprioception:
+                prop_inputs = gather_proprioception_inputs(
+                    batch, base_rest_lengths, proprioception_inputs
+                )
+                sensor_inputs = torch.cat([sensor_inputs, prop_inputs], dim=1)
 
             # Forward pass through NN - get full activations for visualization
             if mode == 'pure':

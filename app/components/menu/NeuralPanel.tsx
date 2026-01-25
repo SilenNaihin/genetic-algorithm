@@ -319,6 +319,43 @@ export function NeuralPanel() {
               </>
             )}
           </div>
+
+          {/* Proprioception Section (Experimental) */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={labelStyle}>
+                Proprioception
+                <InfoTooltip text={TOOLTIPS.proprioception} />
+              </span>
+              <input
+                type="checkbox"
+                checked={config.useProprioception}
+                onChange={(e) => setConfig({ useProprioception: e.target.checked })}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+              />
+            </div>
+
+            {config.useProprioception && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={labelStyle}>
+                    Inputs
+                    <InfoTooltip text={TOOLTIPS.proprioceptionInputs} />
+                  </span>
+                </div>
+                <select
+                  value={config.proprioceptionInputs}
+                  onChange={(e) => setConfig({ proprioceptionInputs: e.target.value as 'strain' | 'velocity' | 'ground' | 'all' })}
+                  style={selectStyle}
+                >
+                  <option value="all">All (strain + velocity + ground)</option>
+                  <option value="strain">Muscle Strain (per muscle)</option>
+                  <option value="velocity">Node Velocities (3 per node)</option>
+                  <option value="ground">Ground Contact (per node)</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
