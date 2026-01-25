@@ -153,6 +153,104 @@
     },
     {
       "id": 8,
+      "name": "NEAT Foundation",
+      "status": "pending",
+      "description": "Implement NEAT gene representation and structural mutations",
+      "see_also": "docs/NEAT.md",
+      "tasks": [
+        "Define ConnectionGene and NodeGene interfaces",
+        "Implement global innovation counter",
+        "Implement NEATGenome creation with minimal topology",
+        "Implement NEATNetwork.fromGenome() with topological sort",
+        "Implement mutateAddConnection()",
+        "Implement mutateAddNode()",
+        "Add NEAT crossover by gene alignment",
+        "Integrate with speciation (Phase 9)"
+      ],
+      "files": [
+        "src/neural/NEATGenome.ts (new)",
+        "src/neural/NEATNetwork.ts (new)",
+        "src/genetics/NEATMutation.ts (new)",
+        "src/genetics/NEATCrossover.ts (new)"
+      ],
+      "test_focus": "NEAT networks should grow topology over generations"
+    },
+    {
+      "id": 9,
+      "name": "Energy System",
+      "status": "pending",
+      "description": "Add metabolic energy to prevent infinite spazzing and encourage efficient movement",
+      "rationale": "Currently creatures can oscillate muscles endlessly without cost. This leads to spazzy, inefficient behavior. Real organisms expend energy when contracting muscles, creating evolutionary pressure for efficient locomotion.",
+      "design": {
+        "core_mechanic": "Creatures have an energy pool that depletes with muscle activity and regenerates slowly over time",
+        "energy_cost_formula": "energy_cost = sum(|muscle_output| × stiffness × dt) - models work done by muscles",
+        "regeneration": {
+          "passive": "Small constant regeneration per timestep (e.g., 0.5 energy/s)",
+          "pellet_bonus": "Collecting a pellet restores significant energy (e.g., +50 energy)",
+          "rationale": "Pellets become actual 'food' - creates biological scavenging pressure"
+        },
+        "depletion_behavior": {
+          "at_zero": "Muscle outputs forced to zero (creature becomes 'exhausted')",
+          "not_disqualification": "Creature can recover if it regenerates energy",
+          "alternative": "Soft exhaustion - outputs scaled by remaining energy percentage"
+        },
+        "starting_energy": {
+          "option_a": "Fixed amount for all creatures (e.g., 100 units)",
+          "option_b": "Proportional to body mass (larger creatures have more energy)",
+          "option_c": "Evolvable parameter in genome (adds complexity)"
+        }
+      },
+      "fitness_integration": {
+        "options": [
+          "Energy efficiency bonus: fitness += remaining_energy × efficiency_weight",
+          "Energy spent penalty: fitness -= energy_spent × cost_weight",
+          "No direct fitness impact - energy is purely a constraint",
+          "Efficiency metric: final_fitness = base_fitness × (energy_remaining / starting_energy)"
+        ],
+        "recommended": "Energy efficiency bonus - rewards creatures that accomplish goals with energy to spare"
+      },
+      "tasks": [
+        "Add useEnergy: boolean to SimulationConfig (default: false)",
+        "Add startingEnergy parameter (default: 100)",
+        "Add energyRegenRate parameter (default: 0.5 per second)",
+        "Add pelletEnergyBonus parameter (default: 50)",
+        "Add energyCostScale parameter (default: 1.0) - multiplier for muscle energy cost",
+        "Add energyEfficiencyBonus parameter (default: 0.2) - fitness points per remaining energy",
+        "Track energy per creature in simulation state",
+        "Implement energy cost calculation in physics step",
+        "Implement passive regeneration",
+        "Implement pellet energy restoration",
+        "Implement exhaustion behavior (zero energy = zero muscle output)",
+        "Add energy bar visualization in creature tooltip",
+        "Add energy over time graph in replay modal",
+        "Add UI controls in fitness/physics panel"
+      ],
+      "files": [
+        "src/types/simulation.ts",
+        "backend/app/schemas/simulation.py",
+        "backend/app/simulation/config.py",
+        "backend/app/simulation/physics.py",
+        "backend/app/simulation/fitness.py",
+        "backend/app/services/pytorch_simulator.py",
+        "app/components/menu/PhysicsPanel.tsx or FitnessPanel.tsx",
+        "app/components/grid/CreatureTooltip.tsx",
+        "app/components/modals/ReplayModal.tsx"
+      ],
+      "test_focus": "Creatures should evolve smoother, more efficient gaits. Spazzy creatures should run out of energy quickly.",
+      "edge_cases": [
+        "Creature with zero energy at start (invalid config)",
+        "Very high energy cost scale making all movement impossible",
+        "Pellet energy bonus larger than starting energy",
+        "Energy regeneration faster than consumption (negates the feature)",
+        "Negative energy (should clamp to 0)"
+      ],
+      "references": [
+        "Metabolic cost of transport in animals: https://en.wikipedia.org/wiki/Metabolic_cost_of_transport",
+        "OpenAI Roboschool uses energy penalties for locomotion"
+      ]
+    },
+    {
+      "id": 10,
       "name": "Speciation (Basic)",
       "status": "pending",
       "description": "Implement basic speciation for diversity protection",
@@ -174,72 +272,11 @@
       "test_focus": "Multiple species should coexist with different strategies"
     },
     {
-      "id": 9,
-      "name": "UI Panel Expansion",
-      "status": "pending",
-      "description": "Expand neural settings panel to accommodate new parameters",
-      "tasks": [
-        "Reorganize neural panel into collapsible sections",
-        "Section 1: Network (mode, hidden size, activation, output bias)",
-        "Section 2: Mutation (rate decay start/end/gens, adaptive toggle)",
-        "Section 3: Selection (method, tournament size, fitness sharing)",
-        "Section 4: Advanced (proprioception, speciation)",
-        "Make panel scrollable or use tabs"
-      ],
-      "files": [
-        "src/main.ts",
-        "src/styles/main.css"
-      ],
-      "test_focus": "All parameters accessible and well-organized"
-    },
-    {
-      "id": 10,
-      "name": "API-First Architecture",
-      "status": "pending",
-      "description": "Prepare for headless NAS by exposing all parameters via API",
-      "depends_on": "Backend API migration (separate chat)",
-      "tasks": [
-        "Define SimulationRequest and SimulationResult API types",
-        "Create runSimulation() function that takes full config",
-        "Return structured results (fitness, generations, best genome)",
-        "Enable batch execution for parameter sweeps",
-        "Add progress callbacks for long runs"
-      ],
-      "files": [
-        "src/api/types.ts (new)",
-        "src/api/simulation.ts (new)"
-      ],
-      "test_focus": "Headless runs should complete and return results"
-    },
-    {
       "id": 11,
-      "name": "Neural Architecture Search (NAS)",
-      "status": "pending",
-      "description": "Automated parameter optimization via grid search and Bayesian optimization",
-      "depends_on": "Phase 10 (API-First)",
-      "tasks": [
-        "Define NASConfig with parameter ranges to search",
-        "Implement grid search over discrete parameter combinations",
-        "Implement random search with configurable budget",
-        "Add Bayesian optimization using surrogate model (optional)",
-        "Track and visualize NAS progress (best params, convergence)",
-        "Export best configuration found",
-        "Add NAS control panel in UI"
-      ],
-      "files": [
-        "src/nas/types.ts (new)",
-        "src/nas/GridSearch.ts (new)",
-        "src/nas/RandomSearch.ts (new)",
-        "src/nas/NASRunner.ts (new)"
-      ],
-      "test_focus": "NAS should find better parameters than defaults"
-    },
-    {
-      "id": 12,
       "name": "Human-in-the-Loop Parameter Tweaking",
       "status": "pending",
       "description": "Allow mid-run parameter changes to guide evolution manually",
-      "depends_on": "Phase 10 (API-First)",
+      "depends_on": "Phase 11 (API-First)",
       "tasks": [
         "Identify tweakable parameters: mutation rate, crossover rate, selection pressure, fitness weights",
         "Identify non-tweakable parameters: network topology, input size (require restart)",
@@ -258,30 +295,6 @@
       ],
       "test_focus": "Parameter changes should take effect immediately and be tracked in history",
       "notes": "This enables 'playing god' - watching evolution and nudging parameters when stuck. Storage complexity: each run stores array of ParameterChangeEvents."
-    },
-    {
-      "id": 13,
-      "name": "NEAT Foundation",
-      "status": "pending",
-      "description": "Implement NEAT gene representation and structural mutations",
-      "see_also": "docs/NEAT_FUTURE.md",
-      "tasks": [
-        "Define ConnectionGene and NodeGene interfaces",
-        "Implement global innovation counter",
-        "Implement NEATGenome creation with minimal topology",
-        "Implement NEATNetwork.fromGenome() with topological sort",
-        "Implement mutateAddConnection()",
-        "Implement mutateAddNode()",
-        "Add NEAT crossover by gene alignment",
-        "Integrate with speciation (Phase 8)"
-      ],
-      "files": [
-        "src/neural/NEATGenome.ts (new)",
-        "src/neural/NEATNetwork.ts (new)",
-        "src/genetics/NEATMutation.ts (new)",
-        "src/genetics/NEATCrossover.ts (new)"
-      ],
-      "test_focus": "NEAT networks should grow topology over generations"
     }
   ],
   "mid_run_tweakable_params": {
@@ -324,8 +337,8 @@
         "purpose": "Genome structure and encoding"
       },
       {
-        "path": "docs/NEAT_FUTURE.md",
-        "purpose": "NEAT implementation plan (already exists)"
+        "path": "docs/NEAT.md",
+        "purpose": "NEAT implementation plan"
       },
       {
         "path": "docs/optimized-runs.md",
@@ -346,7 +359,7 @@
     "One phase at a time - test before moving on",
     "Update documentation after each phase",
     "Add tests for new genetics functions",
-    "Keep UI changes minimal until Phase 9",
+    "Keep UI changes minimal until Phase 10",
     "Maintain backward compatibility with existing saved runs",
     "GPU acceleration handled in separate chat"
   ],
@@ -378,6 +391,28 @@
           "Update fitness calculation in backend",
           "Add UI controls for start gen and ramp duration"
         ]
+      },
+      {
+        "name": "Multi-Layer Hidden Networks",
+        "description": "Add configurable number of hidden layers (currently fixed at 1)",
+        "rationale": "With proprioception adding up to 56 inputs, deeper networks could learn hierarchical features (e.g., first layer extracts leg patterns, second combines into gaits).",
+        "concern": "Neuroevolution struggles with deep networks - search space explodes without gradients. Width (more neurons) often helps more than depth for locomotion tasks. Current hidden size is only 8 - try increasing width first.",
+        "recommendation": "Before adding layers, try: (1) hidden size 16 or 32, (2) longer evolution runs. If still stuck, try 2 hidden layers.",
+        "tasks": [
+          "Add hiddenLayers parameter (default 1, max 3)",
+          "Add hiddenSizes array parameter (e.g., [16, 8] for 2 layers)",
+          "Update BatchedNeuralNetwork to support variable depth",
+          "Update weight mutation to handle multi-layer topology",
+          "Update crossover for multi-layer genomes",
+          "Update NeuralVisualizer to render multiple hidden layers",
+          "Add UI controls for layer count and per-layer sizes"
+        ],
+        "weight_counts": {
+          "1_layer_8_hidden": "~590 weights",
+          "2_layers_8_8": "~655 weights",
+          "1_layer_16_hidden": "~1135 weights",
+          "2_layers_16_8": "~1200 weights"
+        }
       }
     ]
   }
