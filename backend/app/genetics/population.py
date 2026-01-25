@@ -28,6 +28,8 @@ from .crossover import (
     clone_genome,
     initialize_neural_genome,
 )
+from .fitness_sharing import apply_fitness_sharing
+from app.neural.network import get_input_size
 
 
 @dataclass
@@ -76,6 +78,10 @@ class EvolutionConfig:
     # Neural crossover method
     neural_crossover_method: str = 'sbx'  # 'interpolation', 'uniform', 'sbx'
     sbx_eta: float = 2.0  # Distribution index for SBX (0.5-5.0)
+
+    # Fitness sharing (diversity maintenance)
+    use_fitness_sharing: bool = False
+    sharing_radius: float = 0.5  # Genome distance threshold
 
     # Mutation
     mutation_rate: float = 0.1
@@ -167,6 +173,8 @@ def generate_random_genome(
     use_neural_net: bool = True,
     neural_hidden_size: int = 8,
     neural_output_bias: float = 0.0,
+    neural_mode: str = 'hybrid',
+    time_encoding: str = 'cyclic',
 ) -> dict:
     """
     Generate a random creature genome.
@@ -176,6 +184,8 @@ def generate_random_genome(
         use_neural_net: Whether to initialize neural genome
         neural_hidden_size: Hidden layer size for neural network
         neural_output_bias: Initial bias for output neurons
+        neural_mode: Neural network mode ('pure' or 'hybrid')
+        time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
 
     Returns:
         Random genome dict
@@ -263,10 +273,12 @@ def generate_random_genome(
     controller_type = 'oscillator'
 
     if use_neural_net and len(muscles) > 0:
+        # Calculate input size based on mode and time encoding
+        input_size = get_input_size(neural_mode, time_encoding)
         neural_genome = initialize_neural_genome(
             num_muscles=len(muscles),
             hidden_size=neural_hidden_size,
-            input_size=8,  # Hybrid mode
+            input_size=input_size,
             output_bias=neural_output_bias,
         )
         controller_type = 'neural'
@@ -331,6 +343,8 @@ def generate_population(
     use_neural_net: bool = True,
     neural_hidden_size: int = 8,
     neural_output_bias: float = 0.0,
+    neural_mode: str = 'hybrid',
+    time_encoding: str = 'cyclic',
 ) -> list[dict]:
     """
     Generate an initial population of random genomes.
@@ -341,6 +355,8 @@ def generate_population(
         use_neural_net: Whether to initialize neural genomes
         neural_hidden_size: Hidden layer size
         neural_output_bias: Initial output bias
+        neural_mode: Neural network mode ('pure' or 'hybrid')
+        time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
 
     Returns:
         List of genome dicts
@@ -351,6 +367,8 @@ def generate_population(
             use_neural_net=use_neural_net,
             neural_hidden_size=neural_hidden_size,
             neural_output_bias=neural_output_bias,
+            neural_mode=neural_mode,
+            time_encoding=time_encoding,
         )
         for _ in range(size)
     ]
@@ -436,6 +454,8 @@ def evolve_population(
             use_crossover=config.get('use_crossover', True),
             neural_crossover_method=config.get('neural_crossover_method', 'sbx'),
             sbx_eta=config.get('sbx_eta', 2.0),
+            use_fitness_sharing=config.get('use_fitness_sharing', False),
+            sharing_radius=config.get('sharing_radius', 0.5),
             mutation_rate=config.get('mutation_rate', 0.1),
             mutation_magnitude=config.get('mutation_magnitude', 0.3),
             structural_rate=config.get('structural_rate', 0.1),
@@ -475,33 +495,43 @@ def evolve_population(
         max_amplitude=config.max_amplitude,
     )
 
+    # Apply fitness sharing if enabled (before selection)
+    # This penalizes creatures in crowded niches to maintain diversity
+    selection_fitness = fitness_scores
+    if config.use_fitness_sharing:
+        selection_fitness = apply_fitness_sharing(
+            genomes, fitness_scores, config.sharing_radius
+        )
+
     # Select survivors based on configured method
     survival_rate = 1 - config.cull_percentage
     num_survivors = max(1, int(len(genomes) * survival_rate))
 
     if config.selection_method == 'truncation':
         # Strict cutoff - only top performers survive
-        result = truncation_selection(genomes, fitness_scores, survival_rate)
+        result = truncation_selection(genomes, selection_fitness, survival_rate)
         survivors = result.survivors
     elif config.selection_method == 'tournament':
         # Tournament selection - random groups, best of each survives
         survivors = tournament_selection(
-            genomes, fitness_scores, num_survivors, config.tournament_size
+            genomes, selection_fitness, num_survivors, config.tournament_size
         )
     else:  # 'rank' (default)
         # Rank-based selection - higher rank = higher survival probability
         # Still uses truncation for initial survival, but rank-based for breeding
-        result = truncation_selection(genomes, fitness_scores, survival_rate)
+        result = truncation_selection(genomes, selection_fitness, survival_rate)
         survivors = result.survivors
 
     # Get survivor fitness scores for rank-based selection
+    # Use shared fitness for selection probabilities (if sharing enabled)
     survivor_ids = {g['id'] for g in survivors}
     survivor_fitness = [
-        fitness_scores[i] for i, g in enumerate(genomes)
+        selection_fitness[i] for i, g in enumerate(genomes)
         if g['id'] in survivor_ids
     ]
 
-    # Map survivor ID to fitness for ancestry building
+    # Map survivor ID to RAW fitness for ancestry building (not shared)
+    # We want to record actual performance, not adjusted scores
     survivor_fitness_map = {}
     for i, g in enumerate(genomes):
         if g['id'] in survivor_ids:

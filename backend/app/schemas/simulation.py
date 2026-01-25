@@ -58,6 +58,7 @@ class SimulationConfig(BaseModel):
     # Neural network settings
     use_neural_net: bool = True
     neural_mode: Literal['hybrid', 'pure'] = 'pure'
+    time_encoding: Literal['none', 'cyclic', 'sin', 'raw', 'sin_raw'] = 'none'  # Time encoding (default: none for pure, cyclic recommended for hybrid)
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
     neural_activation: str = Field(default='tanh')
     weight_mutation_rate: float = Field(default=0.2, ge=0.0, le=1.0)
@@ -77,6 +78,10 @@ class SimulationConfig(BaseModel):
     # Crossover method for neural weights
     neural_crossover_method: Literal['interpolation', 'uniform', 'sbx'] = 'sbx'
     sbx_eta: float = Field(default=2.0, ge=0.5, le=5.0)
+
+    # Fitness sharing (diversity maintenance)
+    use_fitness_sharing: bool = False
+    sharing_radius: float = Field(default=0.5, ge=0.1, le=2.0)
 
     # Disqualification thresholds
     position_threshold: float = Field(default=50.0, ge=10.0)
@@ -149,9 +154,10 @@ class SimulationResult(BaseModel):
     # Fitness over time (for graphing actual fitness progression)
     fitness_over_time: list[float] | None = None
 
-    # Neural network activations per frame (muscle outputs for each frame)
+    # Neural network activations per frame (full forward pass data)
     # Only populated for neural controller creatures when frames are recorded
-    activations_per_frame: list[list[float]] | None = None
+    # Each entry: { "inputs": [...], "hidden": [...], "outputs": [...] }
+    activations_per_frame: list[dict] | None = None
 
 
 class BatchSimulationRequest(BaseModel):

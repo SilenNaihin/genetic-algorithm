@@ -78,8 +78,8 @@ weights -= lr * grad               weights = mutate(parent_weights)
 ### Network Topology (Fixed, v1)
 
 ```
-INPUTS (8)              HIDDEN (8, tanh)         OUTPUTS (N muscles)
-═══════════             ════════════════         ═══════════════════
+INPUTS (7-9)            HIDDEN (8, tanh)         OUTPUTS (N muscles)
+════════════            ════════════════         ═══════════════════
 
 pellet_dir_x  ─────┐                         ┌─── muscle_0_mod [-1, 1]
 pellet_dir_y  ─────┤    ┌───────────────┐    │
@@ -88,9 +88,28 @@ velocity_x    ─────┤    │   8 neurons   │    │
 velocity_y    ─────┼────┤     tanh      ├────┼─── muscle_2_mod [-1, 1]
 velocity_z    ─────┤    │  activation   │    │
 pellet_dist   ─────┼────┤               ├────┼─── ...
-time_phase    ─────┘    └───────────────┘    │
-                                             └─── muscle_N_mod [-1, 1]
+time_1?       ─────┤    └───────────────┘    │
+time_2?       ─────┘                         └─── muscle_N_mod [-1, 1]
 ```
+
+### Time Encoding Options
+
+The number of inputs varies based on time encoding:
+
+| Encoding | Inputs | Time Components | Use Case |
+|----------|--------|-----------------|----------|
+| `none` | 7 | - | Pure mode default, NN controls timing |
+| `sin` | 8 | sin(2πt) | Basic rhythmic timing |
+| `raw` | 8 | t/maxTime | Linear progress 0→1 |
+| `cyclic` | 9 | sin(2πt), cos(2πt) | Unique position in cycle (hybrid default) |
+| `sin_raw` | 9 | sin(2πt), t/maxTime | Rhythm + progress awareness |
+
+**When to use each:**
+- **none**: Let NN learn its own timing (pure mode)
+- **sin**: Simple rhythmic coordination
+- **raw**: Behaviors that change over simulation time
+- **cyclic**: Precise cycle position without ambiguity (sin alone has two points per value)
+- **sin_raw**: Both rhythm for locomotion and awareness of time elapsed
 
 ### Sensor Inputs
 
@@ -103,20 +122,21 @@ time_phase    ─────┘    └─────────────�
 | `velocity_y` | [-1, 1] | Y component of creature velocity (normalized) |
 | `velocity_z` | [-1, 1] | Z component of creature velocity (normalized) |
 | `pellet_dist` | [0, 1] | Normalized distance to pellet (0=at pellet, 1=far) |
-| `time_phase` | [-1, 1] | sin(time × 2π) for rhythmic behaviors |
+| `time_1` | [-1, 1] | sin(2πt) - rhythmic timing (if encoding includes sin) |
+| `time_2` | [-1, 1] or [0, 1] | cos(2πt) for cyclic, t/maxTime for sin_raw |
 
 ### Weight Count
 
-For a creature with N muscles:
-- Input → Hidden: 8 × 8 = 64 weights + 8 biases = **72 parameters**
-- Hidden → Output: 8 × N = 8N weights + N biases = **9N parameters**
-- **Total**: 72 + 9N parameters
+For a creature with N muscles and I inputs (7-9 based on time encoding):
+- Input → Hidden: I × 8 weights + 8 biases = **I×8 + 8 parameters**
+- Hidden → Output: 8 × N weights + N biases = **9N parameters**
+- **Total**: (I×8 + 8) + 9N parameters
 
-| Muscles | Total Parameters |
-|---------|------------------|
-| 5 | 117 |
-| 10 | 162 |
-| 15 | 207 |
+| Inputs | Muscles | Total Parameters |
+|--------|---------|------------------|
+| 7 (none) | 10 | 64 + 8 + 90 = 162 |
+| 8 (sin/raw) | 10 | 72 + 8 + 90 = 170 |
+| 9 (cyclic/sin_raw) | 10 | 80 + 8 + 90 = 178 |
 
 Compare to oscillator mode: ~12 evolvable parameters per muscle = 60-180 total.
 Similar count, but neural net can learn **arbitrary** input→output mappings.
@@ -156,10 +176,12 @@ contraction = base * amplitude * modulation
 Neural network **directly controls** muscle contraction:
 
 ```python
-# Direct neural control (7 inputs, no time_phase)
+# Direct neural control (7-9 inputs depending on time_encoding)
 nn_output = network.forward(sensors)  # in [-1, 1]
 contraction = nn_output * max_amplitude
 ```
+
+By default, pure mode uses `time_encoding='none'` (7 inputs), but you can optionally add time inputs for rhythm awareness.
 
 **Advantages:**
 - Can learn any behavior (no oscillator constraints)
@@ -568,6 +590,7 @@ function rankBasedSelection(population: Creature[]): Creature {
 |---------|------|---------|-------------|
 | `useNeuralNet` | boolean | false | Enable neural network control |
 | `neuralMode` | enum | 'hybrid' | 'hybrid' or 'pure' control mode |
+| `timeEncoding` | enum | 'none' | Time input encoding: 'none', 'sin', 'raw', 'cyclic', 'sin_raw' |
 | `hiddenSize` | number | 8 | Neurons in hidden layer |
 | `activation` | enum | 'tanh' | 'tanh', 'relu', or 'sigmoid' |
 | `mutationMagnitude` | number | 0.3 | Weight perturbation std dev |
@@ -586,6 +609,7 @@ class SimulationConfig(BaseModel):
     # Core settings
     use_neural_net: bool = True
     neural_mode: Literal['hybrid', 'pure'] = 'hybrid'
+    time_encoding: Literal['none', 'sin', 'raw', 'cyclic', 'sin_raw'] = 'none'
     neural_hidden_size: int = 8
     activation: Literal['tanh', 'relu', 'sigmoid'] = 'tanh'
 

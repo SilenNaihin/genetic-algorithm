@@ -491,6 +491,50 @@ class TestGenerateRandomGenome:
         assert genome['neuralGenome'] is not None
         assert genome['controllerType'] == 'neural'
 
+    def test_neural_genome_input_size_none_encoding(self):
+        """Time encoding 'none' should have 7 inputs (no time)."""
+        # Works for both pure and hybrid modes
+        genome_pure = generate_random_genome(use_neural_net=True, neural_mode='pure', time_encoding='none')
+        genome_hybrid = generate_random_genome(use_neural_net=True, neural_mode='hybrid', time_encoding='none')
+
+        assert genome_pure['neuralGenome'].get('input_size') == 7
+        assert genome_hybrid['neuralGenome'].get('input_size') == 7
+
+    def test_neural_genome_input_size_cyclic_encoding(self):
+        """Time encoding 'cyclic' should have 9 inputs."""
+        genome_pure = generate_random_genome(use_neural_net=True, neural_mode='pure', time_encoding='cyclic')
+        genome_hybrid = generate_random_genome(use_neural_net=True, neural_mode='hybrid', time_encoding='cyclic')
+
+        assert genome_pure['neuralGenome'].get('input_size') == 9
+        assert genome_hybrid['neuralGenome'].get('input_size') == 9
+
+    def test_neural_genome_input_size_sin_encoding(self):
+        """Time encoding 'sin' should have 8 inputs."""
+        genome = generate_random_genome(use_neural_net=True, neural_mode='hybrid', time_encoding='sin')
+
+        neural_genome = genome['neuralGenome']
+        assert neural_genome is not None
+        input_size = neural_genome.get('input_size')
+        assert input_size == 8, f"Sin encoding should have 8 inputs, got {input_size}"
+
+    def test_neural_genome_input_size_raw_encoding(self):
+        """Time encoding 'raw' should have 8 inputs."""
+        genome = generate_random_genome(use_neural_net=True, neural_mode='pure', time_encoding='raw')
+
+        neural_genome = genome['neuralGenome']
+        assert neural_genome is not None
+        input_size = neural_genome.get('input_size')
+        assert input_size == 8, f"Raw encoding should have 8 inputs, got {input_size}"
+
+    def test_neural_genome_input_size_sin_raw_encoding(self):
+        """Time encoding 'sin_raw' should have 9 inputs (sin + raw)."""
+        genome = generate_random_genome(use_neural_net=True, neural_mode='pure', time_encoding='sin_raw')
+
+        neural_genome = genome['neuralGenome']
+        assert neural_genome is not None
+        input_size = neural_genome.get('input_size')
+        assert input_size == 9, f"Sin+raw encoding should have 9 inputs, got {input_size}"
+
 
 class TestGeneratePopulation:
     """Test population generation."""
@@ -508,6 +552,44 @@ class TestGeneratePopulation:
             assert 'id' in genome
             assert 'nodes' in genome
             assert len(genome['nodes']) >= 3
+
+    def test_time_encoding_propagates_to_all_genomes(self):
+        """time_encoding should propagate to all genomes in population."""
+        # Test 'none' encoding (7 inputs)
+        pop_none = generate_population(
+            size=5,
+            use_neural_net=True,
+            time_encoding='none',
+        )
+        for genome in pop_none:
+            neural_genome = genome.get('neuralGenome')
+            if neural_genome:  # Only check if neural genome was created
+                input_size = neural_genome.get('input_size')
+                assert input_size == 7, f"'none' encoding should have 7 inputs, got {input_size}"
+
+        # Test cyclic encoding (9 inputs)
+        pop_cyclic = generate_population(
+            size=5,
+            use_neural_net=True,
+            time_encoding='cyclic',
+        )
+        for genome in pop_cyclic:
+            neural_genome = genome.get('neuralGenome')
+            if neural_genome:
+                input_size = neural_genome.get('input_size')
+                assert input_size == 9, f"'cyclic' encoding should have 9 inputs, got {input_size}"
+
+        # Test sin encoding (8 inputs)
+        pop_sin = generate_population(
+            size=5,
+            use_neural_net=True,
+            time_encoding='sin',
+        )
+        for genome in pop_sin:
+            neural_genome = genome.get('neuralGenome')
+            if neural_genome:
+                input_size = neural_genome.get('input_size')
+                assert input_size == 8, f"'sin' encoding should have 8 inputs, got {input_size}"
 
 
 class TestEvolvePopulation:

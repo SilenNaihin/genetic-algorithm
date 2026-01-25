@@ -13,6 +13,7 @@
  */
 
 import type { NeuralGenomeData, NeuralTopology } from '../neural';
+import type { FrameActivations } from '../types';
 import { getActivation } from '../neural';
 
 /**
@@ -124,6 +125,8 @@ const DEFAULT_OPTIONS: NeuralVisualizerOptions = {
   showWeights: true
 };
 
+type TimeEncoding = 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
+
 export class NeuralVisualizer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -133,6 +136,7 @@ export class NeuralVisualizer {
   private activationFn: ((x: number) => number) | null = null;
   private lastResult: ForwardResult | null = null;
   private muscleNames: string[] = [];
+  private timeEncoding: TimeEncoding = 'none';
 
   constructor(container: HTMLElement, options: Partial<NeuralVisualizerOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -197,20 +201,38 @@ export class NeuralVisualizer {
 
   /**
    * Set stored activations directly from simulation data.
-   * This displays the actual muscle outputs from simulation rather than recomputing.
-   * @param outputs - Muscle activation values from simulation (one per muscle)
+   * This displays the actual activations from simulation rather than recomputing.
+   * @param activations - Full activation data from simulation (inputs, hidden, outputs)
+   *                      Can also accept legacy format (just outputs array)
    */
-  setStoredActivations(outputs: number[]): void {
+  setStoredActivations(activations: FrameActivations | number[]): void {
     if (!this.topology) return;
 
-    // Create a ForwardResult-like object with the stored outputs
-    // We don't have the exact hidden/input values from simulation,
-    // so we'll show outputs directly and use placeholder values for visualization
-    this.lastResult = {
-      inputs: new Array(this.topology.inputSize).fill(0),  // Not stored, use placeholder
-      hidden: new Array(this.topology.hiddenSize).fill(0), // Not stored, use placeholder
-      outputs: outputs.slice(0, this.topology.outputSize),
-    };
+    // Handle both new format (FrameActivations) and legacy format (outputs array)
+    if (Array.isArray(activations)) {
+      // Legacy format: just outputs array
+      this.lastResult = {
+        inputs: new Array(this.topology.inputSize).fill(0),
+        hidden: new Array(this.topology.hiddenSize).fill(0),
+        outputs: activations.slice(0, this.topology.outputSize),
+      };
+    } else {
+      // New format: full FrameActivations with inputs, hidden, outputs
+      this.lastResult = {
+        inputs: activations.inputs || new Array(this.topology.inputSize).fill(0),
+        hidden: activations.hidden || new Array(this.topology.hiddenSize).fill(0),
+        outputs: (activations.outputs || []).slice(0, this.topology.outputSize),
+      };
+    }
+    this.render();
+  }
+
+  /**
+   * Set time encoding for accurate input labels.
+   * Call this after setGenome to update labels.
+   */
+  setTimeEncoding(encoding: TimeEncoding): void {
+    this.timeEncoding = encoding;
     this.render();
   }
 
@@ -222,6 +244,7 @@ export class NeuralVisualizer {
     this.topology = null;
     this.activationFn = null;
     this.lastResult = null;
+    this.timeEncoding = 'none';
     this.render();
   }
 
@@ -299,70 +322,99 @@ export class NeuralVisualizer {
     inputY: number[],
     hiddenY: number[],
     outputY: number[],
-    _inputs: number[],
-    _hidden: number[],
-    outputs: number[]
+    inputs: number[],
+    hidden: number[],
+    _outputs: number[]
   ): void {
     const weights = this.weights;
 
-    // Draw input -> hidden connections
+    // Draw input -> hidden connections with signal flow
     for (let i = 0; i < inputY.length; i++) {
       for (let h = 0; h < hiddenY.length; h++) {
         const weight = weights?.weightsIH[i]?.[h] ?? 0;
-        this.drawWeightedConnection(ctx, layerX[0], inputY[i], layerX[1], hiddenY[h], weight);
+        const inputVal = inputs[i] || 0;
+        // Signal = input activation × weight
+        const signal = inputVal * weight;
+        this.drawSignalConnection(ctx, layerX[0], inputY[i], layerX[1], hiddenY[h], weight, signal);
       }
     }
 
-    // Draw hidden -> output connections
+    // Draw hidden -> output connections with signal flow
     for (let h = 0; h < hiddenY.length; h++) {
       for (let o = 0; o < outputY.length; o++) {
         const weight = weights?.weightsHO[h]?.[o] ?? 0;
-        // Modulate by output activation for dynamic feedback
-        const outputAct = outputs[o] || 0;
-        this.drawWeightedConnection(ctx, layerX[1], hiddenY[h], layerX[2], outputY[o], weight, outputAct);
+        const hiddenVal = hidden[h] || 0;
+        // Signal = hidden activation × weight
+        const signal = hiddenVal * weight;
+        this.drawSignalConnection(ctx, layerX[1], hiddenY[h], layerX[2], outputY[o], weight, signal);
       }
     }
   }
 
   /**
-   * Draw a connection line with color based on weight sign and thickness based on magnitude.
-   * - Positive weights: green/cyan
-   * - Negative weights: red/magenta
-   * - Stronger weights: thicker lines, higher opacity
+   * Draw a connection line showing actual signal flow.
+   * Signal = activation × weight, showing what's actually contributing to outputs.
+   *
+   * - Positive signal (positive contribution): cyan/green
+   * - Negative signal (inhibitory): red/orange
+   * - Signal magnitude determines brightness and thickness
+   * - Inactive connections (near-zero signal) are dimmed
    */
-  private drawWeightedConnection(
+  private drawSignalConnection(
     ctx: CanvasRenderingContext2D,
     x1: number, y1: number,
     x2: number, y2: number,
     weight: number,
-    outputActivation?: number
+    signal: number
   ): void {
-    const magnitude = Math.abs(weight);
-    const isPositive = weight >= 0;
+    const weightMag = Math.abs(weight);
+    const signalMag = Math.abs(signal);
+    const isPositiveSignal = signal >= 0;
 
-    // Skip very weak connections to reduce visual noise
-    if (magnitude < 0.05) return;
+    // Skip very weak weights to reduce visual noise
+    if (weightMag < 0.03) return;
 
-    // Normalize magnitude (weights typically in [-2, 2] range)
-    const normalizedMag = Math.min(magnitude / 1.5, 1);
+    // Normalize signal (typically in [-2, 2] range after activation × weight)
+    const normalizedSignal = Math.min(signalMag / 1.0, 1);
 
-    // Color: green/cyan for positive, red/magenta for negative
-    // Saturation and lightness increase with magnitude
-    const hue = isPositive ? 160 : 0;  // Cyan-ish for positive, red for negative
-    const saturation = 50 + normalizedMag * 40;
-    const lightness = 35 + normalizedMag * 25;
+    // Normalize weight for base line width
+    const normalizedWeight = Math.min(weightMag / 1.5, 1);
 
-    // Alpha based on magnitude - stronger weights more visible
-    let alpha = 0.2 + normalizedMag * 0.6;
+    // Color based on signal direction (what's actually contributing)
+    // Positive signal: cyan/green (excitatory)
+    // Negative signal: red/orange (inhibitory)
+    // Near-zero signal: gray (inactive)
+    let hue: number;
+    let saturation: number;
+    let lightness: number;
 
-    // If output activation provided, boost alpha when active
-    if (outputActivation !== undefined) {
-      const actMag = Math.abs(outputActivation);
-      alpha = Math.min(0.9, alpha + actMag * 0.3);
+    if (signalMag < 0.02) {
+      // Near-zero signal - show as dim gray (inactive)
+      hue = 0;
+      saturation = 0;
+      lightness = 25 + normalizedWeight * 15;
+    } else if (isPositiveSignal) {
+      // Positive signal - cyan to green (excitatory)
+      hue = 160;
+      saturation = 50 + normalizedSignal * 40;
+      lightness = 35 + normalizedSignal * 30;
+    } else {
+      // Negative signal - red to orange (inhibitory)
+      hue = 10;
+      saturation = 50 + normalizedSignal * 40;
+      lightness = 35 + normalizedSignal * 30;
     }
 
-    // Line width scales with magnitude
-    const lineWidth = 0.5 + normalizedMag * 2.5;
+    // Alpha: active signals are more visible
+    const alpha = signalMag < 0.02
+      ? 0.15 + normalizedWeight * 0.2  // Inactive: show weight structure dimly
+      : 0.3 + normalizedSignal * 0.6;   // Active: brighten with signal
+
+    // Line width: base on weight, boost when active
+    const baseWidth = 0.5 + normalizedWeight * 1.5;
+    const lineWidth = signalMag < 0.02
+      ? baseWidth
+      : baseWidth + normalizedSignal * 1.5;
 
     ctx.beginPath();
     ctx.moveTo(x1, y1);
@@ -443,8 +495,34 @@ export class NeuralVisualizer {
     ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillStyle = '#888';
 
-    // Input labels (abbreviated sensor names)
-    const shortNames = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist', 'time'];
+    // Input labels (abbreviated sensor names) - based on time encoding
+    const baseNames = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist'];
+    let shortNames: string[];
+    switch (this.timeEncoding) {
+      case 'none':
+        shortNames = baseNames;
+        break;
+      case 'sin':
+        shortNames = [...baseNames, 't_sin'];
+        break;
+      case 'raw':
+        shortNames = [...baseNames, 't_raw'];
+        break;
+      case 'cyclic':
+        shortNames = [...baseNames, 't_sin', 't_cos'];
+        break;
+      case 'sin_raw':
+        shortNames = [...baseNames, 't_sin', 't_raw'];
+        break;
+      default:
+        // Fallback based on input size if encoding not set
+        const inputSize = this.topology?.inputSize || 7;
+        shortNames = inputSize <= 7
+          ? baseNames
+          : inputSize === 8
+            ? [...baseNames, 'time']
+            : [...baseNames, 't_1', 't_2'];
+    }
     ctx.textAlign = 'right';
     for (let i = 0; i < inputY.length && i < shortNames.length; i++) {
       ctx.fillText(shortNames[i], pixelAlign(layerX[0] - 10), pixelAlign(inputY[i]));

@@ -6,13 +6,31 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { ReplayRenderer } from '../../../src/rendering/ReplayRenderer';
 import { NeuralVisualizer } from '../../../src/ui/NeuralVisualizer';
-import { gatherSensorInputsPure, gatherSensorInputsHybrid, NEURAL_INPUT_SIZE_PURE } from '../../../src/neural';
+import { gatherSensorInputsForEncoding } from '../../../src/neural';
+import type { TimeEncodingType } from '../../../src/neural';
 import * as StorageService from '../../../src/services/StorageService';
 import type { CreatureGenome } from '../../../src/types';
 import type { CreatureSimulationResult } from '../../../src/types';
 
-// Sensor names for neural info display
-const SENSOR_NAMES = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist', 'time'];
+// Sensor names for neural info display - based on time encoding
+const BASE_SENSOR_NAMES = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist'];
+
+function getSensorNamesForEncoding(encoding: TimeEncodingType): string[] {
+  switch (encoding) {
+    case 'none':
+      return BASE_SENSOR_NAMES;
+    case 'sin':
+      return [...BASE_SENSOR_NAMES, 't_sin'];
+    case 'raw':
+      return [...BASE_SENSOR_NAMES, 't_raw'];
+    case 'cyclic':
+      return [...BASE_SENSOR_NAMES, 't_sin', 't_cos'];
+    case 'sin_raw':
+      return [...BASE_SENSOR_NAMES, 't_sin', 't_raw'];
+    default:
+      return BASE_SENSOR_NAMES;
+  }
+}
 
 // Family tree types
 interface AncestorInfo {
@@ -82,7 +100,7 @@ export function ReplayModal() {
         firstFitness: replayResult.fitnessOverTime?.[0],
         lastFitness: replayResult.fitnessOverTime?.[replayResult.fitnessOverTime?.length - 1],
         activationsPerFrameLength: replayResult.activationsPerFrame?.length,
-        firstActivations: replayResult.activationsPerFrame?.[0]?.slice(0, 3),
+        firstActivations: replayResult.activationsPerFrame?.[0]?.outputs?.slice(0, 3),
       });
       setLoadedResult(replayResult);
       return;
@@ -204,6 +222,8 @@ export function ReplayModal() {
     });
 
     visualizer.setGenome(genome.neuralGenome, muscleNames);
+    // Set time encoding for accurate input labels
+    visualizer.setTimeEncoding(config.timeEncoding || 'none');
 
     return () => {
       if (neuralVisualizerRef.current) {
@@ -211,7 +231,7 @@ export function ReplayModal() {
         neuralVisualizerRef.current = null;
       }
     };
-  }, [isOpen, loadedResult]);
+  }, [isOpen, loadedResult, config.timeEncoding]);
 
   // Build family tree from embedded ancestry chain (no DB lookups needed)
   const buildFamilyTree = useCallback((genome: CreatureGenome) => {
@@ -311,9 +331,11 @@ export function ReplayModal() {
       // Update neural visualization if creature has neural genome
       const genome = loadedResult.genome;
       if (neuralVisualizerRef.current && genome.neuralGenome && genome.controllerType === 'neural') {
-        // Prefer stored activations from simulation (accurate)
-        if (loadedResult.activationsPerFrame && loadedResult.activationsPerFrame[frameIndex]) {
-          neuralVisualizerRef.current.setStoredActivations(loadedResult.activationsPerFrame[frameIndex]);
+        // Prefer stored activations from simulation (accurate - includes inputs, hidden, outputs)
+        const frameActivations = loadedResult.activationsPerFrame?.[frameIndex];
+        if (frameActivations) {
+          // New format: full FrameActivations object with inputs, hidden, outputs
+          neuralVisualizerRef.current.setStoredActivations(frameActivations);
         } else {
           // Fallback: recompute from sensor inputs (may differ from actual simulation)
           const frame = frames[frameIndex];
@@ -353,11 +375,12 @@ export function ReplayModal() {
             }
           }
 
-          // Gather sensor inputs based on neural mode
-          const isPureMode = genome.neuralGenome.topology.inputSize === NEURAL_INPUT_SIZE_PURE;
-          const sensorInputs = isPureMode
-            ? gatherSensorInputsPure(pelletDir, velocityDir, normalizedDist)
-            : gatherSensorInputsHybrid(pelletDir, velocityDir, normalizedDist, targetTime);
+          // Gather sensor inputs using actual time encoding from config
+          const timeEncoding = (config.timeEncoding || 'none') as TimeEncodingType;
+          const sensorInputs = gatherSensorInputsForEncoding(
+            pelletDir, velocityDir, normalizedDist, targetTime,
+            timeEncoding, config.simulationDuration
+          );
 
           neuralVisualizerRef.current.updateActivations(sensorInputs);
         }
@@ -752,7 +775,7 @@ export function ReplayModal() {
                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
                   <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '4px' }}>SENSOR INPUTS</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '9px' }}>
-                    {SENSOR_NAMES.map((name, i) => (
+                    {getSensorNamesForEncoding(config.timeEncoding || 'none').map((name, i) => (
                       <div
                         key={name}
                         style={{

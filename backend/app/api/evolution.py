@@ -124,6 +124,8 @@ async def run_generation(
             use_neural_net=config.use_neural_net,
             neural_hidden_size=config.neural_hidden_size,
             neural_output_bias=config.neural_output_bias,
+            neural_mode=config.neural_mode,
+            time_encoding=config.time_encoding,
         )
     else:
         # Get previous generation performances (sorted by fitness)

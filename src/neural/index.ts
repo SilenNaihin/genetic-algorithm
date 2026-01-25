@@ -25,7 +25,8 @@ export {
 export type {
   NeuralTopology,
   NeuralGenomeData,
-  NeuralConfig
+  NeuralConfig,
+  TimeEncodingType
 } from './NeuralGenome';
 export {
   DEFAULT_NEURAL_CONFIG,
@@ -42,5 +43,7 @@ export {
   validateNeuralGenome,
   gatherSensorInputs,
   gatherSensorInputsPure,
-  gatherSensorInputsHybrid
+  gatherSensorInputsHybrid,
+  gatherSensorInputsForSize,
+  gatherSensorInputsForEncoding
 } from './NeuralGenome';

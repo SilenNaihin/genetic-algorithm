@@ -42,6 +42,7 @@ export interface ApiSimulationConfig {
   fitness_regression_penalty: number;
   use_neural_net: boolean;
   neural_mode: 'hybrid' | 'pure';
+  time_encoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
   neural_hidden_size: number;
   neural_activation: string;
   weight_mutation_rate: number;
@@ -158,6 +159,7 @@ export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
     fitness_regression_penalty: config.fitnessRegressionPenalty,
     use_neural_net: config.useNeuralNet,
     neural_mode: config.neuralMode,
+    time_encoding: config.timeEncoding,
     neural_hidden_size: config.neuralHiddenSize,
     neural_activation: config.neuralActivation,
     weight_mutation_rate: config.weightMutationRate,
@@ -201,6 +203,7 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
     fitnessRegressionPenalty: api.fitness_regression_penalty,
     useNeuralNet: api.use_neural_net,
     neuralMode: api.neural_mode,
+    timeEncoding: api.time_encoding,
     neuralHiddenSize: api.neural_hidden_size,
     neuralActivation: api.neural_activation as SimulationConfig['neuralActivation'],
     weightMutationRate: api.weight_mutation_rate,

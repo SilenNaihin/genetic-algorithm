@@ -84,11 +84,37 @@ export function NeuralPanel() {
             </div>
             <select
               value={config.neuralMode}
-              onChange={(e) => setConfig({ neuralMode: e.target.value as 'hybrid' | 'pure' })}
+              onChange={(e) => {
+                const newMode = e.target.value as 'hybrid' | 'pure';
+                // Auto-switch time encoding defaults when mode changes
+                const newTimeEncoding = newMode === 'hybrid' ? 'cyclic' : 'none';
+                setConfig({ neuralMode: newMode, timeEncoding: newTimeEncoding });
+              }}
               style={selectStyle}
             >
               <option value="hybrid">Hybrid</option>
               <option value="pure">Pure</option>
+            </select>
+          </div>
+
+          {/* Time Encoding - available for both modes */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={labelStyle}>
+                Time Encoding
+                <InfoTooltip text={TOOLTIPS.timeEncoding} />
+              </span>
+            </div>
+            <select
+              value={config.timeEncoding}
+              onChange={(e) => setConfig({ timeEncoding: e.target.value as 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw' })}
+              style={selectStyle}
+            >
+              <option value="none">None (7 inputs)</option>
+              <option value="cyclic">Cyclic (9 inputs)</option>
+              <option value="sin">Sin (8 inputs)</option>
+              <option value="raw">Raw (8 inputs)</option>
+              <option value="sin_raw">Sin+Raw (9 inputs)</option>
             </select>
           </div>
 

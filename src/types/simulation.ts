@@ -50,6 +50,7 @@ export interface SimulationConfig {
   // Neural network settings (neuroevolution)
   useNeuralNet: boolean;              // Enable neural network control
   neuralMode: 'hybrid' | 'pure';      // How NN output is used
+  timeEncoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';  // Time encoding (default: none for pure, cyclic for hybrid)
   neuralHiddenSize: number;           // Neurons in hidden layer
   neuralActivation: ActivationType;   // Activation function
   weightMutationRate: number;         // Target/end probability each weight mutates
@@ -69,6 +70,10 @@ export interface SimulationConfig {
   // Crossover method for neural weights
   neuralCrossoverMethod: 'interpolation' | 'uniform' | 'sbx';  // How neural weights are combined during crossover
   sbxEta: number;                     // SBX distribution index (0.5-5.0, lower = more exploration)
+
+  // Fitness sharing (diversity maintenance)
+  useFitnessSharing: boolean;         // Enable fitness sharing to penalize similar creatures
+  sharingRadius: number;              // Genome distance threshold for sharing (0.1-2.0)
 
   // Frame storage mode for replay capability
   frameStorageMode: 'none' | 'sparse' | 'all';  // none = no replays, sparse = top/bottom only, all = all creatures
@@ -112,6 +117,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Neural network defaults (enabled by default)
   useNeuralNet: true,
   neuralMode: 'pure',
+  timeEncoding: 'none',  // Default 'none' for pure mode; 'cyclic' recommended for hybrid
   neuralHiddenSize: 8,
   neuralActivation: 'tanh',
   weightMutationRate: 0.2,
@@ -131,6 +137,10 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Crossover method defaults
   neuralCrossoverMethod: 'sbx',  // SBX produces smoother offspring distribution
   sbxEta: 2.0,                   // Balanced exploration/exploitation
+
+  // Fitness sharing defaults
+  useFitnessSharing: false,      // Off by default - enable to maintain diversity
+  sharingRadius: 0.5,            // Moderate sharing radius
 
   // Frame storage mode
   frameStorageMode: 'all',       // Store frames for all creatures by default (enables replays)
@@ -217,7 +227,7 @@ export interface CreatureSimulationResult {
   pellets: PelletData[];
   fitnessOverTime: number[];
   disqualified: DisqualificationReason;
-  activationsPerFrame?: number[][];  // Neural network muscle outputs per frame [frame][muscle]
+  activationsPerFrame?: FrameActivations[];  // Full neural network activations per frame
 
   // UI-specific properties (set by frontend from evolution step response)
   _isSurvivor?: boolean;   // For animation: creature survived from previous generation
@@ -230,4 +240,14 @@ export interface PelletData {
   collectedAtFrame: number | null;
   spawnedAtFrame: number;
   initialDistance: number;  // Distance from creature edge when pellet spawned
+}
+
+/**
+ * Full neural network activation data for a single frame.
+ * Includes inputs, hidden layer activations, and outputs.
+ */
+export interface FrameActivations {
+  inputs: number[];   // Sensor inputs fed to network
+  hidden: number[];   // Hidden layer activations
+  outputs: number[];  // Muscle outputs
 }

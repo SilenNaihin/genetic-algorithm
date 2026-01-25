@@ -5,14 +5,19 @@ Computes sensor inputs for all creatures in parallel:
 - Pellet direction (3D unit vector toward pellet)
 - Velocity direction (3D unit vector of movement)
 - Pellet distance (normalized 0-1)
-- Time phase (hybrid mode only, sin wave for rhythm)
+- Time encoding (hybrid mode only):
+  - cyclic: sin(2πt), cos(2πt) - unique value for every point in cycle
+  - sin: sin(2πt) - original behavior
+  - raw: t / maxTime - linear 0→1
 """
 
 import torch
+import math
 from typing import Literal
 
 from app.simulation.tensors import CreatureBatch, get_center_of_mass
 from app.simulation.physics import MAX_PELLET_DISTANCE
+from app.neural.network import TimeEncoding
 
 
 @torch.no_grad()
@@ -49,42 +54,79 @@ def gather_sensor_inputs_pure(
 
 
 @torch.no_grad()
-def gather_sensor_inputs_hybrid(
+def gather_sensor_inputs_with_time(
     pellet_direction: torch.Tensor,
     velocity_direction: torch.Tensor,
     normalized_distance: torch.Tensor,
     simulation_time: float,
+    time_encoding: TimeEncoding = 'cyclic',
+    max_time: float = 20.0,
 ) -> torch.Tensor:
     """
-    Gather sensor inputs for hybrid mode (8 inputs).
+    Gather sensor inputs with optional time encoding (7-9 inputs).
 
-    Hybrid mode: NN modulates base oscillation, time phase helps sync.
+    Time encoding options:
+    - none: 7 inputs (no time)
+    - sin: 7 + 1 = 8 (original behavior)
+    - raw: 7 + 1 = 8 (linear 0→1)
+    - cyclic: 7 + 2 = 9 (sin and cos for unique cycle position)
+    - sin_raw: 7 + 2 = 9 (sin for rhythm + raw for progress)
 
     Args:
         pellet_direction: [B, 3] unit vector toward pellet
         velocity_direction: [B, 3] unit vector of movement
         normalized_distance: [B] distance to pellet (0=at pellet, 1=far)
         simulation_time: Current simulation time in seconds
+        time_encoding: How to encode time input ('none', 'cyclic', 'sin', 'raw', 'sin_raw')
+        max_time: Maximum simulation time for 'raw' encoding normalization
 
     Returns:
-        inputs: [B, 8] sensor inputs
+        inputs: [B, 7-9] sensor inputs depending on encoding
             [pellet_dir_x, pellet_dir_y, pellet_dir_z,
              velocity_x, velocity_y, velocity_z,
-             pellet_dist, time_phase]
+             pellet_dist, time_input(s)?]
     """
     batch_size = pellet_direction.shape[0]
     device = pellet_direction.device
 
-    # Time phase: sin wave for rhythmic behavior (matches TypeScript)
-    time_phase = torch.sin(torch.tensor(simulation_time * torch.pi * 2, device=device))
+    # Determine number of time inputs
+    if time_encoding == 'none':
+        num_time_inputs = 0
+    elif time_encoding in ('cyclic', 'sin_raw'):
+        num_time_inputs = 2
+    else:  # sin, raw
+        num_time_inputs = 1
 
-    inputs = torch.zeros(batch_size, 8, device=device)
+    total_inputs = 7 + num_time_inputs
+
+    inputs = torch.zeros(batch_size, total_inputs, device=device)
     inputs[:, 0:3] = pellet_direction
     inputs[:, 3:6] = velocity_direction
     inputs[:, 6] = normalized_distance
-    inputs[:, 7] = time_phase
+
+    # Compute time encoding (if any)
+    if time_encoding == 'cyclic':
+        # Cyclic encoding: [sin(2πt), cos(2πt)] - unique value for every point in cycle
+        angle = simulation_time * 2.0 * math.pi
+        inputs[:, 7] = math.sin(angle)
+        inputs[:, 8] = math.cos(angle)
+    elif time_encoding == 'sin_raw':
+        # Sin + Raw encoding: [sin(2πt), t/maxTime] - rhythm + progress
+        inputs[:, 7] = math.sin(simulation_time * 2.0 * math.pi)
+        inputs[:, 8] = min(simulation_time / max_time, 1.0)
+    elif time_encoding == 'sin':
+        # Sin encoding: sin(2πt) - original behavior
+        inputs[:, 7] = math.sin(simulation_time * 2.0 * math.pi)
+    elif time_encoding == 'raw':
+        # Raw encoding: t / maxTime - linear 0→1
+        inputs[:, 7] = min(simulation_time / max_time, 1.0)
+    # time_encoding == 'none': no time inputs added
 
     return inputs
+
+
+# Keep old name as alias for backwards compatibility
+gather_sensor_inputs_hybrid = gather_sensor_inputs_with_time
 
 
 @torch.no_grad()
@@ -95,6 +137,8 @@ def gather_sensor_inputs(
     simulation_time: float,
     mode: Literal['pure', 'hybrid'] = 'hybrid',
     max_pellet_distance: float = MAX_PELLET_DISTANCE,
+    time_encoding: TimeEncoding = 'cyclic',
+    max_time: float = 20.0,
 ) -> torch.Tensor:
     """
     Gather all sensor inputs from simulation state.
@@ -106,11 +150,13 @@ def gather_sensor_inputs(
         pellet_positions: [B, 3] current target pellet positions
         previous_com: [B, 3] center of mass from previous frame
         simulation_time: Current simulation time
-        mode: 'pure' (7 inputs) or 'hybrid' (8 inputs)
+        mode: 'pure' or 'hybrid' (affects default time_encoding only)
         max_pellet_distance: Max distance for normalization
+        time_encoding: Time encoding method ('none', 'cyclic', 'sin', 'raw')
+        max_time: Maximum simulation time for 'raw' encoding normalization
 
     Returns:
-        inputs: [B, 7] or [B, 8] depending on mode
+        inputs: [B, 7-9] depending on time_encoding
     """
     device = batch.positions.device
 
@@ -134,10 +180,11 @@ def gather_sensor_inputs(
     # Normalized distance (0 = at pellet, 1 = far away)
     normalized_distance = (pellet_dist.squeeze(-1) / max_pellet_distance).clamp(0, 1)  # [B]
 
-    if mode == 'pure':
-        return gather_sensor_inputs_pure(pellet_direction, velocity_direction, normalized_distance)
-    else:
-        return gather_sensor_inputs_hybrid(pellet_direction, velocity_direction, normalized_distance, simulation_time)
+    # Use unified function for all modes - time_encoding determines input count
+    return gather_sensor_inputs_with_time(
+        pellet_direction, velocity_direction, normalized_distance,
+        simulation_time, time_encoding, max_time
+    )
 
 
 @torch.no_grad()

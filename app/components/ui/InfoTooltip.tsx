@@ -113,7 +113,8 @@ export function InfoTooltip({ text, position = 'top', width = 200 }: InfoTooltip
  */
 export const TOOLTIPS = {
   // Neural settings
-  neuralMode: 'Pure: NN has full control over muscles (7 inputs, no time). Hybrid: NN modulates base oscillation (8 inputs with time phase). Pure evolves from scratch; Hybrid guides existing movement.',
+  neuralMode: 'Pure: NN has full control over muscles, no base oscillation. Hybrid: NN modulates base oscillation. Pure evolves from scratch; Hybrid guides existing movement. Both can use time encoding.',
+  timeEncoding: 'Time inputs for the neural network. None (default for pure): no time inputs (7). Cyclic (default for hybrid): sin + cos for unique cycle position (9). Sin: rhythm only (8). Raw: linear progress 0→1 (8). Sin+Raw: rhythm + progress (9).',
   hiddenSize: 'Number of neurons in the hidden layer. More neurons = more complex behaviors but slower evolution. 4-8 for simple tasks, 12-16 for complex coordination.',
   activation: 'How neurons transform inputs. Tanh (-1 to 1): smooth, good default. ReLU (0 to ∞): sparse, fast. Sigmoid (0 to 1): positive only, good for muscle-like outputs.',
   weightMutationRate: 'Target mutation rate. With decay on, starts at 5× this value (max 50%) and decreases over 50 generations. Example: 10% target → starts at 50%, decays to 10%.',
@@ -148,6 +149,10 @@ export const TOOLTIPS = {
   crossoverUniform: 'Randomly pick each weight from either parent (50/50). Can be disruptive - child may get mismatched weights that don\'t work well together.',
   crossoverSbx: 'Simulated Binary Crossover (Deb & Agrawal, 1995). Produces offspring statistically centered around parents but can explore slightly beyond. Smoother distribution than uniform, more flexible than interpolation.',
   sbxEta: 'Distribution index controlling offspring spread. Low (0.5-1): children can be far from parents (exploration). High (3-5): children stay close to parents (exploitation). Default 2.0 is balanced.',
+
+  // Fitness sharing
+  fitnessSharing: 'Fitness sharing (Goldberg & Richardson, 1987) maintains population diversity by penalizing creatures that are too similar. Each creature\'s fitness is divided by the number of similar creatures in its "niche". This prevents the population from converging to a single solution and encourages exploration of different strategies.',
+  sharingRadius: 'Distance threshold for considering two creatures "similar". Creatures within this genome distance share fitness rewards. Lower values (0.1-0.3): only very similar creatures share, preserves more unique solutions. Higher values (0.5-1.0): broader sharing, stronger diversity pressure. Based on neural weight distance.',
 
   // Simulation settings
   simulationDuration: 'How long each creature is simulated in seconds. Longer durations allow more complex behaviors but take more time.',

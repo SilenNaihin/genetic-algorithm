@@ -16,8 +16,15 @@ from app.core.device import get_device_str
 
 # Constants matching TypeScript
 DEFAULT_OUTPUT_BIAS = 0.0
-NEURAL_INPUT_SIZE_PURE = 7
-NEURAL_INPUT_SIZE_HYBRID = 8
+NEURAL_INPUT_SIZE_BASE = 7  # pellet_dir(3) + velocity_dir(3) + distance(1)
+# Time encoding adds 0-2 inputs:
+# - 'none': +0 = 7 (no time)
+# - 'sin': +1 = 8
+# - 'raw': +1 = 8
+# - 'cyclic': +2 = 9 (sin + cos for unique cycle position)
+# - 'sin_raw': +2 = 9 (sin for rhythm + raw for progress)
+
+TimeEncoding = Literal['none', 'cyclic', 'sin', 'raw', 'sin_raw']
 
 
 @dataclass
@@ -31,11 +38,29 @@ class NeuralConfig:
     weight_mutation_magnitude: float = 0.3
     output_bias: float = DEFAULT_OUTPUT_BIAS
     dead_zone: float = 0.1  # Pure mode only
+    time_encoding: TimeEncoding = 'cyclic'  # Hybrid mode time encoding
 
 
-def get_input_size(mode: Literal['hybrid', 'pure']) -> int:
-    """Get input size based on neural mode."""
-    return NEURAL_INPUT_SIZE_PURE if mode == 'pure' else NEURAL_INPUT_SIZE_HYBRID
+def get_input_size(mode: Literal['hybrid', 'pure'], time_encoding: TimeEncoding = 'cyclic') -> int:
+    """
+    Get input size based on neural mode and time encoding.
+
+    Time encoding options (apply to both modes):
+      - none: 7 inputs (no time)
+      - sin: 7 + 1 = 8 (original behavior)
+      - raw: 7 + 1 = 8 (linear 0→1)
+      - cyclic: 7 + 2 = 9 (sin and cos for unique cycle position)
+      - sin_raw: 7 + 2 = 9 (sin for rhythm + raw for progress)
+
+    Default: pure='none', hybrid='cyclic'
+    """
+    if time_encoding == 'none':
+        return NEURAL_INPUT_SIZE_BASE  # 7
+
+    if time_encoding in ('cyclic', 'sin_raw'):
+        return NEURAL_INPUT_SIZE_BASE + 2  # 9 (two time inputs)
+    else:
+        return NEURAL_INPUT_SIZE_BASE + 1  # 8 (sin or raw)
 
 
 def calculate_weight_count(input_size: int, hidden_size: int, output_size: int) -> int:
@@ -143,6 +168,38 @@ class BatchedNeuralNetwork:
         return output
 
     @torch.no_grad()
+    def forward_full(self, inputs: torch.Tensor) -> dict:
+        """
+        Batched forward pass returning full activation data for visualization.
+
+        Args:
+            inputs: [B, input_size] sensor inputs for each creature
+
+        Returns:
+            dict with:
+                - 'inputs': [B, input_size] the input tensor (for visualization)
+                - 'hidden': [B, hidden_size] hidden layer activations
+                - 'outputs': [B, max_muscles] output layer activations
+        """
+        # Ensure inputs are on the same device as network weights
+        if inputs.device != self.weights_ih.device:
+            inputs = inputs.to(self.weights_ih.device)
+
+        # Hidden layer: h = activation(x @ W_ih + b_h)
+        hidden = torch.einsum('bi,bih->bh', inputs, self.weights_ih) + self.bias_h
+        hidden = self._activation(hidden)
+
+        # Output layer: y = tanh(h @ W_ho + b_o)
+        output = torch.einsum('bh,bho->bo', hidden, self.weights_ho) + self.bias_o
+        output = torch.tanh(output)
+
+        return {
+            'inputs': inputs,
+            'hidden': hidden,
+            'outputs': output,
+        }
+
+    @torch.no_grad()
     def forward_with_dead_zone(self, inputs: torch.Tensor, dead_zone: float = 0.1) -> torch.Tensor:
         """
         Forward pass with dead zone applied (pure mode).
@@ -157,6 +214,25 @@ class BatchedNeuralNetwork:
             output = output.masked_fill(mask, 0.0)
 
         return output
+
+    @torch.no_grad()
+    def forward_full_with_dead_zone(self, inputs: torch.Tensor, dead_zone: float = 0.1) -> dict:
+        """
+        Forward pass with dead zone applied, returning full activations (pure mode).
+
+        Small outputs (abs < dead_zone) are zeroed out.
+
+        Returns:
+            dict with 'inputs', 'hidden', 'outputs' (outputs have dead zone applied)
+        """
+        result = self.forward_full(inputs)
+
+        if dead_zone > 0:
+            # Zero out small outputs
+            mask = torch.abs(result['outputs']) < dead_zone
+            result['outputs'] = result['outputs'].masked_fill(mask, 0.0)
+
+        return result
 
     @classmethod
     def from_genomes(
@@ -178,7 +254,7 @@ class BatchedNeuralNetwork:
             device: Target device
         """
         batch_size = len(neural_genomes)
-        input_size = get_input_size(config.neural_mode)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
         hidden_size = config.hidden_size
 
         network = cls(
@@ -255,7 +331,7 @@ class BatchedNeuralNetwork:
         - Hidden biases: 0
         - Output biases: DEFAULT_OUTPUT_BIAS (-0.5)
         """
-        input_size = get_input_size(config.neural_mode)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
         hidden_size = config.hidden_size
 
         network = cls(

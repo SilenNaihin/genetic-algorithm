@@ -4,6 +4,15 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Added
+- **Time Encoding Options**: Configurable time input for neural networks
+  - `none`: 7 inputs (no time) - default for pure mode
+  - `sin`: 8 inputs (sin(2πt)) - rhythmic timing
+  - `raw`: 8 inputs (t/maxTime) - linear progress 0→1
+  - `cyclic`: 9 inputs (sin + cos) - unique position in cycle, default for hybrid mode
+  - `sin_raw`: 9 inputs (sin + raw) - combines rhythm with progress awareness
+  - Menu dropdown to select encoding, auto-switches when toggling pure/hybrid mode
+
 ### Fixed
 - **Fitness Progress Banking**: Fixed pellet collection causing fitness to DROP instead of increase
   - Before: Collecting pellet reset progress to 0 (fitness 80 → 20)

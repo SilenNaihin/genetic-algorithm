@@ -237,6 +237,86 @@ export function gatherSensorInputsHybrid(
   ];
 }
 
+export type TimeEncodingType = 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
+
+/**
+ * Gather sensor inputs based on time encoding.
+ * Handles all time encoding modes:
+ * - none: 7 inputs (no time)
+ * - sin: 8 inputs (sin(2πt))
+ * - raw: 8 inputs (t/maxTime)
+ * - cyclic: 9 inputs (sin + cos)
+ * - sin_raw: 9 inputs (sin + raw)
+ */
+export function gatherSensorInputsForEncoding(
+  pelletDirection: { x: number; y: number; z: number },
+  velocityDirection: { x: number; y: number; z: number },
+  normalizedDistance: number,
+  simulationTime: number,
+  timeEncoding: TimeEncodingType,
+  maxTime: number = 20.0
+): number[] {
+  const base = [
+    pelletDirection.x,
+    pelletDirection.y,
+    pelletDirection.z,
+    velocityDirection.x,
+    velocityDirection.y,
+    velocityDirection.z,
+    normalizedDistance,
+  ];
+
+  const angle = simulationTime * Math.PI * 2;
+
+  switch (timeEncoding) {
+    case 'none':
+      return base;
+    case 'sin':
+      return [...base, Math.sin(angle)];
+    case 'raw':
+      return [...base, Math.min(simulationTime / maxTime, 1.0)];
+    case 'cyclic':
+      return [...base, Math.sin(angle), Math.cos(angle)];
+    case 'sin_raw':
+      return [...base, Math.sin(angle), Math.min(simulationTime / maxTime, 1.0)];
+    default:
+      return base;
+  }
+}
+
+/**
+ * Gather sensor inputs based on the expected input size.
+ * DEPRECATED: Use gatherSensorInputsForEncoding when time encoding is known.
+ *
+ * This function guesses the encoding based on input size:
+ * - 7 inputs: none
+ * - 8 inputs: sin (guessed - could be raw)
+ * - 9 inputs: cyclic (guessed - could be sin_raw)
+ */
+export function gatherSensorInputsForSize(
+  pelletDirection: { x: number; y: number; z: number },
+  velocityDirection: { x: number; y: number; z: number },
+  normalizedDistance: number,
+  simulationTime: number,
+  inputSize: number,
+  maxTime: number = 20.0
+): number[] {
+  // Guess encoding based on input size
+  let encoding: TimeEncodingType;
+  if (inputSize <= 7) {
+    encoding = 'none';
+  } else if (inputSize === 8) {
+    encoding = 'sin'; // Guess sin (could be raw)
+  } else {
+    encoding = 'cyclic'; // Guess cyclic (could be sin_raw)
+  }
+
+  return gatherSensorInputsForEncoding(
+    pelletDirection, velocityDirection, normalizedDistance,
+    simulationTime, encoding, maxTime
+  );
+}
+
 /**
  * @deprecated Use gatherSensorInputsPure or gatherSensorInputsHybrid
  */

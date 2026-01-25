@@ -19,8 +19,7 @@ from app.neural.network import (
     BatchedNeuralNetwork,
     NeuralConfig,
     DEFAULT_OUTPUT_BIAS,
-    NEURAL_INPUT_SIZE_PURE,
-    NEURAL_INPUT_SIZE_HYBRID,
+    NEURAL_INPUT_SIZE_BASE,
     get_input_size,
     calculate_weight_count,
 )
@@ -36,17 +35,34 @@ class TestConstants:
     def test_default_output_bias(self):
         assert DEFAULT_OUTPUT_BIAS == 0.0
 
-    def test_input_size_pure(self):
-        assert NEURAL_INPUT_SIZE_PURE == 7
+    def test_input_size_base(self):
+        """Base input size (without time encoding) should be 7."""
+        assert NEURAL_INPUT_SIZE_BASE == 7
 
-    def test_input_size_hybrid(self):
-        assert NEURAL_INPUT_SIZE_HYBRID == 8
+    def test_get_input_size_none_encoding(self):
+        """'none' encoding returns 7 inputs (base sensors only)."""
+        assert get_input_size('pure', 'none') == 7
+        assert get_input_size('hybrid', 'none') == 7
 
-    def test_get_input_size_pure(self):
-        assert get_input_size('pure') == 7
+    def test_get_input_size_cyclic_encoding(self):
+        """Cyclic encoding adds 2 inputs (sin + cos) = 9 total."""
+        assert get_input_size('pure', 'cyclic') == 9
+        assert get_input_size('hybrid', 'cyclic') == 9
 
-    def test_get_input_size_hybrid(self):
-        assert get_input_size('hybrid') == 8
+    def test_get_input_size_sin_encoding(self):
+        """Sin encoding adds 1 input = 8 total."""
+        assert get_input_size('pure', 'sin') == 8
+        assert get_input_size('hybrid', 'sin') == 8
+
+    def test_get_input_size_raw_encoding(self):
+        """Raw encoding adds 1 input = 8 total."""
+        assert get_input_size('pure', 'raw') == 8
+        assert get_input_size('hybrid', 'raw') == 8
+
+    def test_get_input_size_default_is_cyclic(self):
+        """Default time_encoding is cyclic."""
+        assert get_input_size('hybrid') == 9
+        assert get_input_size('pure') == 9  # Default is cyclic for both modes
 
 
 # =============================================================================
@@ -150,10 +166,11 @@ class TestNetworkInitialization:
 
         assert torch.all(network.muscle_mask)
 
-    def test_pure_mode_input_size(self):
+    def test_base_input_size(self):
+        """Network with base input size (no time encoding) should have 7 inputs."""
         network = BatchedNeuralNetwork(
             batch_size=5,
-            input_size=NEURAL_INPUT_SIZE_PURE,
+            input_size=NEURAL_INPUT_SIZE_BASE,
             hidden_size=8,
             max_muscles=10,
         )
@@ -163,7 +180,7 @@ class TestNetworkInitialization:
     def test_hybrid_mode_input_size(self):
         network = BatchedNeuralNetwork(
             batch_size=5,
-            input_size=NEURAL_INPUT_SIZE_HYBRID,
+            input_size=8,  # Hybrid with sin encoding
             hidden_size=8,
             max_muscles=10,
         )
@@ -274,7 +291,8 @@ class TestForwardPass:
             config=config,
         )
 
-        inputs = torch.randn(20, 8)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        inputs = torch.randn(20, input_size)
         outputs = network.forward(inputs)
 
         # tanh output should be in [-1, 1]
@@ -414,7 +432,8 @@ class TestDeadZone:
             config=config,
         )
 
-        inputs = torch.randn(5, 8)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        inputs = torch.randn(5, input_size)
         outputs_normal = network.forward(inputs)
         outputs_dead_zone = network.forward_with_dead_zone(inputs, dead_zone=0.0)
 
@@ -689,7 +708,8 @@ class TestEdgeCases:
             config=config,
         )
 
-        inputs = torch.randn(1, 8)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        inputs = torch.randn(1, input_size)
         outputs = network.forward(inputs)
 
         assert outputs.shape == (1, 15)
@@ -703,7 +723,8 @@ class TestEdgeCases:
             max_muscles=1,
         )
 
-        inputs = torch.randn(5, 8)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        inputs = torch.randn(5, input_size)
         outputs = network.forward(inputs)
 
         assert outputs.shape == (5, 1)
@@ -716,7 +737,8 @@ class TestEdgeCases:
             config=config,
         )
 
-        inputs = torch.randn(500, 8)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        inputs = torch.randn(500, input_size)
         outputs = network.forward(inputs)
 
         assert outputs.shape == (500, 15)
@@ -729,7 +751,8 @@ class TestEdgeCases:
             config=config,
         )
 
-        inputs = torch.randn(5, 8)
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+        inputs = torch.randn(5, input_size)
         outputs = network.forward(inputs)
 
         assert outputs.shape == (5, 15)
@@ -742,10 +765,12 @@ class TestEdgeCases:
             config=config,
         )
 
+        input_size = get_input_size(config.neural_mode, config.time_encoding)
+
         # Test with various input patterns
-        inputs_normal = torch.randn(100, 8)
-        inputs_extreme = torch.randn(100, 8) * 100
-        inputs_zeros = torch.zeros(100, 8)
+        inputs_normal = torch.randn(100, input_size)
+        inputs_extreme = torch.randn(100, input_size) * 100
+        inputs_zeros = torch.zeros(100, input_size)
 
         for inputs in [inputs_normal, inputs_extreme, inputs_zeros]:
             outputs = network.forward(inputs)

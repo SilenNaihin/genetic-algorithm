@@ -3,8 +3,7 @@
 from app.neural.network import (
     # Constants
     DEFAULT_OUTPUT_BIAS,
-    NEURAL_INPUT_SIZE_PURE,
-    NEURAL_INPUT_SIZE_HYBRID,
+    NEURAL_INPUT_SIZE_BASE,
     # Config
     NeuralConfig,
     # Functions
@@ -16,7 +15,8 @@ from app.neural.network import (
 
 from app.neural.sensors import (
     gather_sensor_inputs_pure,
-    gather_sensor_inputs_hybrid,
+    gather_sensor_inputs_with_time,
+    gather_sensor_inputs_hybrid,  # alias for gather_sensor_inputs_with_time
     gather_sensor_inputs,
     compute_pellet_direction_for_nn,
     compute_velocity_direction_for_nn,
@@ -26,8 +26,7 @@ from app.neural.sensors import (
 __all__ = [
     # Constants
     'DEFAULT_OUTPUT_BIAS',
-    'NEURAL_INPUT_SIZE_PURE',
-    'NEURAL_INPUT_SIZE_HYBRID',
+    'NEURAL_INPUT_SIZE_BASE',
     # Config
     'NeuralConfig',
     # Functions
@@ -37,6 +36,7 @@ __all__ = [
     'BatchedNeuralNetwork',
     # Sensors
     'gather_sensor_inputs_pure',
+    'gather_sensor_inputs_with_time',
     'gather_sensor_inputs_hybrid',
     'gather_sensor_inputs',
     'compute_pellet_direction_for_nn',
