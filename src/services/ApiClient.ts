@@ -55,6 +55,8 @@ export interface ApiSimulationConfig {
   frame_rate: number;
   sparse_top_count: number;
   sparse_bottom_count: number;
+  use_proprioception: boolean;
+  proprioception_inputs: 'strain' | 'velocity' | 'ground' | 'all';
 }
 
 
@@ -172,6 +174,8 @@ export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
     frame_rate: 15,
     sparse_top_count: config.sparseTopCount,
     sparse_bottom_count: config.sparseBottomCount,
+    use_proprioception: config.useProprioception ?? false,
+    proprioception_inputs: config.proprioceptionInputs ?? 'all',
   };
 }
 
@@ -215,6 +219,8 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
     frameStorageMode: api.frame_storage_mode,
     sparseTopCount: api.sparse_top_count,
     sparseBottomCount: api.sparse_bottom_count,
+    useProprioception: api.use_proprioception ?? false,
+    proprioceptionInputs: api.proprioception_inputs ?? 'all',
   };
 }
 
