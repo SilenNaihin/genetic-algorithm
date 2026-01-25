@@ -115,21 +115,22 @@ def gather_sensor_inputs_with_time(
     inputs[:, 6] = normalized_distance
 
     # Compute time encoding (if any)
+    # All sin-based encodings use 2-second period: -1 at t=0, 0 at t=0.5, 1 at t=1, 0 at t=1.5, -1 at t=2
     if time_encoding == 'cyclic':
-        # Cyclic encoding: [sin(2πt), cos(2πt)] - unique value for every point in cycle
-        angle = simulation_time * 2.0 * math.pi
-        inputs[:, 7] = math.sin(angle)
-        inputs[:, 8] = math.cos(angle)
+        # Cyclic encoding: [-cos(πt), sin(πt)] - unique value for every point in 2s cycle
+        angle = simulation_time * math.pi
+        inputs[:, 7] = -math.cos(angle)  # -1 at t=0, 1 at t=1
+        inputs[:, 8] = math.sin(angle)   # 0 at t=0, 0 at t=1
     elif time_encoding == 'sin_raw':
-        # Sin + Raw encoding: [sin(2πt), t/maxTime] - rhythm + progress
-        inputs[:, 7] = math.sin(simulation_time * 2.0 * math.pi)
-        inputs[:, 8] = min(simulation_time / max_time, 1.0)
+        # Sin + Raw encoding: [-cos(πt), 2*(t/maxTime)-1] - rhythm + progress
+        inputs[:, 7] = -math.cos(simulation_time * math.pi)
+        inputs[:, 8] = 2.0 * min(simulation_time / max_time, 1.0) - 1.0
     elif time_encoding == 'sin':
-        # Sin encoding: sin(2πt) - original behavior
-        inputs[:, 7] = math.sin(simulation_time * 2.0 * math.pi)
+        # Sin encoding: -cos(πt) - 2 second period, starts at -1
+        inputs[:, 7] = -math.cos(simulation_time * math.pi)
     elif time_encoding == 'raw':
-        # Raw encoding: t / maxTime - linear 0→1
-        inputs[:, 7] = min(simulation_time / max_time, 1.0)
+        # Raw encoding: 2*(t/maxTime)-1 - linear -1→1 (matches other input ranges)
+        inputs[:, 7] = 2.0 * min(simulation_time / max_time, 1.0) - 1.0
     # time_encoding == 'none': no time inputs added
 
     return inputs

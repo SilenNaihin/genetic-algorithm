@@ -126,6 +126,14 @@ const DEFAULT_OPTIONS: NeuralVisualizerOptions = {
 };
 
 type TimeEncoding = 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
+type ProprioceptionInputs = 'strain' | 'velocity' | 'ground' | 'all';
+
+interface ProprioceptionConfig {
+  enabled: boolean;
+  inputs: ProprioceptionInputs;
+  numMuscles: number;  // Actual muscle count for this creature
+  numNodes: number;    // Actual node count for this creature
+}
 
 export class NeuralVisualizer {
   private canvas: HTMLCanvasElement;
@@ -137,6 +145,7 @@ export class NeuralVisualizer {
   private lastResult: ForwardResult | null = null;
   private muscleNames: string[] = [];
   private timeEncoding: TimeEncoding = 'none';
+  private proprioception: ProprioceptionConfig = { enabled: false, inputs: 'all', numMuscles: 0, numNodes: 0 };
 
   constructor(container: HTMLElement, options: Partial<NeuralVisualizerOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -237,6 +246,15 @@ export class NeuralVisualizer {
   }
 
   /**
+   * Set proprioception config for accurate input labels.
+   * Call this after setGenome to update labels.
+   */
+  setProprioception(config: ProprioceptionConfig): void {
+    this.proprioception = config;
+    this.render();
+  }
+
+  /**
    * Clear the visualization
    */
   clear(): void {
@@ -245,6 +263,7 @@ export class NeuralVisualizer {
     this.activationFn = null;
     this.lastResult = null;
     this.timeEncoding = 'none';
+    this.proprioception = { enabled: false, inputs: 'all', numMuscles: 0, numNodes: 0 };
     this.render();
   }
 
@@ -268,7 +287,17 @@ export class NeuralVisualizer {
       return;
     }
 
-    const { inputSize, hiddenSize, outputSize } = this.topology;
+    const { hiddenSize, outputSize } = this.topology;
+
+    // Calculate actual input size - use stored activations if available, otherwise calculate from config
+    let actualInputSize = this.topology.inputSize;
+    if (this.lastResult?.inputs && this.lastResult.inputs.length > 0) {
+      actualInputSize = this.lastResult.inputs.length;
+    } else if (this.proprioception.enabled) {
+      // Calculate expected input size based on config
+      const labels = this.getInputLabels();
+      actualInputSize = labels.length;
+    }
 
     // Layout parameters
     const padding = 20;
@@ -280,12 +309,12 @@ export class NeuralVisualizer {
     ];
 
     // Calculate node positions
-    const inputY = this.getNodeYPositions(inputSize, height, padding);
+    const inputY = this.getNodeYPositions(actualInputSize, height, padding);
     const hiddenY = this.getNodeYPositions(hiddenSize, height, padding);
     const outputY = this.getNodeYPositions(outputSize, height, padding);
 
     // Get activations (or use defaults if not computed yet)
-    const inputs = this.lastResult?.inputs || new Array(inputSize).fill(0);
+    const inputs = this.lastResult?.inputs || new Array(actualInputSize).fill(0);
     const hidden = this.lastResult?.hidden || new Array(hiddenSize).fill(0);
     const outputs = this.lastResult?.outputs || new Array(outputSize).fill(0);
 
@@ -480,6 +509,75 @@ export class NeuralVisualizer {
     }
   }
 
+  /**
+   * Generate input labels based on time encoding and proprioception config.
+   * Uses descriptive names like "M1_strain" for muscle 1 strain.
+   */
+  private getInputLabels(): string[] {
+    // Base sensor names (always present)
+    const baseNames = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist'];
+    let labels = [...baseNames];
+
+    // Add time encoding inputs
+    switch (this.timeEncoding) {
+      case 'sin':
+        labels.push('t_sin');
+        break;
+      case 'raw':
+        labels.push('t_raw');
+        break;
+      case 'cyclic':
+        labels.push('t_sin', 't_cos');
+        break;
+      case 'sin_raw':
+        labels.push('t_sin', 't_raw');
+        break;
+      // 'none' adds nothing
+    }
+
+    // Add proprioception inputs if enabled
+    if (this.proprioception.enabled) {
+      const { inputs, numMuscles, numNodes } = this.proprioception;
+
+      // Strain inputs (1 per muscle) - how stretched/compressed each muscle is
+      if (inputs === 'strain' || inputs === 'all') {
+        for (let i = 0; i < numMuscles; i++) {
+          // Use muscle name if available, otherwise M1, M2, etc.
+          const muscleName = this.muscleNames[i] || `M${i + 1}`;
+          labels.push(`${muscleName}_str`);
+        }
+        // Pad to MAX_MUSCLES=15 for tensor batching (masked to 0)
+        for (let i = numMuscles; i < 15; i++) {
+          labels.push(`M${i + 1}_str*`);
+        }
+      }
+
+      // Velocity inputs (3 per node: x, y, z) - how fast each node is moving
+      if (inputs === 'velocity' || inputs === 'all') {
+        for (let i = 0; i < numNodes; i++) {
+          labels.push(`N${i + 1}_vx`, `N${i + 1}_vy`, `N${i + 1}_vz`);
+        }
+        // Pad to MAX_NODES=8 for tensor batching
+        for (let i = numNodes; i < 8; i++) {
+          labels.push(`N${i + 1}_vx*`, `N${i + 1}_vy*`, `N${i + 1}_vz*`);
+        }
+      }
+
+      // Ground contact inputs (1 per node) - is each node touching ground
+      if (inputs === 'ground' || inputs === 'all') {
+        for (let i = 0; i < numNodes; i++) {
+          labels.push(`N${i + 1}_gnd`);
+        }
+        // Pad to MAX_NODES=8 for tensor batching
+        for (let i = numNodes; i < 8; i++) {
+          labels.push(`N${i + 1}_gnd*`);
+        }
+      }
+    }
+
+    return labels;
+  }
+
   private drawLabels(
     ctx: CanvasRenderingContext2D,
     layerX: number[],
@@ -495,34 +593,8 @@ export class NeuralVisualizer {
     ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillStyle = '#888';
 
-    // Input labels (abbreviated sensor names) - based on time encoding
-    const baseNames = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist'];
-    let shortNames: string[];
-    switch (this.timeEncoding) {
-      case 'none':
-        shortNames = baseNames;
-        break;
-      case 'sin':
-        shortNames = [...baseNames, 't_sin'];
-        break;
-      case 'raw':
-        shortNames = [...baseNames, 't_raw'];
-        break;
-      case 'cyclic':
-        shortNames = [...baseNames, 't_sin', 't_cos'];
-        break;
-      case 'sin_raw':
-        shortNames = [...baseNames, 't_sin', 't_raw'];
-        break;
-      default:
-        // Fallback based on input size if encoding not set
-        const inputSize = this.topology?.inputSize || 7;
-        shortNames = inputSize <= 7
-          ? baseNames
-          : inputSize === 8
-            ? [...baseNames, 'time']
-            : [...baseNames, 't_1', 't_2'];
-    }
+    // Input labels (abbreviated sensor names) - based on time encoding and proprioception
+    const shortNames = this.getInputLabels();
     ctx.textAlign = 'right';
     for (let i = 0; i < inputY.length && i < shortNames.length; i++) {
       ctx.fillText(shortNames[i], pixelAlign(layerX[0] - 10), pixelAlign(inputY[i]));

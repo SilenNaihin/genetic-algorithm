@@ -266,19 +266,24 @@ export function gatherSensorInputsForEncoding(
     normalizedDistance,
   ];
 
-  const angle = simulationTime * Math.PI * 2;
+  // 2-second period: -1 at t=0, 0 at t=0.5, 1 at t=1, 0 at t=1.5, -1 at t=2
+  const angle = simulationTime * Math.PI;
 
   switch (timeEncoding) {
     case 'none':
       return base;
     case 'sin':
-      return [...base, Math.sin(angle)];
+      // -cos(πt/2) gives -1 at t=0, 1 at t=2
+      return [...base, -Math.cos(angle)];
     case 'raw':
-      return [...base, Math.min(simulationTime / maxTime, 1.0)];
+      // Linear -1→1 (matches other input ranges)
+      return [...base, 2.0 * Math.min(simulationTime / maxTime, 1.0) - 1.0];
     case 'cyclic':
-      return [...base, Math.sin(angle), Math.cos(angle)];
+      // [-cos(πt/2), sin(πt/2)] - unique value for every point in 4s cycle
+      return [...base, -Math.cos(angle), Math.sin(angle)];
     case 'sin_raw':
-      return [...base, Math.sin(angle), Math.min(simulationTime / maxTime, 1.0)];
+      // Sin (-cos) + linear -1→1
+      return [...base, -Math.cos(angle), 2.0 * Math.min(simulationTime / maxTime, 1.0) - 1.0];
     default:
       return base;
   }

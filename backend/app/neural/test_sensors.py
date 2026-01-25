@@ -165,67 +165,67 @@ class TestHybridModeSensors:
         assert inputs.shape == (1, 8)
 
     def test_sin_encoding_formula(self):
-        """Test that sin encoding uses sin(time * 2*pi)."""
+        """Test that sin encoding uses -cos(πt) for 2-second period."""
         pellet_dir = torch.zeros(1, 3)
         velocity_dir = torch.zeros(1, 3)
         distance = torch.zeros(1)
 
-        # At t=0.0, sin(0) = 0
+        # At t=0: -cos(0) = -1
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.0, time_encoding='sin')
-        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
+        assert inputs[0, 7].item() == pytest.approx(-1.0, abs=1e-5)
 
-        # At t=0.25, sin(pi/2) = 1
-        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.25, time_encoding='sin')
-        assert inputs[0, 7].item() == pytest.approx(1.0, abs=1e-5)
-
-        # At t=0.5, sin(pi) = 0
+        # At t=0.5: -cos(π/2) = 0
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.5, time_encoding='sin')
         assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
 
-        # At t=0.75, sin(3pi/2) = -1
-        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.75, time_encoding='sin')
-        assert inputs[0, 7].item() == pytest.approx(-1.0, abs=1e-5)
+        # At t=1: -cos(π) = 1
+        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 1.0, time_encoding='sin')
+        assert inputs[0, 7].item() == pytest.approx(1.0, abs=1e-5)
+
+        # At t=1.5: -cos(3π/2) = 0
+        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 1.5, time_encoding='sin')
+        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
 
     def test_cyclic_encoding_formula(self):
-        """Test that cyclic encoding uses [sin(2πt), cos(2πt)]."""
+        """Test that cyclic encoding uses [-cos(πt), sin(πt)] for 2-second period."""
         pellet_dir = torch.zeros(1, 3)
         velocity_dir = torch.zeros(1, 3)
         distance = torch.zeros(1)
 
-        # At t=0.0: sin(0)=0, cos(0)=1
+        # At t=0: -cos(0)=-1, sin(0)=0
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.0, time_encoding='cyclic')
-        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
-        assert inputs[0, 8].item() == pytest.approx(1.0, abs=1e-5)
-
-        # At t=0.25: sin(π/2)=1, cos(π/2)=0
-        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.25, time_encoding='cyclic')
-        assert inputs[0, 7].item() == pytest.approx(1.0, abs=1e-5)
-        assert inputs[0, 8].item() == pytest.approx(0.0, abs=1e-5)
-
-        # At t=0.5: sin(π)=0, cos(π)=-1
-        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.5, time_encoding='cyclic')
-        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
-        assert inputs[0, 8].item() == pytest.approx(-1.0, abs=1e-5)
-
-        # At t=0.75: sin(3π/2)=-1, cos(3π/2)=0
-        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.75, time_encoding='cyclic')
         assert inputs[0, 7].item() == pytest.approx(-1.0, abs=1e-5)
         assert inputs[0, 8].item() == pytest.approx(0.0, abs=1e-5)
 
+        # At t=0.5: -cos(π/2)=0, sin(π/2)=1
+        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.5, time_encoding='cyclic')
+        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
+        assert inputs[0, 8].item() == pytest.approx(1.0, abs=1e-5)
+
+        # At t=1: -cos(π)=1, sin(π)=0
+        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 1.0, time_encoding='cyclic')
+        assert inputs[0, 7].item() == pytest.approx(1.0, abs=1e-5)
+        assert inputs[0, 8].item() == pytest.approx(0.0, abs=1e-5)
+
+        # At t=1.5: -cos(3π/2)=0, sin(3π/2)=-1
+        inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 1.5, time_encoding='cyclic')
+        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
+        assert inputs[0, 8].item() == pytest.approx(-1.0, abs=1e-5)
+
     def test_raw_encoding_formula(self):
-        """Test that raw encoding uses t / max_time."""
+        """Test that raw encoding uses 2*(t/max_time)-1 for range [-1, 1]."""
         pellet_dir = torch.zeros(1, 3)
         velocity_dir = torch.zeros(1, 3)
         distance = torch.zeros(1)
         max_time = 20.0
 
-        # At t=0: raw = 0
+        # At t=0: raw = -1.0
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 0.0, time_encoding='raw', max_time=max_time)
-        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
+        assert inputs[0, 7].item() == pytest.approx(-1.0, abs=1e-5)
 
-        # At t=10: raw = 0.5
+        # At t=10: raw = 0.0 (midpoint)
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 10.0, time_encoding='raw', max_time=max_time)
-        assert inputs[0, 7].item() == pytest.approx(0.5, abs=1e-5)
+        assert inputs[0, 7].item() == pytest.approx(0.0, abs=1e-5)
 
         # At t=20: raw = 1.0
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, 20.0, time_encoding='raw', max_time=max_time)
@@ -256,7 +256,7 @@ class TestHybridModeSensors:
         pellet_dir = torch.tensor([[0.1, 0.2, 0.3]])
         velocity_dir = torch.tensor([[0.4, 0.5, 0.6]])
         distance = torch.tensor([0.7])
-        time = 0.25  # sin(π/2) = 1, cos(π/2) = 0
+        time = 1.0  # -cos(π) = 1, sin(π) = 0
 
         inputs = gather_sensor_inputs_hybrid(pellet_dir, velocity_dir, distance, time, time_encoding='cyclic')
 
@@ -269,9 +269,9 @@ class TestHybridModeSensors:
         assert inputs[0, 5].item() == pytest.approx(0.6)
         assert inputs[0, 6].item() == pytest.approx(0.7)
 
-        # Time inputs are 8th and 9th
-        assert inputs[0, 7].item() == pytest.approx(1.0, abs=1e-5)  # sin
-        assert inputs[0, 8].item() == pytest.approx(0.0, abs=1e-5)  # cos
+        # Time inputs are 8th and 9th (2-second period: -cos(πt), sin(πt))
+        assert inputs[0, 7].item() == pytest.approx(1.0, abs=1e-5)  # -cos(π) = 1
+        assert inputs[0, 8].item() == pytest.approx(0.0, abs=1e-5)  # sin(π) = 0
 
     def test_default_encoding_is_cyclic(self):
         """Default time encoding should be cyclic (9 inputs)."""

@@ -114,7 +114,7 @@ export function InfoTooltip({ text, position = 'top', width = 200 }: InfoTooltip
 export const TOOLTIPS = {
   // Neural settings
   neuralMode: 'Pure: NN has full control over muscles, no base oscillation. Hybrid: NN modulates base oscillation. Pure evolves from scratch; Hybrid guides existing movement. Both can use time encoding.',
-  timeEncoding: 'Time inputs for the neural network. None (default for pure): no time inputs (7). Cyclic (default for hybrid): sin + cos for unique cycle position (9). Sin: rhythm only (8). Raw: linear progress 0→1 (8). Sin+Raw: rhythm + progress (9).',
+  timeEncoding: 'Time inputs for the neural network. None (default for pure): no time inputs (7). Cyclic: unique position in 2s cycle (9). Sin: 2s rhythm -1→1→-1 (8). Raw: linear progress -1→1 (8). Sin+Raw: rhythm + progress (9).',
   hiddenSize: 'Number of neurons in the hidden layer. More neurons = more complex behaviors but slower evolution. 4-8 for simple tasks, 12-16 for complex coordination.',
   activation: 'How neurons transform inputs. Tanh (-1 to 1): smooth, good default. ReLU (0 to ∞): sparse, fast. Sigmoid (0 to 1): positive only, good for muscle-like outputs.',
   weightMutationRate: 'Target mutation rate. With decay on, starts at 5× this value (max 50%) and decreases over 50 generations. Example: 10% target → starts at 50%, decays to 10%.',

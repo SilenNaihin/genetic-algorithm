@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { FiCopy } from 'react-icons/fi';
 import { useEvolutionStore } from '../../stores/evolutionStore';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -12,24 +13,69 @@ import * as StorageService from '../../../src/services/StorageService';
 import type { CreatureGenome } from '../../../src/types';
 import type { CreatureSimulationResult } from '../../../src/types';
 
-// Sensor names for neural info display - based on time encoding
+// Sensor names for neural info display - based on time encoding and proprioception
 const BASE_SENSOR_NAMES = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist'];
 
-function getSensorNamesForEncoding(encoding: TimeEncodingType): string[] {
+type ProprioceptionInputs = 'strain' | 'velocity' | 'ground' | 'all';
+
+interface ProprioceptionConfig {
+  enabled: boolean;
+  inputs: ProprioceptionInputs;
+  numMuscles: number;
+  numNodes: number;
+}
+
+function getSensorNamesForEncoding(
+  encoding: TimeEncodingType,
+  proprioception?: ProprioceptionConfig,
+  muscleNames?: string[]
+): string[] {
+  let names = [...BASE_SENSOR_NAMES];
+
+  // Add time encoding
   switch (encoding) {
-    case 'none':
-      return BASE_SENSOR_NAMES;
     case 'sin':
-      return [...BASE_SENSOR_NAMES, 't_sin'];
+      names.push('t_sin');
+      break;
     case 'raw':
-      return [...BASE_SENSOR_NAMES, 't_raw'];
+      names.push('t_raw');
+      break;
     case 'cyclic':
-      return [...BASE_SENSOR_NAMES, 't_sin', 't_cos'];
+      names.push('t_sin', 't_cos');
+      break;
     case 'sin_raw':
-      return [...BASE_SENSOR_NAMES, 't_sin', 't_raw'];
-    default:
-      return BASE_SENSOR_NAMES;
+      names.push('t_sin', 't_raw');
+      break;
   }
+
+  // Add proprioception inputs if enabled
+  if (proprioception?.enabled) {
+    const { inputs, numMuscles, numNodes } = proprioception;
+
+    // Strain: how stretched/compressed each muscle is
+    if (inputs === 'strain' || inputs === 'all') {
+      for (let i = 0; i < numMuscles; i++) {
+        const muscleName = muscleNames?.[i] || `M${i + 1}`;
+        names.push(`${muscleName}_str`);
+      }
+      // Padding (masked to 0)
+      for (let i = numMuscles; i < 15; i++) names.push(`M${i + 1}_str*`);
+    }
+
+    // Velocity: how fast each node is moving (x, y, z)
+    if (inputs === 'velocity' || inputs === 'all') {
+      for (let i = 0; i < numNodes; i++) names.push(`N${i + 1}_vx`, `N${i + 1}_vy`, `N${i + 1}_vz`);
+      for (let i = numNodes; i < 8; i++) names.push(`N${i + 1}_vx*`, `N${i + 1}_vy*`, `N${i + 1}_vz*`);
+    }
+
+    // Ground contact: is each node touching ground
+    if (inputs === 'ground' || inputs === 'all') {
+      for (let i = 0; i < numNodes; i++) names.push(`N${i + 1}_gnd`);
+      for (let i = numNodes; i < 8; i++) names.push(`N${i + 1}_gnd*`);
+    }
+  }
+
+  return names;
 }
 
 // Family tree types
@@ -224,6 +270,13 @@ export function ReplayModal() {
     visualizer.setGenome(genome.neuralGenome, muscleNames);
     // Set time encoding for accurate input labels
     visualizer.setTimeEncoding(config.timeEncoding || 'none');
+    // Set proprioception config for input labels
+    visualizer.setProprioception({
+      enabled: config.useProprioception || false,
+      inputs: config.proprioceptionInputs || 'all',
+      numMuscles: genome.muscles.length,
+      numNodes: genome.nodes.length,
+    });
 
     return () => {
       if (neuralVisualizerRef.current) {
@@ -606,9 +659,22 @@ export function ReplayModal() {
                 Creature Info
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>ID</span>
-                  <span style={{ color: 'var(--text-primary)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={genome.id}>{genome.id.slice(0, 12)}...</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>ID</span>
+                    <FiCopy
+                      onClick={() => navigator.clipboard.writeText(genome.id)}
+                      style={{
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        fontSize: '12px',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                      title="Copy ID"
+                    />
+                  </div>
+                  <span style={{ color: 'var(--text-primary)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={genome.id}>{genome.id.slice(0, 12)}...</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Generation</span>
@@ -774,17 +840,35 @@ export function ReplayModal() {
                 </div>
                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
                   <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '4px' }}>SENSOR INPUTS</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '9px' }}>
-                    {getSensorNamesForEncoding(config.timeEncoding || 'none').map((name, i) => (
-                      <div
-                        key={name}
-                        style={{
-                          color: i < 3 ? 'var(--accent)' : i < 6 ? 'var(--success)' : 'var(--text-secondary)',
-                        }}
-                      >
-                        {name}
-                      </div>
-                    ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '9px', maxHeight: '120px', overflowY: 'auto' }}>
+                    {(() => {
+                      // Get muscle names for labels
+                      const muscleNames = genome.muscles.map((m) => {
+                        const nodeAIndex = genome.nodes.findIndex((n) => n.id === m.nodeA) + 1;
+                        const nodeBIndex = genome.nodes.findIndex((n) => n.id === m.nodeB) + 1;
+                        return `${nodeAIndex}-${nodeBIndex}`;
+                      });
+                      return getSensorNamesForEncoding(config.timeEncoding || 'none', {
+                        enabled: config.useProprioception || false,
+                        inputs: config.proprioceptionInputs || 'all',
+                        numMuscles: genome.muscles.length,
+                        numNodes: genome.nodes.length,
+                      }, muscleNames).map((name) => {
+                        // Color by input type (check suffix/pattern)
+                        let color = 'var(--text-secondary)';
+                        if (name.startsWith('dir_')) color = 'var(--accent)';
+                        else if (name.startsWith('vel_')) color = 'var(--success)';
+                        else if (name.startsWith('t_')) color = 'var(--warning)';
+                        else if (name.includes('_str')) color = name.endsWith('*') ? 'var(--text-muted)' : '#e879f9';  // purple for strain
+                        else if (name.includes('_v')) color = name.endsWith('*') ? 'var(--text-muted)' : '#38bdf8';    // sky blue for node velocity
+                        else if (name.includes('_gnd')) color = name.endsWith('*') ? 'var(--text-muted)' : '#fbbf24';  // amber for ground contact
+                        return (
+                          <div key={name} style={{ color }}>
+                            {name}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </div>
