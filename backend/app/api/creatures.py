@@ -219,12 +219,18 @@ async def get_creature_frames(
             fitness_over_time_raw = zlib.decompress(frame.fitness_over_time)
             fitness_over_time = json.loads(fitness_over_time_raw)
 
+        activations_per_frame = None
+        if frame.activations_per_frame:
+            activations_raw = zlib.decompress(frame.activations_per_frame)
+            activations_per_frame = json.loads(activations_raw)
+
         return {
             "frames_data": frames_data,
             "frame_count": frame.frame_count,
             "frame_rate": frame.frame_rate,
             "pellet_frames": pellet_frames,
             "fitness_over_time": fitness_over_time,
+            "activations_per_frame": activations_per_frame,
             "generation": frame.generation,
         }
     except Exception as e:

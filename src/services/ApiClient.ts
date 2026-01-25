@@ -557,6 +557,11 @@ export async function getCreatureFrames(
     initial_distance: number;
   }> | null;
   fitness_over_time: number[] | null;
+  activations_per_frame: Array<{
+    inputs: number[];
+    hidden: number[];
+    outputs: number[];
+  }> | null;
   generation: number;
 }> {
   const url = generation !== undefined

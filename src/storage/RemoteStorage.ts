@@ -222,7 +222,7 @@ export class RemoteStorage {
     _disqualified: string | null,
     realPellets?: PelletData[],
     realFitnessOverTime?: number[]
-  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[] }> {
+  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[]; activationsPerFrame?: Array<{ inputs: number[]; hidden: number[]; outputs: number[] }> }> {
     try {
       // Use best performance generation if available (for best/longest survivor replays)
       const generation = genome._bestPerformanceGeneration;
@@ -239,7 +239,7 @@ export class RemoteStorage {
 
       if (!framesData.frames_data || framesData.frames_data.length === 0) {
         console.warn('[RemoteStorage] No frames data in API response');
-        return { frames: [], fitnessOverTime: [], pellets: [] };
+        return { frames: [], fitnessOverTime: [], pellets: [], activationsPerFrame: undefined };
       }
 
       const frames = this.expandFrames(framesData.frames_data, genome);
@@ -269,27 +269,33 @@ export class RemoteStorage {
         }));
       }
 
+      // Get activations from API response
+      const activationsPerFrame = framesData.activations_per_frame ?? undefined;
+      if (activationsPerFrame) {
+        console.log('[RemoteStorage] Using activations_per_frame from backend API:', activationsPerFrame.length, 'frames');
+      }
+
       // Use backend fitness_over_time if available (preferred - accurate from simulation)
       if (framesData.fitness_over_time && framesData.fitness_over_time.length > 0) {
         console.log('[RemoteStorage] Using fitness_over_time from backend API:', framesData.fitness_over_time.length, 'entries');
-        return { frames, fitnessOverTime: framesData.fitness_over_time, pellets };
+        return { frames, fitnessOverTime: framesData.fitness_over_time, pellets, activationsPerFrame };
       }
 
       // Fallback: use real fitnessOverTime if provided and matches frame count
       if (realFitnessOverTime && realFitnessOverTime.length > 0) {
         if (realFitnessOverTime.length === frames.length) {
           console.log('[RemoteStorage] Using real fitnessOverTime from caller');
-          return { frames, fitnessOverTime: realFitnessOverTime, pellets };
+          return { frames, fitnessOverTime: realFitnessOverTime, pellets, activationsPerFrame };
         }
       }
 
       // No backend fitness_over_time available (legacy data) - return empty
       // Frontend does NOT recalculate - all fitness calculations are backend-owned
       console.log('[RemoteStorage] No backend fitness_over_time available (legacy data)');
-      return { frames, fitnessOverTime: [], pellets };
+      return { frames, fitnessOverTime: [], pellets, activationsPerFrame };
     } catch (error) {
       console.error('[RemoteStorage] Failed to load creature frames:', error);
-      return { frames: [], fitnessOverTime: [], pellets: [] };
+      return { frames: [], fitnessOverTime: [], pellets: [], activationsPerFrame: undefined };
     }
   }
 

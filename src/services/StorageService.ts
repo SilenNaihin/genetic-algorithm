@@ -135,7 +135,7 @@ export async function loadCreatureFrames(
   disqualified: string | null,
   pellets?: PelletData[],
   fitnessOverTime?: number[]
-): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[] }> {
+): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[]; activationsPerFrame?: Array<{ inputs: number[]; hidden: number[]; outputs: number[] }> }> {
   return storage.loadCreatureFrames(creatureId, genome, pelletsCollected, config, disqualified, pellets, fitnessOverTime);
 }
 

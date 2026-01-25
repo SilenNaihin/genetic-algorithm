@@ -399,6 +399,11 @@ async def run_generation(
             if sim_result.get("fitness_over_time"):
                 fitness_over_time_data = zlib.compress(json.dumps(sim_result["fitness_over_time"]).encode())
 
+            # Store neural network activations per frame
+            activations_data = None
+            if sim_result.get("activations_per_frame"):
+                activations_data = zlib.compress(json.dumps(sim_result["activations_per_frame"]).encode())
+
             creature_frame = CreatureFrame(
                 creature_id=creature_id,
                 generation=current_gen,
@@ -407,6 +412,7 @@ async def run_generation(
                 frame_rate=15,
                 pellet_frames=pellet_data,
                 fitness_over_time=fitness_over_time_data,
+                activations_per_frame=activations_data,
             )
             db.add(creature_frame)
 

@@ -136,6 +136,9 @@ class CreatureFrame(Base):
     # Fitness values per frame (compressed JSON array)
     fitness_over_time: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
+    # Neural network activations per frame (compressed JSON array of {inputs, hidden, outputs})
+    activations_per_frame: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
     # Composite foreign key
     __table_args__ = (
         ForeignKeyConstraint(
