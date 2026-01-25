@@ -1126,8 +1126,8 @@ def compute_neural_rest_lengths(
     """
     Compute muscle rest lengths from neural network outputs.
 
-    Pure mode: NN directly controls contraction
-        contraction = nn_output * amplitude
+    Pure mode: NN directly controls contraction (no amplitude)
+        contraction = nn_output  # [-1, 1] maps directly
         rest_length = base * (1 - contraction)
 
     Hybrid mode: NN modulates base oscillator
@@ -1294,8 +1294,10 @@ def simulate_with_neural(
     # Store base rest lengths
     base_rest_lengths = batch.spring_rest_length.clone()
 
-    # Initialize previous COM for velocity calculation
-    previous_com = get_center_of_mass(batch)
+    # Initialize COM for velocity calculation
+    # velocity_com tracks the COM from the PREVIOUS sensor gather (not previous physics step)
+    # This is needed because batch.positions at step N start == batch.positions at step N-1 end
+    velocity_com = get_center_of_mass(batch)
 
     # Accumulators
     total_activation = torch.zeros(B, device=device)
@@ -1303,10 +1305,13 @@ def simulate_with_neural(
     time = 0.0
 
     for step in range(num_steps):
-        # 1. Gather sensor inputs
+        # 1. Gather sensor inputs (using velocity_com for velocity direction)
         sensor_inputs = gather_sensor_inputs(
-            batch, pellet_positions, previous_com, time, mode=mode
+            batch, pellet_positions, velocity_com, time, mode=mode
         )
+
+        # Update velocity_com AFTER gathering (captures movement since last gather)
+        velocity_com = get_center_of_mass(batch)
 
         # 2. Forward pass through NN
         if mode == 'pure':
@@ -1321,7 +1326,6 @@ def simulate_with_neural(
 
         # 4. Accumulate activation
         total_activation += step_activation
-        previous_com = current_com
         time += dt
 
         # Record frame if needed
@@ -1426,8 +1430,13 @@ def simulate_with_fitness_neural(
     # Store base rest lengths
     base_rest_lengths = batch.spring_rest_length.clone()
 
-    # Initialize previous COM for velocity calculation
-    previous_com = get_center_of_mass(batch)
+    # Initialize COM tracking for velocity calculation
+    # IMPORTANT: Use separate tracking for NN velocity vs physics
+    # - last_nn_com: COM from last NN update (for velocity direction in sensor inputs)
+    #   Only updated when NN is updated, so velocity captures movement over nn_update_interval steps
+    # - previous_com: COM from last physics step (for other calculations)
+    last_nn_com = get_center_of_mass(batch)
+    previous_com = last_nn_com.clone()
 
     # GPU-friendly pellet event tracking (avoid CPU transfers in loop)
     max_pellets = 20  # Buffer for pellet events (typical max ~10 collections per creature)
@@ -1461,10 +1470,14 @@ def simulate_with_fitness_neural(
         # 1. Update NN outputs only every nn_update_interval steps (reduces jitter)
         if step % nn_update_interval == 0 or nn_outputs is None:
             # Gather base sensor inputs (uses current pellet positions)
+            # Use last_nn_com for velocity calculation - captures movement since last NN update
             sensor_inputs = gather_sensor_inputs(
-                batch, pellets.positions, previous_com, time, mode=mode,
+                batch, pellets.positions, last_nn_com, time, mode=mode,
                 time_encoding=time_encoding, max_time=max_time
             )
+
+            # Update last_nn_com AFTER gathering inputs (for next NN update)
+            last_nn_com = get_center_of_mass(batch)
 
             # Add proprioception inputs if enabled
             if use_proprioception:
