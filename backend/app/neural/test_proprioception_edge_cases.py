@@ -21,7 +21,6 @@ from app.neural.sensors import (
     compute_ground_contact,
     gather_proprioception_inputs,
     get_proprioception_input_size,
-    GROUND_CONTACT_THRESHOLD,
 )
 from app.neural.network import (
     get_input_size,
@@ -220,32 +219,46 @@ class TestNodeVelocitiesNumerical:
 # =============================================================================
 
 class TestGroundContactNumerical:
-    """Tests for numerical stability in ground contact calculation."""
+    """Tests for numerical stability in ground contact calculation.
 
-    def test_exactly_at_threshold(self, simple_genome):
-        """Exactly at threshold should be considered NOT touching."""
+    Ground contact is now based on node bottom position (y - size) relative to ground level (0).
+    A node is touching if its bottom surface is at or below ground level.
+    """
+
+    def test_bottom_exactly_at_ground(self, simple_genome):
+        """Node bottom exactly at ground level should be touching."""
         batch = creature_genomes_to_batch([simple_genome])
-        batch.positions[0, :, 1] = GROUND_CONTACT_THRESHOLD
+        # Set Y position = size so bottom is at 0
+        batch.positions[0, 0, 1] = batch.sizes[0, 0].item()
 
         contact = compute_ground_contact(batch)
 
-        # At threshold means y < threshold is False
-        assert (contact == 0).all(), "Exactly at threshold should NOT be touching"
+        assert contact[0, 0] == 1.0, "Bottom at ground level should be touching"
 
-    def test_just_below_threshold(self, simple_genome):
-        """Just below threshold should be touching."""
+    def test_bottom_just_above_ground(self, simple_genome):
+        """Node bottom just above ground should NOT be touching."""
         batch = creature_genomes_to_batch([simple_genome])
-        batch.positions[0, :, 1] = GROUND_CONTACT_THRESHOLD - 0.001
+        # Set Y position = size + 0.1 so bottom is 0.1 above ground
+        batch.positions[0, 0, 1] = batch.sizes[0, 0].item() + 0.1
 
         contact = compute_ground_contact(batch)
 
-        valid_contacts = contact[0, :batch.node_counts[0].item()]
-        assert (valid_contacts == 1).all(), "Just below threshold should be touching"
+        assert contact[0, 0] == 0.0, "Bottom above ground should NOT be touching"
+
+    def test_bottom_below_ground(self, simple_genome):
+        """Node bottom below ground should be touching."""
+        batch = creature_genomes_to_batch([simple_genome])
+        # Set Y position so bottom is below ground
+        batch.positions[0, 0, 1] = batch.sizes[0, 0].item() - 0.1
+
+        contact = compute_ground_contact(batch)
+
+        assert contact[0, 0] == 1.0, "Bottom below ground should be touching"
 
     def test_negative_y_position(self, simple_genome):
-        """Negative Y (below ground) should be touching."""
+        """Negative Y (center below ground) should definitely be touching."""
         batch = creature_genomes_to_batch([simple_genome])
-        batch.positions[0, 0, 1] = -1.0  # Below ground
+        batch.positions[0, 0, 1] = -1.0  # Center below ground
 
         contact = compute_ground_contact(batch)
 
@@ -260,18 +273,21 @@ class TestGroundContactNumerical:
 
         assert (contact == 0).all(), "High positions should not be touching"
 
-    def test_mixed_contacts(self, simple_genome):
-        """Some nodes touching, some not."""
+    def test_mixed_contacts_with_sizes(self, simple_genome):
+        """Some nodes touching, some not, accounting for sizes."""
         batch = creature_genomes_to_batch([simple_genome])
-        batch.positions[0, 0, 1] = 0.05  # Touching
-        batch.positions[0, 1, 1] = 0.5   # Not touching
-        batch.positions[0, 2, 1] = 0.1   # Touching
+        # Node 0: bottom at ground (y = size)
+        batch.positions[0, 0, 1] = batch.sizes[0, 0].item()
+        # Node 1: bottom well above ground (y = size + 1)
+        batch.positions[0, 1, 1] = batch.sizes[0, 1].item() + 1.0
+        # Node 2: bottom below ground (y = size - 0.1)
+        batch.positions[0, 2, 1] = batch.sizes[0, 2].item() - 0.1
 
         contact = compute_ground_contact(batch)
 
-        assert contact[0, 0] == 1.0
-        assert contact[0, 1] == 0.0
-        assert contact[0, 2] == 1.0
+        assert contact[0, 0] == 1.0, "Node 0 bottom at ground"
+        assert contact[0, 1] == 0.0, "Node 1 bottom above ground"
+        assert contact[0, 2] == 1.0, "Node 2 bottom below ground"
 
 
 # =============================================================================

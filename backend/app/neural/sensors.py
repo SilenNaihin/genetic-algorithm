@@ -360,16 +360,18 @@ def compute_node_velocities(
 @torch.no_grad()
 def compute_ground_contact(
     batch: CreatureBatch,
-    ground_threshold: float = GROUND_CONTACT_THRESHOLD,
+    ground_level: float = 0.0,
 ) -> torch.Tensor:
     """
     Compute ground contact for each node: 1 if touching ground, 0 otherwise.
 
-    A node is considered touching ground if its Y position is below the threshold.
+    A node is considered touching ground if its bottom surface (center Y - radius)
+    is at or below ground level. This accounts for node size so visually touching
+    nodes register as contacting ground.
 
     Args:
-        batch: CreatureBatch with current positions
-        ground_threshold: Y position threshold for ground contact
+        batch: CreatureBatch with current positions and sizes
+        ground_level: Y position of ground plane (default 0)
 
     Returns:
         contact: [B, MAX_NODES] binary contact values (0 or 1)
@@ -380,9 +382,14 @@ def compute_ground_contact(
     if B == 0:
         return torch.zeros(0, MAX_NODES, device=device)
 
-    # Check if node Y position is below threshold
+    # Check if bottom of node (center - radius) is at or below ground level
+    # Node touches ground when: y_position - size <= ground_level
+    # With small epsilon for numerical stability
     y_positions = batch.positions[:, :, 1]  # [B, MAX_NODES]
-    contact = (y_positions < ground_threshold).float()  # [B, MAX_NODES]
+    node_sizes = batch.sizes  # [B, MAX_NODES] - node radii
+    bottom_positions = y_positions - node_sizes  # [B, MAX_NODES]
+
+    contact = (bottom_positions <= ground_level + 0.01).float()  # [B, MAX_NODES]
 
     # Apply node mask (padding nodes get contact=0)
     contact = contact * batch.node_mask
