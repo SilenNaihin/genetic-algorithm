@@ -3,12 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { TooltipManager, tooltipRow, tooltipTitle } from '../../../src/ui/TooltipManager';
 import { getCreatureName } from '../../../src/ui/CreatureCardRenderer';
+import { useEvolutionStore } from '../../stores/evolutionStore';
 import type { CreatureSimulationResult } from '../../../src/types';
 
 /**
  * Generates tooltip HTML for a creature card.
  */
 function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, stackDepth?: number): string {
+  const config = useEvolutionStore.getState().config;
+  const isPureMode = config.neuralMode === 'pure';
   const genome = result.genome;
   const creatureName = getCreatureName(genome);
   const avgStiffness = genome.muscles.length > 0
@@ -73,8 +76,8 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, st
       ${tooltipRow('Nodes', genome.nodes.length)}
       ${tooltipRow('Muscles', genome.muscles.length)}
       ${tooltipRow('Avg Stiffness', avgStiffness.toFixed(0))}
-      ${tooltipRow('Avg Frequency', `${avgFrequency.toFixed(1)} Hz`)}
-      ${tooltipRow('Global Speed', `${genome.globalFrequencyMultiplier.toFixed(2)}x`)}
+      ${!isPureMode ? tooltipRow('Avg Frequency', `${avgFrequency.toFixed(1)} Hz`) : ''}
+      ${!isPureMode ? tooltipRow('Global Speed', `${genome.globalFrequencyMultiplier.toFixed(2)}x`) : ''}
     </div>
 
     <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">${result.disqualified ? 'Replay unavailable' : 'Click to replay'}</div>
