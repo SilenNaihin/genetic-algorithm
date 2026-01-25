@@ -287,21 +287,55 @@ export function MenuScreen() {
                 </div>
               </SettingsPopover>
             )}
+            {/* Crossover ratio slider - only shown when both mutation and crossover enabled */}
+            {config.useMutation && config.useCrossover && (
+              <ParamSlider
+                name="Cross/Mut Ratio"
+                value={config.crossoverRate * 100}
+                displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
+                min={0}
+                max={100}
+                tooltip={TOOLTIPS.crossoverRate}
+                onChange={(v) => setConfig({ crossoverRate: v / 100 })}
+                width="160px"
+              />
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+              <input
+                type="checkbox"
+                checked={config.useFitnessSharing}
+                onChange={(e) => setConfig({ useFitnessSharing: e.target.checked })}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+              />
+              Sharing
+              <InfoTooltip text={TOOLTIPS.fitnessSharing} width={280} />
+            </label>
+            {/* Sharing settings gear - only shown when sharing enabled */}
+            {config.useFitnessSharing && (
+              <SettingsPopover width={200}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                      Sharing Radius
+                      <InfoTooltip text={TOOLTIPS.sharingRadius} />
+                    </div>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={2.0}
+                      step={0.1}
+                      value={config.sharingRadius}
+                      onChange={(e) => setConfig({ sharingRadius: parseFloat(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent)' }}
+                    />
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      {config.sharingRadius.toFixed(1)} {config.sharingRadius <= 0.3 ? '(narrow)' : config.sharingRadius >= 1.0 ? '(wide)' : '(balanced)'}
+                    </div>
+                  </div>
+                </div>
+              </SettingsPopover>
+            )}
           </div>
-
-          {/* Crossover ratio slider - only shown when both enabled */}
-          {config.useMutation && config.useCrossover && (
-            <ParamSlider
-              name="Cross/Mut Ratio"
-              value={config.crossoverRate * 100}
-              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
-              min={0}
-              max={100}
-              tooltip={TOOLTIPS.crossoverRate}
-              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
-              width="160px"
-            />
-          )}
 
           {/* Replay Storage */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -180,6 +180,72 @@ child = clone(parent)
 
 Population never changes. Only useful for testing.
 
+## Fitness Sharing
+
+Fitness sharing (Goldberg & Richardson, 1987) maintains population diversity by penalizing creatures that are too similar. This prevents premature convergence to a single solution.
+
+### How It Works
+
+1. **Calculate genome distance** between all pairs of creatures (based on neural weight differences)
+2. **For each creature**, count how many others are within the "sharing radius" (similar)
+3. **Divide fitness** by the niche count: `shared_fitness = raw_fitness / niche_count`
+
+This means:
+- **Unique creatures** keep their full fitness (niche count ≈ 1)
+- **Crowded niches** share fitness, reducing effective score for each member
+- **Selection pressure** shifts toward exploring diverse solutions
+
+### The Sharing Function
+
+```python
+def sharing_function(distance, radius, alpha=1.0):
+    if distance >= radius:
+        return 0.0
+    return 1.0 - (distance / radius) ** alpha
+```
+
+The sharing value is 1 for identical creatures, decreasing linearly to 0 at the sharing radius.
+
+### Genome Distance
+
+For neural genomes, distance is the normalized root-mean-squared difference across all weight matrices:
+
+```python
+distance = sqrt(sum((w1 - w2)^2) / num_weights)
+```
+
+For creatures without neural networks, distance is based on structural differences (node count, muscle count).
+
+### Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `useFitnessSharing` | `false` | Enable/disable fitness sharing |
+| `sharingRadius` | `0.5` | Distance threshold for sharing |
+
+**Sharing radius guidelines:**
+- **0.1 - 0.3** (narrow): Only very similar creatures share, preserves more unique solutions
+- **0.5** (default): Moderate diversity pressure
+- **1.0 - 2.0** (wide): Strong diversity pressure, even moderately different creatures share
+
+### When to Use
+
+- **Population converging too quickly** - creatures all look similar after few generations
+- **Complex fitness landscapes** - multiple valid strategies should be explored
+- **Combined with crossover** - maintains diverse gene pool for recombination
+
+### Example
+
+```
+Without sharing:
+  Creature A: fitness 100, many similar clones → all survive
+  Creature B: fitness 95, unique → might get culled
+
+With sharing (3 similar to A):
+  Creature A: shared_fitness = 100 / 3 = 33
+  Creature B: shared_fitness = 95 / 1 = 95 → survives!
+```
+
 ## Configuration Reference
 
 | Parameter | Default | Description |
@@ -197,6 +263,8 @@ Population never changes. Only useful for testing.
 | `weightMutationRate` | `0.2` | Neural weight mutation probability |
 | `weightMutationMagnitude` | `0.3` | Neural weight mutation strength |
 | `weightMutationDecay` | `'linear'` | Decay schedule for weight mutation |
+| `useFitnessSharing` | `false` | Enable fitness sharing for diversity |
+| `sharingRadius` | `0.5` | Genome distance threshold for sharing |
 
 ## Recommended Configurations
 
@@ -233,5 +301,6 @@ Enable [Adaptive Mutation](./ADAPTIVE_MUTATION.md) to automatically boost mutati
 
 - Deb, K. & Agrawal, R.B. (1995). "Simulated Binary Crossover for Continuous Search Space." *Complex Systems*, 9(2), 115-148.
 - Deb, K. & Beyer, H.G. (2001). "Self-Adaptive Genetic Algorithms with Simulated Binary Crossover." *Evolutionary Computation*, 9(2), 197-221.
-- Goldberg, D.E. (1989). "Genetic Algorithms in Search, Optimization, and Machine Learning"
+- Goldberg, D.E. (1989). "Genetic Algorithms in Search, Optimization, and Machine Learning." Addison-Wesley.
+- Goldberg, D.E. & Richardson, J. (1987). "Genetic Algorithms with Sharing for Multimodal Function Optimization." *Proceedings of the Second International Conference on Genetic Algorithms*, 41-49.
 - Stanley, K.O. & Miikkulainen, R. (2002). "Evolving Neural Networks through Augmenting Topologies." *Evolutionary Computation*, 10(2), 99-127.
