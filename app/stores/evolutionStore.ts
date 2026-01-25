@@ -239,7 +239,6 @@ export const useEvolutionStore = create<EvolutionStore>()(
  * Selector hooks for common state slices
  * Use these for better TypeScript inference and cleaner component code
  */
-export const useAppState = () => useEvolutionStore((s) => s.appState);
 export const useEvolutionStep = () => useEvolutionStore((s) => s.evolutionStep);
 export const useGeneration = () => useEvolutionStore((s) => s.generation);
 export const useConfig = () => useEvolutionStore((s) => s.config);

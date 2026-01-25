@@ -31,7 +31,6 @@
   },
   "homepage": "https://github.com/SilenNaihin/genetic-algorithm#readme",
   "dependencies": {
-    "cannon-es": "^0.20.0",
     "chart.js": "^4.5.1",
     "next": "^16.1.4",
     "react": "^19.2.3",
