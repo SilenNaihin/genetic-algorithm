@@ -222,7 +222,7 @@ export class RemoteStorage {
     _disqualified: string | null,
     realPellets?: PelletData[],
     realFitnessOverTime?: number[]
-  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[]; activationsPerFrame?: Array<{ inputs: number[]; hidden: number[]; outputs: number[] }> }> {
+  ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[]; activationsPerFrame?: Array<{ inputs: number[]; hidden: number[]; outputs: number[]; outputs_raw?: number[] }> }> {
     try {
       // Use best performance generation if available (for best/longest survivor replays)
       const generation = genome._bestPerformanceGeneration;

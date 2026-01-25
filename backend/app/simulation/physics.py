@@ -1568,13 +1568,18 @@ def simulate_with_fitness_neural(
             fitness_per_frame.append(current_fitness.clone())
 
             # Record full neural network activations for this frame
-            # Store as dict: {inputs, hidden, outputs} per creature
+            # Store as dict: {inputs, hidden, outputs, outputs_raw} per creature
+            # outputs_raw = pre-dead-zone values for visualization
             if current_full_activations is not None:
-                activations_per_frame.append({
+                frame_activations = {
                     'inputs': current_full_activations['inputs'].clone(),
                     'hidden': current_full_activations['hidden'].clone(),
                     'outputs': current_full_activations['outputs'].clone(),
-                })
+                }
+                # Include raw outputs if available (pure mode only)
+                if 'outputs_raw' in current_full_activations:
+                    frame_activations['outputs_raw'] = current_full_activations['outputs_raw'].clone()
+                activations_per_frame.append(frame_activations)
 
             frame_index += 1
 
@@ -1612,12 +1617,18 @@ def simulate_with_fitness_neural(
         if fitness_per_frame:
             result['fitness_per_frame'] = torch.stack(fitness_per_frame, dim=1)  # [B, F]
         if activations_per_frame:
-            # Stack full activations: each item is {inputs, hidden, outputs} with [B, ...] tensors
-            # Result: {inputs: [B, F, I], hidden: [B, F, H], outputs: [B, F, O]}
-            result['activations_per_frame'] = {
+            # Stack full activations: each item is {inputs, hidden, outputs, outputs_raw} with [B, ...] tensors
+            # Result: {inputs: [B, F, I], hidden: [B, F, H], outputs: [B, F, O], outputs_raw: [B, F, O]}
+            stacked_activations = {
                 'inputs': torch.stack([a['inputs'] for a in activations_per_frame], dim=1),
                 'hidden': torch.stack([a['hidden'] for a in activations_per_frame], dim=1),
                 'outputs': torch.stack([a['outputs'] for a in activations_per_frame], dim=1),
             }
+            # Include raw outputs if available (pure mode only)
+            if 'outputs_raw' in activations_per_frame[0]:
+                stacked_activations['outputs_raw'] = torch.stack(
+                    [a['outputs_raw'] for a in activations_per_frame], dim=1
+                )
+            result['activations_per_frame'] = stacked_activations
 
     return result

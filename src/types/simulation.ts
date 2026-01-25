@@ -257,5 +257,6 @@ export interface PelletData {
 export interface FrameActivations {
   inputs: number[];   // Sensor inputs fed to network
   hidden: number[];   // Hidden layer activations
-  outputs: number[];  // Muscle outputs
+  outputs: number[];  // Muscle outputs (post-dead-zone)
+  outputs_raw?: number[];  // Raw muscle outputs before dead zone (pure mode only)
 }

@@ -561,6 +561,7 @@ export async function getCreatureFrames(
     inputs: number[];
     hidden: number[];
     outputs: number[];
+    outputs_raw?: number[];  // Pre-dead-zone values (pure mode only)
   }> | null;
   generation: number;
 }> {

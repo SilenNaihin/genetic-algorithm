@@ -279,9 +279,14 @@ class BatchedNeuralNetwork:
         Small outputs (abs < dead_zone) are zeroed out.
 
         Returns:
-            dict with 'inputs', 'hidden', 'outputs' (outputs have dead zone applied)
+            dict with 'inputs', 'hidden', 'outputs', 'outputs_raw'
+            - outputs: post-dead-zone values (used for physics)
+            - outputs_raw: original NN outputs before dead zone (for visualization)
         """
         result = self.forward_full(inputs)
+
+        # Store raw outputs before dead zone for visualization
+        result['outputs_raw'] = result['outputs'].clone()
 
         if dead_zone > 0:
             # Zero out small outputs

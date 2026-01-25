@@ -321,6 +321,50 @@ class TestStructuralMutation:
         nodes = {result.get('nodeA'), result.get('nodeB')}
         assert 'n3' in nodes
 
+    def test_mutation_adapts_neural_topology_on_muscle_add(self, constraints):
+        """Neural topology should adapt when structural mutation adds muscles."""
+        # Create genome with 2 muscles and neural genome sized for 2 outputs
+        genome = {
+            'id': 'test',
+            'nodes': [
+                {'id': 'n1', 'position': {'x': 0, 'y': 0, 'z': 0}, 'size': 0.3, 'friction': 0.5},
+                {'id': 'n2', 'position': {'x': 1, 'y': 0, 'z': 0}, 'size': 0.3, 'friction': 0.5},
+                {'id': 'n3', 'position': {'x': 0, 'y': 1, 'z': 0}, 'size': 0.3, 'friction': 0.5},
+            ],
+            'muscles': [
+                {'id': 'm1', 'nodeA': 'n1', 'nodeB': 'n2', 'strength': 100, 'frequency': 1, 'amplitude': 0.3, 'phase': 0},
+            ],
+            'neuralGenome': {
+                'input_size': 7,
+                'hidden_size': 4,
+                'output_size': 1,  # Only 1 muscle initially
+                'weights_ih': [0.1] * (7 * 4),
+                'weights_ho': [0.1] * (4 * 1),
+                'biases_h': [0.0] * 4,
+                'biases_o': [-0.5],
+            },
+        }
+
+        # Force add a muscle
+        config = MutationConfig(rate=0.0, structural_rate=1.0, neural_rate=0.0)
+
+        # Run mutation multiple times until a muscle is added
+        for _ in range(50):
+            mutated = mutate_genome(genome, config, constraints)
+            if len(mutated['muscles']) > len(genome['muscles']):
+                # Muscle was added - neural topology should be adapted
+                neural = mutated['neuralGenome']
+                assert neural['output_size'] == len(mutated['muscles']), \
+                    f"Neural output_size {neural['output_size']} != muscle count {len(mutated['muscles'])}"
+                # Verify weights are the right size
+                expected_ho_weights = neural['hidden_size'] * neural['output_size']
+                assert len(neural['weights_ho']) == expected_ho_weights, \
+                    f"weights_ho size {len(neural['weights_ho'])} != expected {expected_ho_weights}"
+                return
+
+        # If we get here, no muscle was added in 50 tries (very unlikely with structural_rate=1.0)
+        pytest.skip("No muscle added in 50 iterations")
+
 
 class TestNeuralMutation:
     """Test neural weight mutation."""
@@ -534,6 +578,39 @@ class TestGenerateRandomGenome:
         assert neural_genome is not None
         input_size = neural_genome.get('input_size')
         assert input_size == 9, f"Sin+raw encoding should have 9 inputs, got {input_size}"
+
+    def test_neural_genome_input_size_with_proprioception(self):
+        """Proprioception should add 47 inputs (MAX_MUSCLES + MAX_NODES * 4)."""
+        # Without proprioception: 7 base + 2 time = 9
+        genome_no_prop = generate_random_genome(
+            use_neural_net=True,
+            neural_mode='pure',
+            time_encoding='sin_raw',
+            use_proprioception=False,
+        )
+        assert genome_no_prop['neuralGenome'].get('input_size') == 9
+
+        # With proprioception 'all': 7 base + 2 time + 47 prop = 56
+        genome_with_prop = generate_random_genome(
+            use_neural_net=True,
+            neural_mode='pure',
+            time_encoding='sin_raw',
+            use_proprioception=True,
+            proprioception_inputs='all',
+        )
+        assert genome_with_prop['neuralGenome'].get('input_size') == 56
+
+    def test_neural_genome_proprioception_strain_only(self):
+        """Proprioception 'strain' should add MAX_MUSCLES (15) inputs."""
+        # 7 base + 0 time + 15 strain = 22
+        genome = generate_random_genome(
+            use_neural_net=True,
+            neural_mode='pure',
+            time_encoding='none',
+            use_proprioception=True,
+            proprioception_inputs='strain',
+        )
+        assert genome['neuralGenome'].get('input_size') == 22
 
 
 class TestGeneratePopulation:

@@ -715,5 +715,70 @@ def make_neural_genome(creature_id: str, hidden_size: int = 8, num_muscles: int 
     return genome
 
 
+# =============================================================================
+# Proprioception Activation Storage Tests
+# =============================================================================
+
+
+class TestProprioceptionActivations:
+    """Test that proprioception inputs are stored correctly in activations."""
+
+    def test_activations_include_proprioception_inputs(self):
+        """
+        BUG REPRODUCTION: When proprioception is enabled, activations_per_frame
+        should store all inputs including proprioception, not just base inputs.
+
+        With proprioception='all' and cyclic time encoding:
+        - Base inputs: 7
+        - Time encoding (cyclic): 2
+        - Strain (MAX_MUSCLES=15): 15
+        - Velocity (MAX_NODES*3=24): 24
+        - Ground (MAX_NODES=8): 8
+        - Total: 56 inputs
+        """
+        genome = make_neural_genome("test_proprio", hidden_size=8, num_muscles=3)
+
+        # Simulate with proprioception enabled and frame recording
+        response = client.post("/api/simulation/batch", json={
+            "genomes": [genome],
+            "config": {
+                "use_neural_net": True,
+                "neural_mode": "hybrid",
+                "time_encoding": "cyclic",
+                "use_proprioception": True,
+                "proprioception_inputs": "all",
+                "simulation_duration": 1.0,  # Minimum allowed
+                "frame_storage_mode": "all",  # Record frames
+                "frame_rate": 15,
+            }
+        })
+
+        assert response.status_code == 200, f"Failed: {response.json()}"
+        results = extract_results(response)
+        assert len(results) == 1
+
+        result = results[0]
+        activations = result.get("activations_per_frame") or result.get("activationsPerFrame")
+
+        assert activations is not None, "activations_per_frame should not be None when frame_storage_mode='all'"
+        assert len(activations) > 0, "Should have at least one frame of activations"
+
+        # Check the first frame's inputs
+        first_frame = activations[0]
+        inputs = first_frame.get("inputs")
+
+        assert inputs is not None, "inputs should be present in activations"
+
+        # Expected: 7 base + 2 cyclic + 15 strain + 24 velocity + 8 ground = 56
+        expected_input_count = 56
+        actual_input_count = len(inputs)
+
+        assert actual_input_count == expected_input_count, (
+            f"Expected {expected_input_count} inputs (with proprioception), "
+            f"but got {actual_input_count}. "
+            f"Backend may not be storing proprioception inputs."
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

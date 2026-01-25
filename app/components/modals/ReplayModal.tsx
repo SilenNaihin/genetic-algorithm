@@ -473,7 +473,6 @@ export function ReplayModal() {
         if (frameActivations) {
           neuralVisualizerRef.current.setStoredActivations(frameActivations);
         }
-        // No fallback - if activations aren't stored (none/sparse mode), visualization shows no values
       }
 
       animationRef.current = requestAnimationFrame(animate);
@@ -674,23 +673,30 @@ export function ReplayModal() {
                     >
                       {formatTime(currentTime)} / {formatTime(totalDuration)}
                     </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {[1, 2, 4].map((s) => (
-                        <Button
-                          key={s}
-                          variant="secondary"
-                          size="small"
-                          onClick={() => handleSpeedChange(s)}
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            background: speed === s ? 'var(--accent)' : undefined,
-                            color: speed === s ? 'white' : undefined,
-                          }}
-                        >
-                          {s}x
-                        </Button>
-                      ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="1"
+                        value={(() => { const idx = [0.1, 0.25, 0.5, 1, 2, 4].indexOf(speed); return idx >= 0 ? idx : 3; })()}
+                        onChange={(e) => {
+                          const speeds = [0.1, 0.25, 0.5, 1, 2, 4];
+                          handleSpeedChange(speeds[parseInt(e.target.value)]);
+                        }}
+                        style={{
+                          width: '80px',
+                          accentColor: 'var(--accent)',
+                        }}
+                      />
+                      <span style={{
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        minWidth: '36px',
+                        textAlign: 'right',
+                      }}>
+                        {speed}x
+                      </span>
                     </div>
                   </div>
                 </div>

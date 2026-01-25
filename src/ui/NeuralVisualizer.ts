@@ -2,11 +2,12 @@
  * Neural Network Visualizer
  *
  * Renders a neural network graph showing:
- * - Input nodes (sensor inputs)
- * - Hidden layer nodes
- * - Output nodes (muscle activations)
+ * - Input nodes at TOP
+ * - Hidden layer nodes in MIDDLE
+ * - Output nodes at BOTTOM
  * - Connection weights (color and thickness)
  * - Node activations (color intensity)
+ * - Dynamic node sizing based on layer sizes
  *
  * Note: This is pure UI code. Weights are read directly from genome data
  * (which comes from the backend). No neural network computation happens here.
@@ -32,6 +33,7 @@ interface ForwardResult {
   inputs: number[];
   hidden: number[];
   outputs: number[];
+  outputs_raw?: number[];  // Pre-dead-zone outputs (pure mode only)
 }
 
 /**
@@ -114,14 +116,12 @@ function forwardPass(
 export interface NeuralVisualizerOptions {
   width: number;
   height: number;
-  showLabels: boolean;
   showWeights: boolean;
 }
 
 const DEFAULT_OPTIONS: NeuralVisualizerOptions = {
-  width: 280,
+  width: 800,
   height: 200,
-  showLabels: true,
   showWeights: true
 };
 
@@ -146,6 +146,7 @@ export class NeuralVisualizer {
   private muscleNames: string[] = [];
   private timeEncoding: TimeEncoding = 'none';
   private proprioception: ProprioceptionConfig = { enabled: false, inputs: 'all', numMuscles: 0, numNodes: 0 };
+  // Note: deadZone display is now handled by comparing raw vs post-dead-zone values
 
   constructor(container: HTMLElement, options: Partial<NeuralVisualizerOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -161,7 +162,7 @@ export class NeuralVisualizer {
     this.canvas.style.width = `${this.options.width}px`;
     this.canvas.style.height = `${this.options.height}px`;
     this.canvas.style.borderRadius = '8px';
-    this.canvas.style.background = 'var(--bg-tertiary)';
+    this.canvas.style.background = '#1a1a24';
 
     this.ctx = this.canvas.getContext('2d')!;
     // Scale context to account for DPR
@@ -211,7 +212,7 @@ export class NeuralVisualizer {
   /**
    * Set stored activations directly from simulation data.
    * This displays the actual activations from simulation rather than recomputing.
-   * @param activations - Full activation data from simulation (inputs, hidden, outputs)
+   * @param activations - Full activation data from simulation (inputs, hidden, outputs, outputs_raw?)
    *                      Can also accept legacy format (just outputs array)
    */
   setStoredActivations(activations: FrameActivations | number[]): void {
@@ -226,11 +227,13 @@ export class NeuralVisualizer {
         outputs: activations.slice(0, this.topology.outputSize),
       };
     } else {
-      // New format: full FrameActivations with inputs, hidden, outputs
+      // New format: full FrameActivations with inputs, hidden, outputs, outputs_raw
       this.lastResult = {
         inputs: activations.inputs || new Array(this.topology.inputSize).fill(0),
         hidden: activations.hidden || new Array(this.topology.hiddenSize).fill(0),
         outputs: (activations.outputs || []).slice(0, this.topology.outputSize),
+        // Include raw outputs if available (pure mode only) - used for visualization
+        outputs_raw: activations.outputs_raw?.slice(0, this.topology.outputSize),
       };
     }
     this.render();
@@ -255,6 +258,33 @@ export class NeuralVisualizer {
   }
 
   /**
+   * Set dead zone threshold for output node coloring.
+   * @deprecated Dead zone display is now handled by comparing raw vs post-dead-zone values
+   */
+  setDeadZone(_deadZone: number): void {
+    // No longer needed - dead zone display uses raw vs post-dead-zone comparison
+  }
+
+  /**
+   * Get non-padded input labels and their indices.
+   * Filters out padded inputs (those ending with *).
+   */
+  private getNonPaddedInputs(): { labels: string[]; indices: number[] } {
+    const allLabels = this.getInputLabels();
+    const labels: string[] = [];
+    const indices: number[] = [];
+
+    for (let i = 0; i < allLabels.length; i++) {
+      if (!allLabels[i].endsWith('*')) {
+        labels.push(allLabels[i]);
+        indices.push(i);
+      }
+    }
+
+    return { labels, indices };
+  }
+
+  /**
    * Clear the visualization
    */
   clear(): void {
@@ -268,7 +298,25 @@ export class NeuralVisualizer {
   }
 
   /**
-   * Render the neural network visualization
+   * Get the actual input size based on config.
+   * When proprioception is enabled, always return the full input count (56),
+   * not the stored activations length which may be smaller.
+   */
+  getActualInputSize(): number {
+    // Proprioception takes priority - always show full input count when enabled
+    if (this.proprioception.enabled) {
+      return this.getInputLabels().length;
+    }
+    // Otherwise use stored activations or topology
+    if (this.lastResult?.inputs && this.lastResult.inputs.length > 0) {
+      return this.lastResult.inputs.length;
+    }
+    return this.topology?.inputSize || 7;
+  }
+
+  /**
+   * Render the neural network visualization (VERTICAL layout: inputs TOP, outputs BOTTOM)
+   * Only shows non-padded inputs (filters out inputs ending with *).
    */
   private render(): void {
     const { width, height } = this.options;
@@ -283,60 +331,89 @@ export class NeuralVisualizer {
       ctx.fillStyle = '#666';
       ctx.font = '12px sans-serif';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillText('No neural network', width / 2, height / 2);
       return;
     }
 
     const { hiddenSize, outputSize } = this.topology;
 
-    // Calculate actual input size - use stored activations if available, otherwise calculate from config
-    let actualInputSize = this.topology.inputSize;
-    if (this.lastResult?.inputs && this.lastResult.inputs.length > 0) {
-      actualInputSize = this.lastResult.inputs.length;
-    } else if (this.proprioception.enabled) {
-      // Calculate expected input size based on config
-      const labels = this.getInputLabels();
-      actualInputSize = labels.length;
-    }
+    // Get non-padded inputs only (filter out padded inputs ending with *)
+    const { labels: inputLabels, indices: inputIndices } = this.getNonPaddedInputs();
+    const displayInputSize = inputLabels.length;
 
-    // Layout parameters
-    const padding = 20;
-    const labelWidth = this.options.showLabels ? 50 : 0;
-    const layerX = [
-      padding + labelWidth,  // Input layer
-      width / 2,             // Hidden layer
-      width - padding - labelWidth  // Output layer
+    // Vertical layout: Y positions for layers (with more space for labels)
+    const topPadding = 35;
+    const bottomPadding = 45;
+    const layerY = [
+      topPadding,                       // Input layer (TOP)
+      height / 2,                       // Hidden layer (MIDDLE)
+      height - bottomPadding            // Output layer (BOTTOM)
     ];
 
-    // Calculate node positions
-    const inputY = this.getNodeYPositions(actualInputSize, height, padding);
-    const hiddenY = this.getNodeYPositions(hiddenSize, height, padding);
-    const outputY = this.getNodeYPositions(outputSize, height, padding);
+    // Calculate X positions for each layer's nodes
+    const sidePadding = 8;
+    const inputX = this.getNodeXPositions(displayInputSize, width, sidePadding);
+    const hiddenX = this.getNodeXPositions(hiddenSize, width, sidePadding);
+    const outputX = this.getNodeXPositions(outputSize, width, sidePadding);
 
     // Get activations (or use defaults if not computed yet)
-    const inputs = this.lastResult?.inputs || new Array(actualInputSize).fill(0);
+    // For inputs, only get non-padded activations
+    const allInputs = this.lastResult?.inputs || new Array(this.getActualInputSize()).fill(0);
+    const inputs = inputIndices.map(i => allInputs[i] || 0);
     const hidden = this.lastResult?.hidden || new Array(hiddenSize).fill(0);
     const outputs = this.lastResult?.outputs || new Array(outputSize).fill(0);
+    // Raw outputs (pre-dead-zone) for visualization - use these for coloring
+    const outputsRaw = this.lastResult?.outputs_raw || outputs;
+
+    // Calculate dynamic node radius based on max layer size
+    const maxLayerSize = Math.max(displayInputSize, hiddenSize, outputSize);
+    const nodeRadius = this.calculateNodeRadius(maxLayerSize, width, sidePadding);
 
     // Draw connections first (so they're behind nodes)
-    // Draw if we have weights (to show actual connection strengths) or topology (for structure)
+    // Only draw connections for non-padded inputs
     if (this.options.showWeights && (this.weights || this.topology)) {
-      this.drawConnections(ctx, layerX, inputY, hiddenY, outputY, inputs, hidden, outputs);
+      this.drawConnectionsFiltered(ctx, layerY, inputX, hiddenX, outputX, inputs, hidden, outputs, inputIndices);
     }
 
-    // Draw nodes
-    this.drawNodes(ctx, layerX[0], inputY, inputs, 'input');
-    this.drawNodes(ctx, layerX[1], hiddenY, hidden, 'hidden');
-    this.drawNodes(ctx, layerX[2], outputY, outputs, 'output');
+    // Get labels for outputs
+    const outputLabels = this.muscleNames.length > 0
+      ? this.muscleNames.map(name => `M${name}`)
+      : Array.from({ length: outputSize }, (_, i) => `O${i + 1}`);
 
-    // Draw labels
-    if (this.options.showLabels) {
-      this.drawLabels(ctx, layerX, inputY, outputY, outputs);
-    }
+    // Draw nodes with labels
+    this.drawNodesWithLabels(ctx, layerY[0], inputX, inputs, nodeRadius, inputLabels, 'top');
+    this.drawNodes(ctx, layerY[1], hiddenX, hidden, nodeRadius);
+    // Pass both raw outputs (for coloring) and post-dead-zone outputs (for display)
+    this.drawOutputNodesWithLabels(ctx, layerY[2], outputX, outputsRaw, outputs, nodeRadius, outputLabels);
+
+    // Draw layer labels on the left
+    ctx.fillStyle = '#666';
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`In (${displayInputSize})`, 5, layerY[0]);
+    ctx.fillText(`H (${hiddenSize})`, 5, layerY[1]);
+    ctx.fillText(`Out (${outputSize})`, 5, layerY[2]);
   }
 
-  private getNodeYPositions(count: number, height: number, padding: number): number[] {
-    const available = height - padding * 2;
+  /**
+   * Calculate dynamic node radius based on layer size
+   */
+  private calculateNodeRadius(maxNodes: number, width: number, padding: number): number {
+    const availableWidth = width - padding * 2;
+    // Max spacing per node
+    const maxSpacing = availableWidth / (maxNodes + 1);
+    // Node radius should be at most 40% of spacing, capped between 3 and 12
+    const radius = Math.min(12, Math.max(3, maxSpacing * 0.35));
+    return radius;
+  }
+
+  /**
+   * Get X positions for nodes in a horizontal row
+   */
+  private getNodeXPositions(count: number, width: number, padding: number): number[] {
+    const available = width - padding * 2;
     const spacing = available / (count + 1);
     const positions: number[] = [];
     for (let i = 0; i < count; i++) {
@@ -345,49 +422,9 @@ export class NeuralVisualizer {
     return positions;
   }
 
-  private drawConnections(
-    ctx: CanvasRenderingContext2D,
-    layerX: number[],
-    inputY: number[],
-    hiddenY: number[],
-    outputY: number[],
-    inputs: number[],
-    hidden: number[],
-    _outputs: number[]
-  ): void {
-    const weights = this.weights;
-
-    // Draw input -> hidden connections with signal flow
-    for (let i = 0; i < inputY.length; i++) {
-      for (let h = 0; h < hiddenY.length; h++) {
-        const weight = weights?.weightsIH[i]?.[h] ?? 0;
-        const inputVal = inputs[i] || 0;
-        // Signal = input activation × weight
-        const signal = inputVal * weight;
-        this.drawSignalConnection(ctx, layerX[0], inputY[i], layerX[1], hiddenY[h], weight, signal);
-      }
-    }
-
-    // Draw hidden -> output connections with signal flow
-    for (let h = 0; h < hiddenY.length; h++) {
-      for (let o = 0; o < outputY.length; o++) {
-        const weight = weights?.weightsHO[h]?.[o] ?? 0;
-        const hiddenVal = hidden[h] || 0;
-        // Signal = hidden activation × weight
-        const signal = hiddenVal * weight;
-        this.drawSignalConnection(ctx, layerX[1], hiddenY[h], layerX[2], outputY[o], weight, signal);
-      }
-    }
-  }
-
   /**
    * Draw a connection line showing actual signal flow.
    * Signal = activation × weight, showing what's actually contributing to outputs.
-   *
-   * - Positive signal (positive contribution): cyan/green
-   * - Negative signal (inhibitory): red/orange
-   * - Signal magnitude determines brightness and thickness
-   * - Inactive connections (near-zero signal) are dimmed
    */
   private drawSignalConnection(
     ctx: CanvasRenderingContext2D,
@@ -409,10 +446,7 @@ export class NeuralVisualizer {
     // Normalize weight for base line width
     const normalizedWeight = Math.min(weightMag / 1.5, 1);
 
-    // Color based on signal direction (what's actually contributing)
-    // Positive signal: cyan/green (excitatory)
-    // Negative signal: red/orange (inhibitory)
-    // Near-zero signal: gray (inactive)
+    // Color based on signal direction
     let hue: number;
     let saturation: number;
     let lightness: number;
@@ -436,14 +470,14 @@ export class NeuralVisualizer {
 
     // Alpha: active signals are more visible
     const alpha = signalMag < 0.02
-      ? 0.15 + normalizedWeight * 0.2  // Inactive: show weight structure dimly
-      : 0.3 + normalizedSignal * 0.6;   // Active: brighten with signal
+      ? 0.1 + normalizedWeight * 0.15
+      : 0.2 + normalizedSignal * 0.5;
 
     // Line width: base on weight, boost when active
-    const baseWidth = 0.5 + normalizedWeight * 1.5;
+    const baseWidth = 0.3 + normalizedWeight * 1.0;
     const lineWidth = signalMag < 0.02
       ? baseWidth
-      : baseWidth + normalizedSignal * 1.5;
+      : baseWidth + normalizedSignal * 1.0;
 
     ctx.beginPath();
     ctx.moveTo(x1, y1);
@@ -453,67 +487,296 @@ export class NeuralVisualizer {
     ctx.stroke();
   }
 
+  /**
+   * Draw connections for filtered (non-padded) inputs only.
+   * Uses inputIndices to map display positions to original weight indices.
+   */
+  private drawConnectionsFiltered(
+    ctx: CanvasRenderingContext2D,
+    layerY: number[],
+    inputX: number[],
+    hiddenX: number[],
+    outputX: number[],
+    inputs: number[],
+    hidden: number[],
+    _outputs: number[],
+    inputIndices: number[]
+  ): void {
+    const weights = this.weights;
+    const storedInputSize = this.topology?.inputSize || 7;
+
+    // Draw input -> hidden connections with signal flow
+    // inputIndices maps display position to original index for weight lookup
+    for (let displayIdx = 0; displayIdx < inputX.length; displayIdx++) {
+      const originalIdx = inputIndices[displayIdx];
+      for (let h = 0; h < hiddenX.length; h++) {
+        // Only use weights if within stored topology
+        const weight = originalIdx < storedInputSize ? (weights?.weightsIH[originalIdx]?.[h] ?? 0) : 0;
+        const inputVal = inputs[displayIdx] || 0;
+        const signal = inputVal * weight;
+        this.drawSignalConnection(ctx, inputX[displayIdx], layerY[0], hiddenX[h], layerY[1], weight, signal);
+      }
+    }
+
+    // Draw hidden -> output connections with signal flow
+    for (let h = 0; h < hiddenX.length; h++) {
+      for (let o = 0; o < outputX.length; o++) {
+        const weight = weights?.weightsHO[h]?.[o] ?? 0;
+        const hiddenVal = hidden[h] || 0;
+        const signal = hiddenVal * weight;
+        this.drawSignalConnection(ctx, hiddenX[h], layerY[1], outputX[o], layerY[2], weight, signal);
+      }
+    }
+  }
+
   private drawNodes(
     ctx: CanvasRenderingContext2D,
-    x: number,
-    yPositions: number[],
+    y: number,
+    xPositions: number[],
     activations: number[],
-    _layer: 'input' | 'hidden' | 'output'
+    nodeRadius: number
   ): void {
-    const nodeRadius = 6;
-
-    for (let i = 0; i < yPositions.length; i++) {
-      const y = yPositions[i];
+    for (let i = 0; i < xPositions.length; i++) {
+      const x = xPositions[i];
       const activation = activations[i] || 0;
-
-      // Node fill color based on activation sign and magnitude
-      // Positive: green/cyan, Negative: red/orange, Zero: gray
-      const magnitude = Math.abs(activation);
-      let hue: number;
-      let saturation: number;
-      let lightness: number;
-
-      if (magnitude < 0.05) {
-        // Near zero - neutral gray
-        hue = 0;
-        saturation = 0;
-        lightness = 40;
-      } else if (activation > 0) {
-        // Positive - green to cyan
-        hue = 140;
-        saturation = 60 + magnitude * 30;
-        lightness = 35 + magnitude * 25;
-      } else {
-        // Negative - red to orange
-        hue = 15;
-        saturation = 60 + magnitude * 30;
-        lightness = 35 + magnitude * 25;
-      }
-
-      // Draw node with slight glow for active nodes
-      if (magnitude > 0.3) {
-        ctx.beginPath();
-        ctx.arc(x, y, nodeRadius + 2, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
-        ctx.fill();
-      }
-
-      // Main node
-      ctx.beginPath();
-      ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
-      ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-      ctx.fill();
-      ctx.strokeStyle = '#555';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      this.drawSingleNode(ctx, x, y, activation, nodeRadius);
     }
+  }
+
+  private drawNodesWithLabels(
+    ctx: CanvasRenderingContext2D,
+    y: number,
+    xPositions: number[],
+    activations: number[],
+    nodeRadius: number,
+    labels: string[],
+    labelPosition: 'top' | 'bottom'
+  ): void {
+    // Calculate font size based on spacing (slightly larger than before)
+    const spacing = xPositions.length > 1 ? xPositions[1] - xPositions[0] : 50;
+    const fontSize = Math.min(9, Math.max(6, spacing * 0.4));
+
+    for (let i = 0; i < xPositions.length; i++) {
+      const x = xPositions[i];
+      const activation = activations[i] || 0;
+      const label = labels[i] || `${i}`;
+
+      // Draw the node
+      this.drawSingleNode(ctx, x, y, activation, nodeRadius);
+
+      // Draw combined "label value" on one line (e.g., "M1-2 0.45")
+      ctx.save();
+      ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, monospace`;
+
+      // Truncate label if too long
+      const shortLabel = label.length > 6 ? label.slice(0, 6) : label;
+
+      // Fixed-width number format: always include sign placeholder
+      // This prevents jitter when values go negative
+      const absValue = Math.abs(activation).toFixed(2);
+      const sign = activation < 0 ? '-' : ' '; // Space for positive to maintain width
+      const valueStr = sign + absValue;
+
+      // Position text above or below node
+      const textY = labelPosition === 'top'
+        ? y - nodeRadius - 3
+        : y + nodeRadius + 3 + fontSize;
+
+      ctx.textBaseline = labelPosition === 'top' ? 'bottom' : 'top';
+
+      // Draw label in gray, then value in color
+      const labelWidth = ctx.measureText(shortLabel + ' ').width;
+      const totalWidth = ctx.measureText(shortLabel + ' ' + valueStr).width;
+      const startX = x - totalWidth / 2;
+
+      // Label part (gray)
+      ctx.fillStyle = '#aaa';
+      ctx.textAlign = 'left';
+      ctx.fillText(shortLabel + ' ', startX, textY);
+
+      // Value part (colored by sign)
+      ctx.fillStyle = activation >= 0 ? '#6ee7b7' : '#fca5a5';
+      ctx.fillText(valueStr, startX + labelWidth, textY);
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Draw output nodes showing raw NN values.
+   * Uses raw activations for coloring (pre-dead-zone) to show true NN output.
+   * @param rawActivations - Pre-dead-zone values (what NN computed)
+   * @param postDeadZoneActivations - Post-dead-zone values (what was applied to physics)
+   */
+  private drawOutputNodesWithLabels(
+    ctx: CanvasRenderingContext2D,
+    y: number,
+    xPositions: number[],
+    rawActivations: number[],
+    postDeadZoneActivations: number[],
+    nodeRadius: number,
+    labels: string[]
+  ): void {
+    const spacing = xPositions.length > 1 ? xPositions[1] - xPositions[0] : 50;
+    const fontSize = Math.min(9, Math.max(6, spacing * 0.4));
+
+    for (let i = 0; i < xPositions.length; i++) {
+      const x = xPositions[i];
+      const rawValue = rawActivations[i] || 0;
+      const postDeadZoneValue = postDeadZoneActivations[i] || 0;
+      const label = labels[i] || `${i}`;
+
+      // Draw the node - gray if dead zone zeroed it, otherwise show raw color
+      const wasZeroedByDeadZone = Math.abs(rawValue) > 0.001 && Math.abs(postDeadZoneValue) < 0.001;
+      this.drawOutputNode(ctx, x, y, rawValue, nodeRadius, wasZeroedByDeadZone);
+
+      // Draw combined "label value" on one line - show RAW value
+      ctx.save();
+      ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, monospace`;
+
+      const shortLabel = label.length > 6 ? label.slice(0, 6) : label;
+      const absValue = Math.abs(rawValue).toFixed(2);
+      const sign = rawValue < 0 ? '-' : ' ';
+      const valueStr = sign + absValue;
+
+      const textY = y + nodeRadius + 3 + fontSize;
+      ctx.textBaseline = 'top';
+
+      const labelWidth = ctx.measureText(shortLabel + ' ').width;
+      const totalWidth = ctx.measureText(shortLabel + ' ' + valueStr).width;
+      const startX = x - totalWidth / 2;
+
+      // Label part (gray)
+      ctx.fillStyle = '#aaa';
+      ctx.textAlign = 'left';
+      ctx.fillText(shortLabel + ' ', startX, textY);
+
+      // Value part - gray if in dead zone, otherwise colored by sign
+      if (wasZeroedByDeadZone) {
+        ctx.fillStyle = '#666';
+      } else {
+        ctx.fillStyle = rawValue > 0 ? '#6ee7b7' : rawValue < 0 ? '#fca5a5' : '#666';
+      }
+      ctx.fillText(valueStr, startX + labelWidth, textY);
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Draw a single output node showing raw NN activation.
+   * Colors based on raw value (pre-dead-zone) to show true NN output.
+   * If inDeadZone is true, shows gray to indicate the output was suppressed.
+   */
+  private drawOutputNode(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    rawActivation: number,
+    nodeRadius: number,
+    inDeadZone: boolean = false
+  ): void {
+    const magnitude = Math.abs(rawActivation);
+    // Normalize magnitude (values are in [-1, 1] range typically)
+    const normalizedMag = Math.min(magnitude, 1);
+
+    let hue: number;
+    let saturation: number;
+    let lightness: number;
+
+    if (inDeadZone) {
+      // Dead zone suppressed this output - show muted gray
+      hue = 0;
+      saturation = 0;
+      lightness = 35;
+    } else if (magnitude < 0.01) {
+      // Near zero - neutral gray
+      hue = 0;
+      saturation = 0;
+      lightness = 40;
+    } else if (rawActivation > 0) {
+      // Positive - green
+      hue = 140;
+      saturation = 50 + normalizedMag * 40;
+      lightness = 35 + normalizedMag * 25;
+    } else {
+      // Negative - red
+      hue = 15;
+      saturation = 50 + normalizedMag * 40;
+      lightness = 35 + normalizedMag * 25;
+    }
+
+    // Draw node with slight glow for strongly active nodes
+    if (magnitude > 0.3) {
+      ctx.beginPath();
+      ctx.arc(x, y, nodeRadius + 2, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
+      ctx.fill();
+    }
+
+    // Main node
+    ctx.beginPath();
+    ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    ctx.fill();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  private drawSingleNode(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    activation: number,
+    nodeRadius: number
+  ): void {
+    // Node fill color based on activation sign and magnitude
+    const magnitude = Math.abs(activation);
+    let hue: number;
+    let saturation: number;
+    let lightness: number;
+
+    if (magnitude < 0.05) {
+      // Near zero - neutral gray
+      hue = 0;
+      saturation = 0;
+      lightness = 40;
+    } else if (activation > 0) {
+      // Positive - green to cyan
+      hue = 140;
+      saturation = 60 + magnitude * 30;
+      lightness = 35 + magnitude * 25;
+    } else {
+      // Negative - red to orange
+      hue = 15;
+      saturation = 60 + magnitude * 30;
+      lightness = 35 + magnitude * 25;
+    }
+
+    // Draw node with slight glow for active nodes
+    if (magnitude > 0.3) {
+      ctx.beginPath();
+      ctx.arc(x, y, nodeRadius + 2, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
+      ctx.fill();
+    }
+
+    // Main node
+    ctx.beginPath();
+    ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    ctx.fill();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
   }
 
   /**
    * Generate input labels based on time encoding and proprioception config.
    * Uses descriptive names like "M1_strain" for muscle 1 strain.
    */
-  private getInputLabels(): string[] {
+  getInputLabels(): string[] {
     // Base sensor names (always present)
     const baseNames = ['dir_x', 'dir_y', 'dir_z', 'vel_x', 'vel_y', 'vel_z', 'dist'];
     let labels = [...baseNames];
@@ -542,7 +805,6 @@ export class NeuralVisualizer {
       // Strain inputs (1 per muscle) - how stretched/compressed each muscle is
       if (inputs === 'strain' || inputs === 'all') {
         for (let i = 0; i < numMuscles; i++) {
-          // Use muscle name if available, otherwise M1, M2, etc.
           const muscleName = this.muscleNames[i] || `M${i + 1}`;
           labels.push(`${muscleName}_str`);
         }
@@ -576,61 +838,6 @@ export class NeuralVisualizer {
     }
 
     return labels;
-  }
-
-  private drawLabels(
-    ctx: CanvasRenderingContext2D,
-    layerX: number[],
-    inputY: number[],
-    outputY: number[],
-    outputs: number[]
-  ): void {
-    // Use pixel-aligned coordinates for crisp text
-    const pixelAlign = (n: number) => Math.round(n) + 0.5;
-
-    // Crisp font rendering
-    ctx.textBaseline = 'middle';
-    ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillStyle = '#888';
-
-    // Input labels (abbreviated sensor names) - based on time encoding and proprioception
-    const shortNames = this.getInputLabels();
-    ctx.textAlign = 'right';
-    for (let i = 0; i < inputY.length && i < shortNames.length; i++) {
-      ctx.fillText(shortNames[i], pixelAlign(layerX[0] - 10), pixelAlign(inputY[i]));
-    }
-
-    // Output labels: muscle ID and activation value with color coding
-    ctx.textAlign = 'left';
-    ctx.font = '9px ui-monospace, monospace';
-    for (let i = 0; i < outputY.length; i++) {
-      const muscleId = this.muscleNames[i] || `M${i}`;
-      const activation = outputs[i] || 0;
-
-      // Muscle ID
-      ctx.fillStyle = '#999';
-      ctx.fillText(muscleId, pixelAlign(layerX[2] + 10), pixelAlign(outputY[i]));
-
-      // Activation value - color coded
-      const actMag = Math.abs(activation);
-      if (actMag < 0.1) {
-        ctx.fillStyle = '#555';
-      } else if (activation > 0) {
-        ctx.fillStyle = `hsl(140, 60%, ${45 + actMag * 20}%)`;
-      } else {
-        ctx.fillStyle = `hsl(15, 60%, ${45 + actMag * 20}%)`;
-      }
-      ctx.fillText(activation.toFixed(2), pixelAlign(layerX[2] + 32), pixelAlign(outputY[i]));
-    }
-
-    // Layer titles
-    ctx.fillStyle = '#aaa';
-    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Input', pixelAlign(layerX[0]), 4);
-    ctx.fillText('Hidden', pixelAlign(layerX[1]), 4);
-    ctx.fillText('Output', pixelAlign(layerX[2]), 4);
   }
 
   /**

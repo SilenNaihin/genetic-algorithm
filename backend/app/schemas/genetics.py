@@ -107,6 +107,10 @@ class GeneratePopulationRequest(BaseModel):
     use_neural_net: bool = True
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
     neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
+    neural_mode: Literal['pure', 'hybrid'] = 'hybrid'
+    time_encoding: Literal['none', 'sin', 'raw', 'cyclic', 'sin_raw'] = 'cyclic'
+    use_proprioception: bool = False
+    proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'
 
 
 class GeneratePopulationResponse(BaseModel):

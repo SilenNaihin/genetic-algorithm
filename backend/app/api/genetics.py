@@ -60,6 +60,10 @@ def generate_initial_population(request: GeneratePopulationRequest):
         use_neural_net=request.use_neural_net,
         neural_hidden_size=request.neural_hidden_size,
         neural_output_bias=request.neural_output_bias,
+        neural_mode=request.neural_mode,
+        time_encoding=request.time_encoding,
+        use_proprioception=request.use_proprioception,
+        proprioception_inputs=request.proprioception_inputs,
     )
 
     return GeneratePopulationResponse(

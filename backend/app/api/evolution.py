@@ -126,6 +126,8 @@ async def run_generation(
             neural_output_bias=config.neural_output_bias,
             neural_mode=config.neural_mode,
             time_encoding=config.time_encoding,
+            use_proprioception=config.use_proprioception,
+            proprioception_inputs=config.proprioception_inputs,
         )
     else:
         # Get previous generation performances (sorted by fitness)
@@ -258,6 +260,9 @@ async def run_generation(
             "use_neural_net": config.use_neural_net,
             "neural_mode": config.neural_mode,
             "neural_hidden_size": config.neural_hidden_size,
+            "time_encoding": config.time_encoding,
+            "use_proprioception": config.use_proprioception,
+            "proprioception_inputs": config.proprioception_inputs,
         },
     )
     simulation_time_ms = int((time.time() - start_time) * 1000)

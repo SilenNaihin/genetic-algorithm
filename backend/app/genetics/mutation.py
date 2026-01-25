@@ -559,10 +559,21 @@ def mutate_genome(
     # Mutate neural genome if present
     neural_genome = genome.get('neuralGenome') or genome.get('neural_genome')
     if neural_genome:
-        new_genome['neuralGenome'] = mutate_neural_genome(
+        mutated_neural = mutate_neural_genome(
             neural_genome,
             config.neural_rate,
             config.neural_magnitude
         )
+
+        # Adapt neural topology if muscle count changed due to structural mutations
+        # Import here to avoid circular dependency (crossover imports from mutation)
+        from app.genetics.crossover import adapt_neural_topology, get_output_size
+
+        new_muscle_count = len(new_genome['muscles'])
+        current_output_size = get_output_size(mutated_neural)
+        if current_output_size != new_muscle_count:
+            mutated_neural = adapt_neural_topology(mutated_neural, new_muscle_count)
+
+        new_genome['neuralGenome'] = mutated_neural
 
     return new_genome

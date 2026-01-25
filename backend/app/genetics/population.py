@@ -175,6 +175,8 @@ def generate_random_genome(
     neural_output_bias: float = 0.0,
     neural_mode: str = 'hybrid',
     time_encoding: str = 'cyclic',
+    use_proprioception: bool = False,
+    proprioception_inputs: str = 'all',
 ) -> dict:
     """
     Generate a random creature genome.
@@ -186,6 +188,8 @@ def generate_random_genome(
         neural_output_bias: Initial bias for output neurons
         neural_mode: Neural network mode ('pure' or 'hybrid')
         time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
+        use_proprioception: Whether to include proprioception inputs
+        proprioception_inputs: Which proprioception inputs to use ('strain', 'velocity', 'ground', 'all')
 
     Returns:
         Random genome dict
@@ -273,8 +277,10 @@ def generate_random_genome(
     controller_type = 'oscillator'
 
     if use_neural_net and len(muscles) > 0:
-        # Calculate input size based on mode and time encoding
-        input_size = get_input_size(neural_mode, time_encoding)
+        # Calculate input size based on mode, time encoding, and proprioception
+        input_size = get_input_size(
+            neural_mode, time_encoding, use_proprioception, proprioception_inputs
+        )
         neural_genome = initialize_neural_genome(
             num_muscles=len(muscles),
             hidden_size=neural_hidden_size,
@@ -345,6 +351,8 @@ def generate_population(
     neural_output_bias: float = 0.0,
     neural_mode: str = 'hybrid',
     time_encoding: str = 'cyclic',
+    use_proprioception: bool = False,
+    proprioception_inputs: str = 'all',
 ) -> list[dict]:
     """
     Generate an initial population of random genomes.
@@ -357,6 +365,8 @@ def generate_population(
         neural_output_bias: Initial output bias
         neural_mode: Neural network mode ('pure' or 'hybrid')
         time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
+        use_proprioception: Whether to include proprioception inputs
+        proprioception_inputs: Which proprioception inputs to use ('strain', 'velocity', 'ground', 'all')
 
     Returns:
         List of genome dicts
@@ -369,6 +379,8 @@ def generate_population(
             neural_output_bias=neural_output_bias,
             neural_mode=neural_mode,
             time_encoding=time_encoding,
+            use_proprioception=use_proprioception,
+            proprioception_inputs=proprioception_inputs,
         )
         for _ in range(size)
     ]
