@@ -54,6 +54,21 @@ damping_factor = (1 - LINEAR_DAMPING) ^ dt  # Time-scaled
 velocity *= damping_factor
 ```
 
+### Muscle Oscillation Limits
+
+Muscle rest lengths are clamped to prevent "spazzy" behavior with small muscles:
+
+```python
+# Oscillation formula
+new_rest_length = base_rest_length * (1 - oscillation * amplitude)
+
+# Clamped to 50%-150% of base to prevent wild swinging
+min_length = max(base_rest_length * 0.5, 0.1)
+max_length = base_rest_length * 1.5
+```
+
+**Why this matters:** Without clamping, a small muscle (0.2 units) with high amplitude (0.5) could oscillate from 0.1 to 0.4 units—a 300% range that causes wild swinging. The clamp limits all muscles to ±50% of their rest length.
+
 ## Tensor Batching
 
 The PyTorch backend processes creatures in parallel using batched tensor operations:
@@ -193,3 +208,73 @@ With M=15 muscles, hidden=8: ~200 parameters per creature.
 | `POST /api/genetics/generate` | Generate random population |
 
 All endpoints accept the full `SimulationConfig` including `time_step` for custom FPS.
+
+## Remote GPU Backend
+
+For large-scale simulations, the backend can proxy simulation requests to a remote GPU server.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────┐
+│            Your Machine                 │
+│                                         │
+│  Next.js :3001 ──► FastAPI :8000        │
+│                    │                    │
+│                    │ GPU_BACKEND_URL    │
+│                    ▼                    │
+└────────────────────┼────────────────────┘
+                     │ (SSH tunnel)
+                     ▼
+        ┌────────────────────────┐
+        │   GPU VM (T4/A100)     │
+        │   FastAPI :8000        │
+        │   PyTorch + CUDA       │
+        └────────────────────────┘
+```
+
+### Setup
+
+**1. On the GPU VM:**
+```bash
+# Clone repo and install
+git clone <repo>
+cd genetic-algorithm/backend
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+pip install -e .
+
+# Start backend
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+**2. SSH tunnel from your machine:**
+```bash
+ssh -L 9000:localhost:8000 user@gpu-vm-ip
+```
+
+**3. Local backend with GPU proxy:**
+```bash
+export GPU_BACKEND_URL="http://localhost:9000"
+cd backend && uvicorn app.main:app --port 8000
+```
+
+**4. Verify connection:**
+```bash
+# Local health check shows proxy mode
+curl http://localhost:8000/api/health
+# {"status":"healthy","device":"cpu","gpu_backend_url":"http://localhost:9000","mode":"proxy"}
+
+# GPU backend health check shows CUDA
+curl http://localhost:9000/api/health
+# {"status":"healthy","device":"cuda","gpu_backend_url":null,"mode":"local"}
+```
+
+### Expected Speedups
+
+| Batch Size | CPU (M1) | T4 GPU | A100 GPU |
+|------------|----------|--------|----------|
+| 100        | 1×       | 3-5×   | 5-10×    |
+| 1,000      | 1×       | 10-20× | 30-50×   |
+| 10,000     | 1×       | 20-30× | 50-100×  |
+
+The T4 has 16GB VRAM, sufficient for batch sizes up to ~5,000 creatures.

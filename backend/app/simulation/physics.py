@@ -221,9 +221,13 @@ def compute_oscillating_rest_lengths(
     contraction = oscillation * amplitude
 
     # New rest length with clamping for stability
-    # Minimum rest length = 0.1 (matching TypeScript)
+    # Clamp to prevent extreme extension/contraction that causes spazzy behavior
+    # Min: 0.1 or 50% of base (whichever is larger) - prevents over-contraction
+    # Max: 150% of base - prevents over-extension that causes wild swinging
     new_rest_length = base_rest_length * (1.0 - contraction)
-    new_rest_length = torch.clamp(new_rest_length, min=0.1)
+    min_length = torch.maximum(base_rest_length * 0.5, torch.tensor(0.1, device=base_rest_length.device))
+    max_length = base_rest_length * 1.5
+    new_rest_length = torch.clamp(new_rest_length, min=min_length, max=max_length)
 
     return new_rest_length
 
@@ -1351,6 +1355,8 @@ def simulate_with_fitness_neural(
     frame_interval: int = 1,
     arena_size: float = 50.0,
     nn_update_interval: int = 4,
+    time_encoding: str = 'cyclic',
+    max_time: float = 20.0,
 ) -> dict:
     """
     Run neural simulation with proper pellet collection tracking.
@@ -1379,6 +1385,8 @@ def simulate_with_fitness_neural(
         frame_interval: Record every N frames (if recording)
         arena_size: Arena size for pellet spawning bounds
         nn_update_interval: Update NN outputs every N physics steps (reduces jitter)
+        time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
+        max_time: Maximum simulation time for 'raw' encoding normalization
 
     Returns:
         Dict with:
@@ -1443,19 +1451,25 @@ def simulate_with_fitness_neural(
     # Cache for NN outputs (updated every nn_update_interval steps)
     nn_outputs = None
 
+    # Store full activations data (inputs, hidden, outputs) for visualization
+    current_full_activations = None
+
     for step in range(num_steps):
         # 1. Update NN outputs only every nn_update_interval steps (reduces jitter)
         if step % nn_update_interval == 0 or nn_outputs is None:
             # Gather sensor inputs (uses current pellet positions)
             sensor_inputs = gather_sensor_inputs(
-                batch, pellets.positions, previous_com, time, mode=mode
+                batch, pellets.positions, previous_com, time, mode=mode,
+                time_encoding=time_encoding, max_time=max_time
             )
 
-            # Forward pass through NN
+            # Forward pass through NN - get full activations for visualization
             if mode == 'pure':
-                nn_outputs = neural_network.forward_with_dead_zone(sensor_inputs, dead_zone)
+                current_full_activations = neural_network.forward_full_with_dead_zone(sensor_inputs, dead_zone)
+                nn_outputs = current_full_activations['outputs']
             else:
-                nn_outputs = neural_network.forward(sensor_inputs)
+                current_full_activations = neural_network.forward_full(sensor_inputs)
+                nn_outputs = current_full_activations['outputs']
 
         # 2. Physics step with neural control (uses cached nn_outputs)
         current_com, step_activation = physics_step_neural(
@@ -1530,8 +1544,14 @@ def simulate_with_fitness_neural(
             )
             fitness_per_frame.append(current_fitness.clone())
 
-            # Record neural network outputs for this frame
-            activations_per_frame.append(nn_outputs.clone())
+            # Record full neural network activations for this frame
+            # Store as dict: {inputs, hidden, outputs} per creature
+            if current_full_activations is not None:
+                activations_per_frame.append({
+                    'inputs': current_full_activations['inputs'].clone(),
+                    'hidden': current_full_activations['hidden'].clone(),
+                    'outputs': current_full_activations['outputs'].clone(),
+                })
 
             frame_index += 1
 
@@ -1569,6 +1589,12 @@ def simulate_with_fitness_neural(
         if fitness_per_frame:
             result['fitness_per_frame'] = torch.stack(fitness_per_frame, dim=1)  # [B, F]
         if activations_per_frame:
-            result['activations_per_frame'] = torch.stack(activations_per_frame, dim=1)  # [B, F, M]
+            # Stack full activations: each item is {inputs, hidden, outputs} with [B, ...] tensors
+            # Result: {inputs: [B, F, I], hidden: [B, F, H], outputs: [B, F, O]}
+            result['activations_per_frame'] = {
+                'inputs': torch.stack([a['inputs'] for a in activations_per_frame], dim=1),
+                'hidden': torch.stack([a['hidden'] for a in activations_per_frame], dim=1),
+                'outputs': torch.stack([a['outputs'] for a in activations_per_frame], dim=1),
+            }
 
     return result
