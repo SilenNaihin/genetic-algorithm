@@ -171,18 +171,41 @@ When CUDA is available:
 Each physics step with neural control:
 1. **Sensor gathering**: [B, 7-8] inputs from world state
 2. **Forward pass**: input → hidden → output with activations
-3. **Muscle control**: [B, M] outputs modulate muscle rest lengths
+3. **Output smoothing**: EMA applied to outputs
+4. **Muscle control**: [B, M] outputs modulate muscle rest lengths
 
-### NN Update Interval
+### Neural Timing Configuration
 
-Neural network outputs are cached and reused for multiple physics steps to reduce jitter:
+The neural network doesn't recompute every physics step. Two parameters control this:
 
+**`neuralUpdateHz`** (default: 15 Hz) - How often the NN recomputes outputs:
 ```python
-nn_update_interval = 4  # Default: update every 4 physics steps
-# At 60 FPS physics: 15 NN updates/sec instead of 60
+nn_update_interval = physics_fps / neural_update_hz
+# At 60 FPS physics, 15 Hz neural: update every 4 steps
+# At 30 FPS physics, 15 Hz neural: update every 2 steps
 ```
 
-This smooths muscle activation without sacrificing responsiveness. The sensor inputs still change every physics step, but the NN only recomputes outputs periodically.
+**`outputSmoothingAlpha`** (default: 0.3) - Exponential smoothing on outputs:
+```python
+smoothed = alpha * raw + (1 - alpha) * smoothed
+# alpha=1.0: no smoothing (instant)
+# alpha=0.3: moderate smoothing (30% new, 70% old)
+# alpha=0.1: heavy smoothing (slow transitions)
+```
+
+### Why These Parameters?
+
+The original hardcoded `nn_update_interval = 4` was replaced with configurable `neuralUpdateHz` because:
+1. **Physics FPS varies**: At 30 FPS, interval=4 means 7.5 updates/sec; at 120 FPS, it's 30/sec
+2. **Desired: consistent update rate** regardless of physics FPS
+3. **Solution**: Specify update rate in Hz, compute interval dynamically
+
+Output smoothing was added because:
+1. **Step-and-hold creates discontinuities**: Output jumps every N steps
+2. **Exponential smoothing**: Creates smooth transitions between updates
+3. **Together**: NN computes at 15 Hz, outputs blend smoothly between updates
+
+See [PHYSICS.md](docs/PHYSICS.md) for detailed documentation on these constraints.
 
 Neural network sizes:
 | Mode | Inputs | Hidden | Outputs | Parameters |

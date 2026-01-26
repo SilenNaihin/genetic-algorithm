@@ -2,10 +2,11 @@
 
 import { CollapsibleAccordion } from '../common/CollapsibleAccordion';
 import { PhysicsConfigPanel } from './PhysicsConfigPanel';
+import { EvolutionPanel } from './EvolutionPanel';
 import { FitnessPanelContent } from './FitnessPanel';
 
 /**
- * Right-side panel containing Physics Config and Fitness Function in an accordion.
+ * Right-side panel containing Physics, Evolution, and Fitness in an accordion.
  * Only one section can be open at a time.
  */
 export function ConfigAccordion() {
@@ -14,6 +15,11 @@ export function ConfigAccordion() {
       id: 'physics',
       title: 'Physics Config',
       content: <PhysicsConfigPanel />,
+    },
+    {
+      id: 'evolution',
+      title: 'Evolution',
+      content: <EvolutionPanel />,
     },
     {
       id: 'fitness',
@@ -35,7 +41,7 @@ export function ConfigAccordion() {
         overflowY: 'auto',
       }}
     >
-      <CollapsibleAccordion sections={sections} defaultOpen="physics" />
+      <CollapsibleAccordion sections={sections} defaultOpen="evolution" />
     </div>
   );
 }

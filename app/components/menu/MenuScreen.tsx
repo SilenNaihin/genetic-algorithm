@@ -9,8 +9,7 @@ import { PreviewCanvas } from './PreviewCanvas';
 import { ConfigAccordion } from './ConfigAccordion';
 import { NeuralPanel } from './NeuralPanel';
 import { LoadRunsModal } from '../modals/LoadRunsModal';
-import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
-import { SettingsPopover } from '../ui/SettingsPopover';
+import { TOOLTIPS } from '../ui/InfoTooltip';
 
 /**
  * Main menu screen component.
@@ -88,324 +87,32 @@ export function MenuScreen() {
           />
         </div>
 
-        {/* Evolution settings row */}
+        {/* Replay Storage */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '24px',
+          gap: '8px',
           marginBottom: '20px',
-          padding: '16px',
-          background: 'var(--bg-tertiary)',
-          borderRadius: '8px',
         }}>
-          {/* Selection method */}
-          <div className="param-group" style={{ width: '120px' }}>
-            <div className="param-label">
-              <span className="param-name">
-                Selection
-                <InfoTooltip
-                  text={
-                    config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
-                    config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
-                    TOOLTIPS.selectionRank
-                  }
-                  width={280}
-                />
-              </span>
-            </div>
-            <select
-              value={config.selectionMethod}
-              onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
-              style={{
-                width: '100%',
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                color: 'var(--text-primary)',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="rank">Rank</option>
-              <option value="tournament">Tournament</option>
-              <option value="truncation">Truncation</option>
-            </select>
-          </div>
-
-          {/* Tournament size - only shown when tournament selected */}
-          {config.selectionMethod === 'tournament' && (
-            <ParamSlider
-              name="Size"
-              value={config.tournamentSize}
-              displayValue={String(config.tournamentSize)}
-              min={2}
-              max={10}
-              step={1}
-              tooltip={TOOLTIPS.tournamentSize}
-              onChange={(v) => setConfig({ tournamentSize: v })}
-              width="100px"
-            />
-          )}
-
-          {/* Evolution mode - Mutation/Crossover stack */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={config.useMutation}
-                  onChange={(e) => {
-                    if (!e.target.checked && !config.useCrossover) return;
-                    setConfig({ useMutation: e.target.checked });
-                  }}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-                />
-                Mutation
-              </label>
-              {/* Mutation settings gear */}
-              <SettingsPopover width={200}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                      Cull %
-                      <InfoTooltip text={TOOLTIPS.cullPercentage} />
-                    </div>
-                    <input
-                      type="range"
-                      min={10}
-                      max={90}
-                      value={config.cullPercentage * 100}
-                      onChange={(e) => setConfig({ cullPercentage: parseInt(e.target.value) / 100 })}
-                      style={{ width: '100%', accentColor: 'var(--accent)' }}
-                    />
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      {Math.round(config.cullPercentage * 100)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                      Mutation Rate
-                      <InfoTooltip text={TOOLTIPS.mutationRate} />
-                    </div>
-                    <input
-                      type="range"
-                      min={5}
-                      max={80}
-                      value={config.mutationRate * 100}
-                      onChange={(e) => setConfig({ mutationRate: parseInt(e.target.value) / 100 })}
-                      style={{ width: '100%', accentColor: 'var(--accent)' }}
-                    />
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      {Math.round(config.mutationRate * 100)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                      Mutation Magnitude
-                      <InfoTooltip text={TOOLTIPS.mutationMagnitude} />
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={1.0}
-                      step={0.1}
-                      value={config.mutationMagnitude}
-                      onChange={(e) => setConfig({ mutationMagnitude: parseFloat(e.target.value) })}
-                      style={{ width: '100%', accentColor: 'var(--accent)' }}
-                    />
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      {config.mutationMagnitude.toFixed(1)}
-                    </div>
-                  </div>
-                </div>
-              </SettingsPopover>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={config.useCrossover}
-                  onChange={(e) => {
-                    if (!e.target.checked && !config.useMutation) return;
-                    setConfig({ useCrossover: e.target.checked });
-                  }}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-                />
-                Crossover
-              </label>
-              {/* Crossover settings gear - only shown when crossover enabled */}
-              {config.useCrossover && config.useNeuralNet && (
-                <SettingsPopover width={200}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                        Method
-                        <InfoTooltip text={
-                          config.neuralCrossoverMethod === 'sbx' ? TOOLTIPS.crossoverSbx :
-                          config.neuralCrossoverMethod === 'uniform' ? TOOLTIPS.crossoverUniform :
-                          TOOLTIPS.crossoverInterpolation
-                        } />
-                      </div>
-                      <select
-                        value={config.neuralCrossoverMethod}
-                        onChange={(e) => setConfig({ neuralCrossoverMethod: e.target.value as 'interpolation' | 'uniform' | 'sbx' })}
-                        style={{
-                          width: '100%',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '4px',
-                          padding: '6px 8px',
-                          color: 'var(--text-primary)',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <option value="sbx">SBX</option>
-                        <option value="interpolation">Interpolation</option>
-                        <option value="uniform">Uniform</option>
-                      </select>
-                    </div>
-                    {config.neuralCrossoverMethod === 'sbx' && (
-                      <div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                          Eta (η)
-                          <InfoTooltip text={TOOLTIPS.sbxEta} />
-                        </div>
-                        <input
-                          type="range"
-                          min={0.5}
-                          max={5}
-                          step={0.5}
-                          value={config.sbxEta}
-                          onChange={(e) => setConfig({ sbxEta: parseFloat(e.target.value) })}
-                          style={{ width: '100%', accentColor: 'var(--accent)' }}
-                        />
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                          {config.sbxEta} {config.sbxEta <= 1 ? '(exploratory)' : config.sbxEta >= 4 ? '(conservative)' : '(balanced)'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </SettingsPopover>
-              )}
-            </div>
-          </div>
-
-          {/* Crossover ratio slider - only shown when both mutation and crossover enabled */}
-          {config.useMutation && config.useCrossover && (
-            <ParamSlider
-              name="Cross/Mut Ratio"
-              value={config.crossoverRate * 100}
-              displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
-              min={0}
-              max={100}
-              tooltip={TOOLTIPS.crossoverRate}
-              onChange={(v) => setConfig({ crossoverRate: v / 100 })}
-              width="160px"
-            />
-          )}
-
-          {/* Diversity stack - Sharing/Speciation */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={config.useFitnessSharing}
-                  onChange={(e) => setConfig({ useFitnessSharing: e.target.checked })}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-                />
-                Sharing
-                <InfoTooltip text={TOOLTIPS.fitnessSharing} width={280} />
-              </label>
-              {/* Sharing settings gear - only shown when sharing enabled */}
-              {config.useFitnessSharing && (
-                <SettingsPopover width={200}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                        Sharing Radius
-                        <InfoTooltip text={TOOLTIPS.sharingRadius} />
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={2.0}
-                        step={0.1}
-                        value={config.sharingRadius}
-                        onChange={(e) => setConfig({ sharingRadius: parseFloat(e.target.value) })}
-                        style={{ width: '100%', accentColor: 'var(--accent)' }}
-                      />
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                        {config.sharingRadius.toFixed(1)} {config.sharingRadius <= 0.3 ? '(narrow)' : config.sharingRadius >= 1.0 ? '(wide)' : '(balanced)'}
-                      </div>
-                    </div>
-                  </div>
-                </SettingsPopover>
-              )}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={config.useSpeciation}
-                  onChange={(e) => setConfig({ useSpeciation: e.target.checked })}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-                />
-                Speciation
-                <InfoTooltip text={TOOLTIPS.speciation} width={280} />
-              </label>
-              {/* Speciation settings gear - only shown when speciation enabled */}
-              {config.useSpeciation && (
-                <SettingsPopover width={200}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                        Compatibility Threshold
-                        <InfoTooltip text={TOOLTIPS.compatibilityThreshold} />
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={3.0}
-                        step={0.1}
-                        value={config.compatibilityThreshold}
-                        onChange={(e) => setConfig({ compatibilityThreshold: parseFloat(e.target.value) })}
-                        style={{ width: '100%', accentColor: 'var(--accent)' }}
-                      />
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                        {config.compatibilityThreshold.toFixed(1)} {config.compatibilityThreshold <= 0.5 ? '(many species)' : config.compatibilityThreshold >= 2.0 ? '(few species)' : '(balanced)'}
-                      </div>
-                    </div>
-                  </div>
-                </SettingsPopover>
-              )}
-            </div>
-          </div>
-
-          {/* Replay Storage */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Replay:</span>
-            <select
-              value={config.frameStorageMode}
-              onChange={(e) => setConfig({ frameStorageMode: e.target.value as 'none' | 'sparse' | 'all' })}
-              style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                color: 'var(--text-primary)',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">All</option>
-              <option value="sparse">Sparse</option>
-              <option value="none">None</option>
-            </select>
-          </div>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Replay Storage:</span>
+          <select
+            value={config.frameStorageMode}
+            onChange={(e) => setConfig({ frameStorageMode: e.target.value as 'none' | 'sparse' | 'all' })}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              color: 'var(--text-primary)',
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="all">All Creatures</option>
+            <option value="sparse">Top/Bottom Only</option>
+            <option value="none">Disabled</option>
+          </select>
         </div>
 
         {/* Action buttons */}
