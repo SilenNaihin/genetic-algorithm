@@ -1174,13 +1174,40 @@ def compute_neural_rest_lengths(
     # Compute rest lengths
     rest_lengths = base_rest_lengths * (1 - contraction)
 
-    # Clamp rest lengths (same as TypeScript: always positive)
+    # Clamp rest lengths to max extension ratio
+    # ratio=2.0 means muscles can be 50%-200% of base rest length
+    # This is applied AFTER velocity cap (in physics_step_neural)
+    # Here we just clamp to min=0.01 for safety
     rest_lengths = torch.clamp(rest_lengths, min=0.01)
 
     # Mask invalid muscles
     rest_lengths = rest_lengths * mask + base_rest_lengths * (1 - mask)
 
     return rest_lengths
+
+
+@torch.no_grad()
+def apply_extension_limit(
+    rest_lengths: torch.Tensor,
+    base_rest_lengths: torch.Tensor,
+    max_extension_ratio: float,
+) -> torch.Tensor:
+    """
+    Clamp muscle rest lengths to max extension ratio.
+
+    Args:
+        rest_lengths: [B, M] current rest lengths
+        base_rest_lengths: [B, M] original rest lengths
+        max_extension_ratio: Max stretch ratio (e.g., 2.0 = 50%-200%)
+
+    Returns:
+        [B, M] clamped rest lengths
+    """
+    min_length = base_rest_lengths / max_extension_ratio
+    max_length = base_rest_lengths * max_extension_ratio
+    # Ensure min is at least 0.01 for physics safety
+    min_length = torch.clamp(min_length, min=0.01)
+    return torch.clamp(rest_lengths, min=min_length, max=max_length)
 
 
 @torch.no_grad()
@@ -1248,6 +1275,7 @@ def physics_step_neural(
     gravity: float = GRAVITY,
     prev_rest_lengths: torch.Tensor | None = None,
     velocity_cap: float | None = None,
+    max_extension_ratio: float | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Perform a physics step with neural network control.
@@ -1262,6 +1290,7 @@ def physics_step_neural(
         gravity: Gravity acceleration
         prev_rest_lengths: [B, M] rest lengths from previous step (for velocity capping)
         velocity_cap: Max muscle length change per second (None = no limit)
+        max_extension_ratio: Max muscle stretch ratio (None = no limit)
 
     Returns:
         Tuple of:
@@ -1280,6 +1309,12 @@ def physics_step_neural(
     if velocity_cap is not None and prev_rest_lengths is not None:
         new_rest_lengths = apply_velocity_cap(
             new_rest_lengths, prev_rest_lengths, velocity_cap, dt
+        )
+
+    # Apply max extension limit if enabled
+    if max_extension_ratio is not None:
+        new_rest_lengths = apply_extension_limit(
+            new_rest_lengths, base_rest_lengths, max_extension_ratio
         )
 
     batch.spring_rest_length = new_rest_lengths
@@ -1432,6 +1467,7 @@ def simulate_with_fitness_neural(
     proprioception_inputs: str = 'all',
     velocity_cap: float | None = None,
     output_smoothing_alpha: float = 1.0,
+    max_extension_ratio: float | None = None,
 ) -> dict:
     """
     Run neural simulation with proper pellet collection tracking.
@@ -1590,7 +1626,8 @@ def simulate_with_fitness_neural(
         # 2. Physics step with neural control (uses cached/smoothed nn_outputs)
         current_com, step_activation = physics_step_neural(
             batch, base_rest_lengths, nn_outputs, time, mode, dt, gravity,
-            prev_rest_lengths=prev_rest_lengths, velocity_cap=velocity_cap
+            prev_rest_lengths=prev_rest_lengths, velocity_cap=velocity_cap,
+            max_extension_ratio=max_extension_ratio
         )
 
         # Update prev_rest_lengths for next step's velocity capping

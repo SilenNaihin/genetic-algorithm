@@ -5,6 +5,27 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Added
+- **Muscle Velocity Cap**: Physics-level constraint on muscle speed (v2-prd Phase 1)
+  - Limits how fast muscles can change length per timestep
+  - Default 5.0 units/sec, configurable 0.1-20.0
+  - Formula: `max_delta_per_step = velocity_cap * dt`
+  - Prevents physically impossible muscle speeds regardless of neural output
+- **Output Smoothing**: Exponential smoothing on neural outputs (v2-prd Phase 2)
+  - Smooths the TARGET muscles are trying to reach
+  - Default alpha=0.3 (30% new + 70% old), configurable 0.05-1.0
+  - Formula: `smoothed = alpha * raw + (1 - alpha) * smoothed`
+  - Alpha guide: 0.1=very smooth, 0.3=moderate, 0.5=light, 1.0=instant
+- **Configurable Neural Update Rate**: Replace hardcoded 4-step cache
+  - New `neuralUpdateHz` parameter (default 15, range 5-60)
+  - Dynamically calculates interval: `physics_fps / neural_update_hz`
+- **Muscle Damping Multiplier**: Global scale for muscle damping (v2-prd Phase 3)
+  - Scales per-muscle damping coefficients uniformly
+  - Default 1.0 (no change), configurable 0.1-5.0
+  - Higher values = more "underwater" feel, less oscillation
+- **Max Extension Ratio**: Configurable muscle stretch limits (v2-prd Phase 4)
+  - Limits how much muscles can stretch/compress relative to rest length
+  - Default 2.0 (muscles can be 50%-200% of rest length), configurable 1.2-5.0
+  - Prevents grotesque stretching, keeps creatures looking solid
 - **Proprioception Inputs**: Body-sensing inputs for neural networks (Phase 7)
   - Muscle strain: (currentLength - restLength) / restLength per muscle (15 inputs)
   - Node velocities: normalized xyz velocity per node (24 inputs)

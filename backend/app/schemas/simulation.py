@@ -28,6 +28,8 @@ class SimulationConfig(BaseModel):
 
     # Muscle constraints
     muscle_velocity_cap: float = Field(default=5.0, ge=0.1, le=20.0)  # Max muscle length change per second
+    muscle_damping_multiplier: float = Field(default=1.0, ge=0.1, le=5.0)  # Global damping scale (higher = more resistance)
+    max_extension_ratio: float = Field(default=2.0, ge=1.2, le=5.0)  # Max muscle stretch (2.0 = 50%-200% of rest length)
 
     # Evolution (not used in simulation, but included for parity)
     population_size: int = Field(default=100, ge=10, le=10000)

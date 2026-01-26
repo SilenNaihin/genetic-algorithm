@@ -1,0 +1,280 @@
+{
+  "name": "Physics & UI Overhaul v2",
+  "version": "1.0",
+  "goal": "Reduce spammy creature behavior through physics constraints and output smoothing, plus restructure UI for better organization",
+  "context": {
+    "problem": "Creatures with many inputs (56 for proprioception) produce chaotic high-frequency oscillations that accidentally work in early generations, creating a local optimum that's hard to escape",
+    "root_causes": [
+      "No physical limit on how fast muscles can change length",
+      "Neural outputs change instantly every N steps (step-and-hold)",
+      "8 hidden neurons can't meaningfully process 56 inputs, producing noise",
+      "Efficiency penalty alone isn't enough selection pressure"
+    ]
+  },
+  "phases": [
+    {
+      "id": 1,
+      "name": "Muscle Velocity Cap",
+      "status": "complete",
+      "description": "Add physics-level constraint on how fast muscles can change length",
+      "rationale": "Directly prevents physically impossible muscle speeds regardless of neural output",
+      "tasks": [
+        "Add `muscle_velocity_cap` to SimulationConfig (default: 5.0 units/sec)",
+        "Add to Python SimulationConfig schema with Field(default=5.0, ge=0.1, le=20.0)",
+        "Add to TypeScript SimulationConfig interface and DEFAULT_CONFIG",
+        "Implement in physics.py: clamp delta_length per timestep",
+        "Pass through API to backend",
+        "Add tests for velocity capping behavior"
+      ],
+      "implementation_notes": {
+        "formula": "max_delta_per_step = velocity_cap * dt",
+        "where_to_add": "backend/app/simulation/physics.py in muscle force calculation",
+        "consideration": "Apply AFTER neural output, BEFORE force calculation"
+      },
+      "files": [
+        "backend/app/simulation/physics.py",
+        "backend/app/simulation/config.py",
+        "backend/app/schemas/simulation.py",
+        "src/types/simulation.ts"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Output Smoothing (Exponential)",
+      "status": "complete",
+      "description": "Replace step-and-hold with exponential smoothing on neural outputs",
+      "rationale": "Smooths the TARGET muscles are trying to reach, preventing chaotic target-seeking",
+      "tasks": [
+        "Add `output_smoothing_alpha` to SimulationConfig (default: 0.3, range 0.05-1.0)",
+        "Add `neural_update_hz` to replace hardcoded 4-step cache (default: 15)",
+        "Implement exponential smoothing: smoothed = alpha * new + (1-alpha) * smoothed",
+        "Compute cache_steps dynamically: int(physics_fps / neural_update_hz)",
+        "Update neural panel UI to show neural_update_hz slider",
+        "Add tests"
+      ],
+      "implementation_notes": {
+        "formula": "smoothed_output[i] = alpha * raw_output[i] + (1 - alpha) * smoothed_output[i]",
+        "alpha_guide": {
+          "0.1": "Very smooth, slow to change",
+          "0.3": "Moderate smoothing (recommended default)",
+          "0.5": "Light smoothing",
+          "1.0": "No smoothing (instant, current behavior)"
+        },
+        "where_to_add": "backend/app/simulation/physics.py or neural output application"
+      },
+      "files": [
+        "backend/app/simulation/physics.py",
+        "backend/app/simulation/config.py",
+        "backend/app/schemas/simulation.py",
+        "src/types/simulation.ts",
+        "app/components/menu/NeuralPanel.tsx"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Expose Muscle Damping",
+      "status": "complete",
+      "description": "Make global muscle damping multiplier configurable",
+      "rationale": "Higher damping = more resistance to rapid changes, smoother physics",
+      "tasks": [
+        "Add `muscle_damping_multiplier` to SimulationConfig (default: 1.0, range 0.1-5.0)",
+        "Apply as multiplier to per-muscle damping in physics",
+        "Add to Physics Config panel in UI",
+        "Add tests"
+      ],
+      "implementation_notes": {
+        "existing": "Muscles already have per-muscle damping coefficients",
+        "new": "Global multiplier that scales all muscle damping uniformly",
+        "effect": "Higher values = more 'underwater' feel, less oscillation"
+      },
+      "files": [
+        "backend/app/simulation/physics.py",
+        "backend/app/simulation/config.py",
+        "backend/app/schemas/simulation.py",
+        "src/types/simulation.ts"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Expose Max Extension Ratio",
+      "status": "complete",
+      "description": "Make max muscle extension ratio configurable (already implemented, just expose)",
+      "rationale": "Prevents grotesque stretching, keeps creatures looking 'solid'",
+      "tasks": [
+        "Verify current max extension implementation",
+        "Add `max_extension_ratio` to SimulationConfig if not present (default: 2.0)",
+        "Add to Physics Config panel in UI",
+        "Document: 2.0 means muscles can be 50%-200% of rest length"
+      ],
+      "files": [
+        "backend/app/simulation/physics.py",
+        "backend/app/simulation/config.py",
+        "backend/app/schemas/simulation.py",
+        "src/types/simulation.ts"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "UI Restructure - Physics Config Panel",
+      "status": "pending",
+      "description": "Create new Physics Config panel with collapsible accordion behavior",
+      "tasks": [
+        "Create CollapsibleAccordion component",
+        "Create PhysicsConfigPanel component",
+        "Move existing params to Physics Config: gravity, sim duration, physics fps",
+        "Add new params: muscle damping, max extension, velocity cap, neural update hz",
+        "Handle max_frequency visibility (hide in pure mode since it's irrelevant)",
+        "Stack Physics Config and Fitness Function panels with accordion behavior"
+      ],
+      "ui_spec": {
+        "accordion_behavior": "When one panel opens, other auto-closes with animation",
+        "physics_config_contents": [
+          "Gravity [-9.8]",
+          "Sim Duration [10s]",
+          "Physics FPS [60]",
+          "--- Muscle Constraints ---",
+          "Damping Multiplier [1.0x]",
+          "Max Extension [2.0x]",
+          "Velocity Cap [5.0/s]",
+          "--- Neural ---",
+          "Update Rate [15 Hz]",
+          "Output Smoothing [0.3]"
+        ],
+        "visual": [
+          "┌─────────────────────────────┐",
+          "│ ▼ Physics Config            │  ← Click to expand/collapse",
+          "├─────────────────────────────┤",
+          "│ Gravity        [-9.8    ]   │",
+          "│ Sim Duration   [10s     ]   │",
+          "│ Physics FPS    [60      ]   │",
+          "│ ─────────────────────────── │",
+          "│ Damping Mult.  [1.0x    ]   │",
+          "│ Max Extension  [2.0x    ]   │",
+          "│ Velocity Cap   [5.0/s   ]   │",
+          "│ ─────────────────────────── │",
+          "│ Neural Update  [15 Hz   ]   │",
+          "│ Output Smooth  [0.3     ]   │",
+          "└─────────────────────────────┘",
+          "┌─────────────────────────────┐",
+          "│ ▶ Fitness Function          │  ← Collapsed when Physics open",
+          "└─────────────────────────────┘"
+        ]
+      },
+      "files": [
+        "app/components/menu/PhysicsConfigPanel.tsx (new)",
+        "app/components/common/CollapsibleAccordion.tsx (new)",
+        "app/components/menu/MenuScreen.tsx",
+        "app/components/menu/FitnessPanel.tsx"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "UI Restructure - Simplify Main Menu",
+      "status": "pending",
+      "description": "Simplify main menu, move secondary params to popovers",
+      "tasks": [
+        "Keep in main menu: Population, Mutation checkbox, Max Nodes, Max Muscles",
+        "Move cull percentage to settings popover beside Mutation checkbox",
+        "Add mutation magnitude and structural rate to same popover",
+        "Update Mutation label to show gear icon when clicked"
+      ],
+      "ui_spec": {
+        "main_menu_after": [
+          "Population [100]",
+          "Mutation ☑️ ⚙️  ← gear opens popover",
+          "Crossover ☑️ ⚙️",
+          "Max Nodes [8]",
+          "Max Muscles [15]"
+        ],
+        "mutation_popover_contents": [
+          "Cull % [50%]",
+          "Mutation Rate [0.1]",
+          "Mutation Magnitude [0.3]",
+          "Structural Rate [0.1]"
+        ]
+      },
+      "files": [
+        "app/components/menu/MenuScreen.tsx"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Pure Mode Cleanup",
+      "status": "pending",
+      "description": "Hide irrelevant frequency params when pure mode selected",
+      "rationale": "In pure mode, neural network directly controls muscles - no base oscillation, so frequency/amplitude/phase are vestigial",
+      "tasks": [
+        "Hide or disable max_frequency in UI when neuralMode === 'pure'",
+        "Add tooltip explaining why (neural net has full control)",
+        "Consider: should we even store frequency in genome for pure mode creatures?"
+      ],
+      "files": [
+        "app/components/menu/MenuScreen.tsx",
+        "app/components/menu/PhysicsConfigPanel.tsx"
+      ]
+    }
+  ],
+  "new_config_fields": {
+    "muscle_velocity_cap": {
+      "type": "number",
+      "default": 5.0,
+      "range": [0.1, 20.0],
+      "unit": "units/second",
+      "description": "Maximum rate of muscle length change"
+    },
+    "output_smoothing_alpha": {
+      "type": "number",
+      "default": 0.3,
+      "range": [0.05, 1.0],
+      "description": "Exponential smoothing factor for neural outputs (1.0 = no smoothing)"
+    },
+    "neural_update_hz": {
+      "type": "number",
+      "default": 15,
+      "range": [5, 60],
+      "unit": "Hz",
+      "description": "Neural network update frequency (replaces hardcoded 4-step cache)"
+    },
+    "muscle_damping_multiplier": {
+      "type": "number",
+      "default": 1.0,
+      "range": [0.1, 5.0],
+      "description": "Global multiplier for all muscle damping coefficients"
+    },
+    "max_extension_ratio": {
+      "type": "number",
+      "default": 2.0,
+      "range": [1.2, 5.0],
+      "description": "Max muscle length as ratio of rest length (2.0 = 50%-200%)"
+    }
+  },
+  "implementation_order": [
+    "Phase 1: Muscle Velocity Cap (quick win, directly addresses spam)",
+    "Phase 2: Output Smoothing (complements velocity cap)",
+    "Phase 3-4: Expose damping and extension (already exist, just wire up)",
+    "Phase 5-6: UI restructure (can be done in parallel)",
+    "Phase 7: Pure mode cleanup (low priority polish)"
+  ],
+  "testing_strategy": {
+    "unit_tests": [
+      "Velocity cap clamps correctly at various FPS",
+      "Exponential smoothing converges correctly",
+      "Damping multiplier scales correctly"
+    ],
+    "integration_tests": [
+      "Full evolution run with new params enabled",
+      "Params persist correctly through API",
+      "UI changes reflect in simulation"
+    ],
+    "manual_tests": [
+      "Run spammy creature with velocity cap - should be smoother",
+      "Compare gen 1 behavior with/without smoothing",
+      "Verify accordion animation feels good"
+    ]
+  },
+  "open_questions": [
+    "Should output smoothing be per-muscle or global?",
+    "Should velocity cap be in world units or relative to rest length?",
+    "Do we need separate smoothing for pure vs hybrid mode?"
+  ]
+}

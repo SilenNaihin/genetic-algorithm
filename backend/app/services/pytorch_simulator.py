@@ -93,6 +93,10 @@ class PyTorchSimulator:
         # Convert genomes to tensor batch
         batch = creature_genomes_to_batch(genomes, device=self.device)
 
+        # Apply global damping multiplier to per-muscle damping
+        if config.muscle_damping_multiplier != 1.0:
+            batch.spring_damping = batch.spring_damping * config.muscle_damping_multiplier
+
         # Check for frequency violations before simulation (only for hybrid mode)
         # In pure mode, frequency is not used - neural net directly controls muscles
         if config.neural_mode == 'pure':
@@ -167,6 +171,7 @@ class PyTorchSimulator:
                 proprioception_inputs=config.proprioception_inputs,
                 velocity_cap=config.muscle_velocity_cap,
                 output_smoothing_alpha=config.output_smoothing_alpha,
+                max_extension_ratio=config.max_extension_ratio,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:

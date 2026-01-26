@@ -19,7 +19,9 @@ export interface SimulationConfig {
   simulationDuration: number;   // Seconds per generation
 
   // Muscle constraints
-  muscleVelocityCap: number;    // Max muscle length change per second (0.1-20.0)
+  muscleVelocityCap: number;       // Max muscle length change per second (0.1-20.0)
+  muscleDampingMultiplier: number; // Global damping scale (0.1-5.0, higher = more resistance)
+  maxExtensionRatio: number;       // Max muscle stretch (1.2-5.0, 2.0 = 50%-200% of rest length)
 
   // Evolution
   populationSize: number;       // 100
@@ -103,7 +105,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   simulationDuration: 20,
 
   // Muscle constraints
-  muscleVelocityCap: 5.0,  // Max muscle length change per second
+  muscleVelocityCap: 5.0,       // Max muscle length change per second
+  muscleDampingMultiplier: 1.0, // Default: no scaling (higher = more 'underwater' feel)
+  maxExtensionRatio: 2.0,       // Muscles can stretch 50%-200% of rest length
 
   populationSize: 100,
   cullPercentage: 0.5,
