@@ -164,6 +164,7 @@ class PyTorchSimulator:
                 max_time=config.simulation_duration,
                 use_proprioception=config.use_proprioception,
                 proprioception_inputs=config.proprioception_inputs,
+                velocity_cap=config.muscle_velocity_cap,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:

@@ -26,6 +26,9 @@ class SimulationConfig(BaseModel):
     time_step: float = Field(default=1/30, ge=1/120, le=1/15)  # 15-120 FPS, default 30 FPS for speed
     simulation_duration: float = Field(default=20.0, ge=1.0, le=60.0)
 
+    # Muscle constraints
+    muscle_velocity_cap: float = Field(default=5.0, ge=0.1, le=20.0)  # Max muscle length change per second
+
     # Evolution (not used in simulation, but included for parity)
     population_size: int = Field(default=100, ge=10, le=10000)
     cull_percentage: float = Field(default=0.5, ge=0.1, le=0.9)

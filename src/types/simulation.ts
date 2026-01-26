@@ -18,6 +18,9 @@ export interface SimulationConfig {
   physicsFPS: number;           // Physics frames per second (15-120)
   simulationDuration: number;   // Seconds per generation
 
+  // Muscle constraints
+  muscleVelocityCap: number;    // Max muscle length change per second (0.1-20.0)
+
   // Evolution
   populationSize: number;       // 100
   cullPercentage: number;       // 0.5 (bottom 50%)
@@ -96,6 +99,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   timeStep: 1 / 30,
   physicsFPS: 30,
   simulationDuration: 20,
+
+  // Muscle constraints
+  muscleVelocityCap: 5.0,  // Max muscle length change per second
 
   populationSize: 100,
   cullPercentage: 0.5,

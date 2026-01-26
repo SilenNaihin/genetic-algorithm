@@ -1184,6 +1184,31 @@ def compute_neural_rest_lengths(
 
 
 @torch.no_grad()
+def apply_velocity_cap(
+    new_rest_lengths: torch.Tensor,
+    prev_rest_lengths: torch.Tensor,
+    velocity_cap: float,
+    dt: float,
+) -> torch.Tensor:
+    """
+    Clamp muscle rest length changes to prevent physically impossible muscle speeds.
+
+    Args:
+        new_rest_lengths: [B, M] desired rest lengths from neural network
+        prev_rest_lengths: [B, M] rest lengths from previous timestep
+        velocity_cap: Maximum length change per second (e.g., 5.0 units/sec)
+        dt: Time step in seconds
+
+    Returns:
+        [B, M] clamped rest lengths
+    """
+    max_delta = velocity_cap * dt
+    delta = new_rest_lengths - prev_rest_lengths
+    clamped_delta = torch.clamp(delta, -max_delta, max_delta)
+    return prev_rest_lengths + clamped_delta
+
+
+@torch.no_grad()
 def physics_step_neural(
     batch: CreatureBatch,
     base_rest_lengths: torch.Tensor,
@@ -1192,6 +1217,8 @@ def physics_step_neural(
     mode: str = 'hybrid',
     dt: float = TIME_STEP,
     gravity: float = GRAVITY,
+    prev_rest_lengths: torch.Tensor | None = None,
+    velocity_cap: float | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Perform a physics step with neural network control.
@@ -1204,6 +1231,8 @@ def physics_step_neural(
         mode: 'pure' or 'hybrid'
         dt: Time step
         gravity: Gravity acceleration
+        prev_rest_lengths: [B, M] rest lengths from previous step (for velocity capping)
+        velocity_cap: Max muscle length change per second (None = no limit)
 
     Returns:
         Tuple of:
@@ -1214,9 +1243,17 @@ def physics_step_neural(
         return torch.zeros(0, 3, device=batch.device), torch.zeros(0, device=batch.device)
 
     # Compute rest lengths from NN outputs
-    batch.spring_rest_length = compute_neural_rest_lengths(
+    new_rest_lengths = compute_neural_rest_lengths(
         batch, base_rest_lengths, nn_outputs, time, mode
     )
+
+    # Apply velocity cap if enabled
+    if velocity_cap is not None and prev_rest_lengths is not None:
+        new_rest_lengths = apply_velocity_cap(
+            new_rest_lengths, prev_rest_lengths, velocity_cap, dt
+        )
+
+    batch.spring_rest_length = new_rest_lengths
 
     # Compute spring forces
     forces = compute_spring_forces(batch)
@@ -1364,6 +1401,7 @@ def simulate_with_fitness_neural(
     max_time: float = 20.0,
     use_proprioception: bool = False,
     proprioception_inputs: str = 'all',
+    velocity_cap: float | None = None,
 ) -> dict:
     """
     Run neural simulation with proper pellet collection tracking.
@@ -1429,6 +1467,9 @@ def simulate_with_fitness_neural(
 
     # Store base rest lengths
     base_rest_lengths = batch.spring_rest_length.clone()
+
+    # Track previous rest lengths for velocity capping
+    prev_rest_lengths = base_rest_lengths.clone()
 
     # Initialize COM tracking for velocity calculation
     # IMPORTANT: Use separate tracking for NN velocity vs physics
@@ -1496,8 +1537,12 @@ def simulate_with_fitness_neural(
 
         # 2. Physics step with neural control (uses cached nn_outputs)
         current_com, step_activation = physics_step_neural(
-            batch, base_rest_lengths, nn_outputs, time, mode, dt, gravity
+            batch, base_rest_lengths, nn_outputs, time, mode, dt, gravity,
+            prev_rest_lengths=prev_rest_lengths, velocity_cap=velocity_cap
         )
+
+        # Update prev_rest_lengths for next step's velocity capping
+        prev_rest_lengths = batch.spring_rest_length.clone()
 
         # 3. Accumulate activation
         total_activation += step_activation
