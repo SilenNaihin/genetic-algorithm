@@ -64,7 +64,7 @@
       "backend_crossover": {
         "id": "1.4",
         "name": "NEAT Crossover",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/genetics/neat_crossover.py",
         "new_file": true,
         "description": "Gene alignment and crossover by innovation ID",
