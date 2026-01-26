@@ -62,6 +62,8 @@ export interface SimulationConfig {
   neuralOutputBias: number;           // Initial output neuron bias (0 = neutral, inside dead zone)
   fitnessEfficiencyPenalty: number;   // Penalty per unit of total muscle activation (encourages efficient movement)
   neuralDeadZone: number;             // Dead zone threshold for pure mode (outputs < threshold become 0)
+  neuralUpdateHz: number;             // NN update frequency in Hz (5-60, default 15)
+  outputSmoothingAlpha: number;       // Exponential smoothing factor (0.05-1.0, 1.0 = no smoothing)
 
   // Adaptive mutation (escape stagnation)
   useAdaptiveMutation: boolean;       // Auto-boost mutation when fitness stagnates
@@ -141,6 +143,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   neuralOutputBias: -0.1,        // Slight negative bias so muscles must evolve to activate
   fitnessEfficiencyPenalty: 0.1, // Subtle penalty for excessive activation
   neuralDeadZone: 0.1,           // Outputs with absolute value < 0.1 become 0 in pure mode
+  neuralUpdateHz: 15,            // Update NN 15 times per second (physics_fps / 4 at 60 FPS)
+  outputSmoothingAlpha: 0.3,     // Moderate smoothing (0.3 = 30% new + 70% old)
 
   // Adaptive mutation defaults
   useAdaptiveMutation: false,    // Off by default - enable for long runs

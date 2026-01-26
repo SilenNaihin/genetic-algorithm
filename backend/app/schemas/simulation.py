@@ -70,6 +70,8 @@ class SimulationConfig(BaseModel):
     neural_output_bias: float = Field(default=-0.1, ge=-2.0, le=2.0)
     fitness_efficiency_penalty: float = Field(default=0.1, ge=0.0, le=5.0)
     neural_dead_zone: float = Field(default=0.1, ge=0.0, le=1.0)
+    neural_update_hz: int = Field(default=15, ge=5, le=60)  # NN update frequency (Hz)
+    output_smoothing_alpha: float = Field(default=0.3, ge=0.05, le=1.0)  # Exponential smoothing (1.0 = no smoothing)
 
     # Adaptive mutation
     use_adaptive_mutation: bool = False

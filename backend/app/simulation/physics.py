@@ -1209,6 +1209,35 @@ def apply_velocity_cap(
 
 
 @torch.no_grad()
+def apply_output_smoothing(
+    raw_outputs: torch.Tensor,
+    smoothed_outputs: torch.Tensor,
+    alpha: float,
+) -> torch.Tensor:
+    """
+    Apply exponential smoothing to neural network outputs.
+
+    Formula: smoothed = alpha * raw + (1 - alpha) * smoothed
+
+    This smooths the TARGET muscles are trying to reach, preventing
+    chaotic target-seeking behavior from noisy neural outputs.
+
+    Args:
+        raw_outputs: [B, M] new neural network outputs
+        smoothed_outputs: [B, M] previous smoothed outputs
+        alpha: Smoothing factor (0.05-1.0)
+            - 0.1 = very smooth, slow to change
+            - 0.3 = moderate smoothing (recommended)
+            - 0.5 = light smoothing
+            - 1.0 = no smoothing (instant, original behavior)
+
+    Returns:
+        [B, M] smoothed outputs
+    """
+    return alpha * raw_outputs + (1 - alpha) * smoothed_outputs
+
+
+@torch.no_grad()
 def physics_step_neural(
     batch: CreatureBatch,
     base_rest_lengths: torch.Tensor,
@@ -1396,12 +1425,13 @@ def simulate_with_fitness_neural(
     record_frames: bool = False,
     frame_interval: int = 1,
     arena_size: float = 50.0,
-    nn_update_interval: int = 4,
+    neural_update_hz: int = 15,
     time_encoding: str = 'cyclic',
     max_time: float = 20.0,
     use_proprioception: bool = False,
     proprioception_inputs: str = 'all',
     velocity_cap: float | None = None,
+    output_smoothing_alpha: float = 1.0,
 ) -> dict:
     """
     Run neural simulation with proper pellet collection tracking.
@@ -1414,6 +1444,7 @@ def simulate_with_fitness_neural(
     - Accumulates muscle activation for efficiency penalty
     - Records pellet history (positions, spawn/collection frames)
     - Records fitness at each frame
+    - Applies exponential smoothing to neural outputs
 
     Args:
         batch: CreatureBatch (modified in place)
@@ -1429,9 +1460,11 @@ def simulate_with_fitness_neural(
         record_frames: Whether to record position frames
         frame_interval: Record every N frames (if recording)
         arena_size: Arena size for pellet spawning bounds
-        nn_update_interval: Update NN outputs every N physics steps (reduces jitter)
+        neural_update_hz: NN update frequency in Hz (replaces hardcoded interval)
         time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
         max_time: Maximum simulation time for 'raw' encoding normalization
+        velocity_cap: Max muscle length change per second (None = no limit)
+        output_smoothing_alpha: Exponential smoothing factor (1.0 = no smoothing)
 
     Returns:
         Dict with:
@@ -1501,8 +1534,14 @@ def simulate_with_fitness_neural(
     time = 0.0
     frame_index = 0
 
+    # Calculate nn_update_interval from neural_update_hz and dt
+    # physics_fps = 1/dt, nn_update_interval = physics_fps / neural_update_hz
+    physics_fps = 1.0 / dt
+    nn_update_interval = max(1, int(physics_fps / neural_update_hz))
+
     # Cache for NN outputs (updated every nn_update_interval steps)
     nn_outputs = None
+    smoothed_outputs = None  # Exponentially smoothed outputs
 
     # Store full activations data (inputs, hidden, outputs) for visualization
     current_full_activations = None
@@ -1530,12 +1569,25 @@ def simulate_with_fitness_neural(
             # Forward pass through NN - get full activations for visualization
             if mode == 'pure':
                 current_full_activations = neural_network.forward_full_with_dead_zone(sensor_inputs, dead_zone)
-                nn_outputs = current_full_activations['outputs']
+                raw_outputs = current_full_activations['outputs']
             else:
                 current_full_activations = neural_network.forward_full(sensor_inputs)
-                nn_outputs = current_full_activations['outputs']
+                raw_outputs = current_full_activations['outputs']
 
-        # 2. Physics step with neural control (uses cached nn_outputs)
+            # Apply exponential smoothing to outputs
+            if smoothed_outputs is None:
+                # First update: initialize smoothed outputs
+                smoothed_outputs = raw_outputs.clone()
+            else:
+                # Apply smoothing: smoothed = alpha * new + (1 - alpha) * smoothed
+                smoothed_outputs = apply_output_smoothing(
+                    raw_outputs, smoothed_outputs, output_smoothing_alpha
+                )
+
+            # Use smoothed outputs for physics
+            nn_outputs = smoothed_outputs
+
+        # 2. Physics step with neural control (uses cached/smoothed nn_outputs)
         current_com, step_activation = physics_step_neural(
             batch, base_rest_lengths, nn_outputs, time, mode, dt, gravity,
             prev_rest_lengths=prev_rest_lengths, velocity_cap=velocity_cap

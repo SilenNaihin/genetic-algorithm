@@ -160,11 +160,13 @@ class PyTorchSimulator:
                 record_frames=config.record_frames,
                 frame_interval=frame_interval,
                 arena_size=config.arena_size,
+                neural_update_hz=config.neural_update_hz,
                 time_encoding=config.time_encoding,
                 max_time=config.simulation_duration,
                 use_proprioception=config.use_proprioception,
                 proprioception_inputs=config.proprioception_inputs,
                 velocity_cap=config.muscle_velocity_cap,
+                output_smoothing_alpha=config.output_smoothing_alpha,
             )
             total_activation = result.get('total_activation', torch.zeros(batch.batch_size))
         else:
