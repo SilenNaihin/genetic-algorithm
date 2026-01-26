@@ -88,7 +88,11 @@ class TestMainMenuConfig:
         assert frames_2s > frames_1s
 
     def test_max_frequency_disqualification(self):
-        """Creatures exceeding max_allowed_frequency should be disqualified."""
+        """Creatures exceeding max_allowed_frequency should be disqualified in hybrid mode.
+
+        NOTE: Frequency check only applies to hybrid mode. In pure mode, neural network
+        directly controls muscles and frequency parameter is vestigial.
+        """
         # Genome with high frequency muscles
         genome = make_api_genome("high_freq")
         for muscle in genome["muscles"]:
@@ -97,7 +101,7 @@ class TestMainMenuConfig:
         # With high limit - should pass
         response_high = client.post("/api/simulation/batch", json={
             "genomes": [genome],
-            "config": {"max_allowed_frequency": 10.0}
+            "config": {"max_allowed_frequency": 10.0, "neural_mode": "hybrid"}
         })
         assert response_high.status_code == 200
         results_high = extract_results(response_high)
@@ -106,7 +110,7 @@ class TestMainMenuConfig:
         # With low limit - should fail
         response_low = client.post("/api/simulation/batch", json={
             "genomes": [genome],
-            "config": {"max_allowed_frequency": 3.0}
+            "config": {"max_allowed_frequency": 3.0, "neural_mode": "hybrid"}
         })
         assert response_low.status_code == 200
         results_low = extract_results(response_low)

@@ -160,9 +160,10 @@ class TestSimulationBatchEndpoint:
         assert response.status_code == 200
 
     def test_batch_simulation_high_frequency_disqualification(self, client):
-        """Creatures with too high frequency should be disqualified."""
+        """Creatures with too high frequency should be disqualified in hybrid mode."""
         # Use globalFrequencyMultiplier to push effective frequency above limit
         # frequency=2.0 * globalFrequencyMultiplier=2.0 = effective 4.0, above max 3.0
+        # NOTE: Must use neural_mode='hybrid' - pure mode doesn't use frequency
         request = {
             "genomes": [
                 {
@@ -179,6 +180,7 @@ class TestSimulationBatchEndpoint:
             ],
             "config": {
                 "max_allowed_frequency": 3.0,
+                "neural_mode": "hybrid",  # Frequency check only applies to hybrid mode
             }
         }
 
