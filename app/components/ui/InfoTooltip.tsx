@@ -168,6 +168,15 @@ export const TOOLTIPS = {
   gravity: 'Downward force on creatures. Stronger gravity (-30) makes movement harder; weaker gravity (-9.8) is more forgiving.',
   groundFriction: 'How much the ground resists sliding. Higher friction allows better grip for pushing off.',
 
+  // Muscle constraints
+  muscleVelocityCap: 'Maximum rate of muscle length change (units/second). Limits how fast muscles can contract/extend regardless of neural output. Lower values = smoother, more realistic movement. Higher values = faster, more responsive muscles.',
+  muscleDampingMultiplier: 'Global scale for muscle damping. 1.0 = normal physics. Higher values (2-5) create an "underwater" feel with more resistance to rapid changes. Lower values (0.1-0.5) allow faster, snappier movement.',
+  maxExtensionRatio: 'Maximum muscle stretch relative to rest length. Ratio of 2.0 means muscles can compress to 50% or stretch to 200% of rest length. Lower ratios (1.2-1.5) keep creatures compact; higher ratios (3-5) allow more extreme stretching.',
+
+  // Neural timing
+  neuralUpdateHz: 'How often the neural network recomputes outputs (Hz). Higher rates = more responsive but potentially noisier behavior. Lower rates = smoother but less reactive. Default 15 Hz means NN updates ~15 times per second.',
+  outputSmoothingAlpha: 'Exponential smoothing on neural outputs. 1.0 = no smoothing (instant). 0.3 = moderate smoothing (30% new + 70% old). 0.1 = heavy smoothing (very gradual transitions). Reduces jitter and chaotic oscillation.',
+
   // Creature settings
   maxNodes: 'Maximum body parts (spheres) a creature can have. More nodes allow complex body shapes but increase simulation cost.',
   maxMuscles: 'Maximum connections between nodes. More muscles allow finer control but require more neural network outputs.',

@@ -6,9 +6,9 @@ import { ParamSlider } from './ParamSlider';
 import { DEFAULT_CONFIG } from '../../../src/types/simulation';
 
 /**
- * Fitness function settings panel - fixed right side of menu screen.
+ * Fitness function settings panel content - used inside CollapsibleAccordion.
  */
-export function FitnessPanel() {
+export function FitnessPanelContent() {
   const config = useConfig();
   const setConfig = useEvolutionStore((s) => s.setConfig);
 
@@ -23,34 +23,7 @@ export function FitnessPanel() {
   };
 
   return (
-    <div
-      id="fitness-settings-panel"
-      style={{
-        position: 'fixed',
-        top: '50%',
-        right: '20px',
-        transform: 'translateY(-50%)',
-        width: '240px',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        background: 'var(--bg-secondary)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-light)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-      }}
-    >
-      <div
-        style={{
-          padding: '12px 16px',
-          borderBottom: '1px solid var(--border)',
-          fontSize: '14px',
-          fontWeight: 600,
-          color: 'var(--text-primary)',
-        }}
-      >
-        Fitness Function
-      </div>
-      <div style={{ padding: '12px 16px' }}>
+    <div style={{ paddingTop: '12px' }}>
         <div style={{ marginBottom: '12px' }}>
           <ParamSlider
             name="Pellet Points"
@@ -111,12 +84,13 @@ export function FitnessPanel() {
             width="100%"
           />
         </div>
-        <Button variant="secondary" size="small" onClick={handleReset} style={{ width: '100%' }}>
-          Reset to Defaults
-        </Button>
-      </div>
+      <Button variant="secondary" size="small" onClick={handleReset} style={{ width: '100%' }}>
+        Reset to Defaults
+      </Button>
     </div>
   );
 }
 
-export default FitnessPanel;
+// Legacy export for backwards compatibility
+export const FitnessPanel = FitnessPanelContent;
+export default FitnessPanelContent;

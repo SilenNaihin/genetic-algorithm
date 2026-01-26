@@ -6,7 +6,7 @@ import { useSimulation } from '../../hooks/useSimulation';
 import { Button } from '../common/Button';
 import { ParamSlider } from './ParamSlider';
 import { PreviewCanvas } from './PreviewCanvas';
-import { FitnessPanel } from './FitnessPanel';
+import { ConfigAccordion } from './ConfigAccordion';
 import { NeuralPanel } from './NeuralPanel';
 import { LoadRunsModal } from '../modals/LoadRunsModal';
 import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
@@ -51,11 +51,11 @@ export function MenuScreen() {
       />
 
       <div className="menu-controls" style={{ maxWidth: '700px', width: '100%' }}>
-        {/* Main parameter sliders - 4 column grid */}
+        {/* Main parameter sliders - 5 column grid */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '16px 24px',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: '16px 20px',
           marginBottom: '24px'
         }}>
           <ParamSlider
@@ -69,16 +69,6 @@ export function MenuScreen() {
             onChange={(v) => setConfig({ populationSize: v })}
           />
           <ParamSlider
-            name="Gravity"
-            value={config.gravity}
-            displayValue={String(config.gravity)}
-            min={-30}
-            max={-5}
-            step={0.1}
-            tooltip={TOOLTIPS.gravity}
-            onChange={(v) => setConfig({ gravity: v })}
-          />
-          <ParamSlider
             name="Mutation Rate"
             value={config.mutationRate * 100}
             displayValue={`${Math.round(config.mutationRate * 100)}%`}
@@ -88,33 +78,13 @@ export function MenuScreen() {
             onChange={(v) => setConfig({ mutationRate: v / 100 })}
           />
           <ParamSlider
-            name="Max Frequency"
-            value={config.maxAllowedFrequency}
-            displayValue={`${config.maxAllowedFrequency} Hz`}
-            min={1}
-            max={10}
-            step={0.5}
-            tooltip={TOOLTIPS.maxAllowedFrequency}
-            onChange={(v) => setConfig({ maxAllowedFrequency: v })}
-          />
-          <ParamSlider
-            name="Sim Duration"
-            value={config.simulationDuration}
-            displayValue={`${config.simulationDuration}s`}
-            min={3}
-            max={60}
-            tooltip={TOOLTIPS.simulationDuration}
-            onChange={(v) => setConfig({ simulationDuration: v })}
-          />
-          <ParamSlider
-            name="Physics FPS"
-            value={config.physicsFPS}
-            displayValue={`${config.physicsFPS}`}
-            min={15}
-            max={120}
-            step={15}
-            tooltip={TOOLTIPS.physicsFPS}
-            onChange={(v) => setConfig({ physicsFPS: v, timeStep: 1 / v })}
+            name="Cull %"
+            value={config.cullPercentage * 100}
+            displayValue={`${Math.round(config.cullPercentage * 100)}%`}
+            min={10}
+            max={90}
+            tooltip={TOOLTIPS.cullPercentage}
+            onChange={(v) => setConfig({ cullPercentage: v / 100 })}
           />
           <ParamSlider
             name="Max Nodes"
@@ -133,15 +103,6 @@ export function MenuScreen() {
             max={30}
             tooltip={TOOLTIPS.maxMuscles}
             onChange={(v) => setConfig({ maxMuscles: v })}
-          />
-          <ParamSlider
-            name="Cull %"
-            value={config.cullPercentage * 100}
-            displayValue={`${Math.round(config.cullPercentage * 100)}%`}
-            min={10}
-            max={90}
-            tooltip={TOOLTIPS.cullPercentage}
-            onChange={(v) => setConfig({ cullPercentage: v / 100 })}
           />
         </div>
 
@@ -424,7 +385,7 @@ export function MenuScreen() {
       </div>
 
       {/* Side panels */}
-      <FitnessPanel />
+      <ConfigAccordion />
       <NeuralPanel />
 
       {/* Load runs modal */}
