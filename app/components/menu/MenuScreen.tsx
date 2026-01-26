@@ -51,11 +51,11 @@ export function MenuScreen() {
       />
 
       <div className="menu-controls" style={{ maxWidth: '700px', width: '100%' }}>
-        {/* Main parameter sliders - 5 column grid */}
+        {/* Main parameter sliders - 3 column grid */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '16px 20px',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '16px 24px',
           marginBottom: '24px'
         }}>
           <ParamSlider
@@ -67,24 +67,6 @@ export function MenuScreen() {
             step={10}
             tooltip={TOOLTIPS.populationSize}
             onChange={(v) => setConfig({ populationSize: v })}
-          />
-          <ParamSlider
-            name="Mutation Rate"
-            value={config.mutationRate * 100}
-            displayValue={`${Math.round(config.mutationRate * 100)}%`}
-            min={5}
-            max={80}
-            tooltip={TOOLTIPS.mutationRate}
-            onChange={(v) => setConfig({ mutationRate: v / 100 })}
-          />
-          <ParamSlider
-            name="Cull %"
-            value={config.cullPercentage * 100}
-            displayValue={`${Math.round(config.cullPercentage * 100)}%`}
-            min={10}
-            max={90}
-            tooltip={TOOLTIPS.cullPercentage}
-            onChange={(v) => setConfig({ cullPercentage: v / 100 })}
           />
           <ParamSlider
             name="Max Nodes"
@@ -169,18 +151,77 @@ export function MenuScreen() {
 
           {/* Evolution mode - Mutation/Crossover stack */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
-              <input
-                type="checkbox"
-                checked={config.useMutation}
-                onChange={(e) => {
-                  if (!e.target.checked && !config.useCrossover) return;
-                  setConfig({ useMutation: e.target.checked });
-                }}
-                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-              />
-              Mutation
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={config.useMutation}
+                  onChange={(e) => {
+                    if (!e.target.checked && !config.useCrossover) return;
+                    setConfig({ useMutation: e.target.checked });
+                  }}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                />
+                Mutation
+              </label>
+              {/* Mutation settings gear */}
+              <SettingsPopover width={200}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                      Cull %
+                      <InfoTooltip text={TOOLTIPS.cullPercentage} />
+                    </div>
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      value={config.cullPercentage * 100}
+                      onChange={(e) => setConfig({ cullPercentage: parseInt(e.target.value) / 100 })}
+                      style={{ width: '100%', accentColor: 'var(--accent)' }}
+                    />
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      {Math.round(config.cullPercentage * 100)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                      Mutation Rate
+                      <InfoTooltip text={TOOLTIPS.mutationRate} />
+                    </div>
+                    <input
+                      type="range"
+                      min={5}
+                      max={80}
+                      value={config.mutationRate * 100}
+                      onChange={(e) => setConfig({ mutationRate: parseInt(e.target.value) / 100 })}
+                      style={{ width: '100%', accentColor: 'var(--accent)' }}
+                    />
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      {Math.round(config.mutationRate * 100)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                      Mutation Magnitude
+                      <InfoTooltip text={TOOLTIPS.mutationMagnitude} />
+                    </div>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={1.0}
+                      step={0.1}
+                      value={config.mutationMagnitude}
+                      onChange={(e) => setConfig({ mutationMagnitude: parseFloat(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent)' }}
+                    />
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      {config.mutationMagnitude.toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+              </SettingsPopover>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
                 <input

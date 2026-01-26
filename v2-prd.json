@@ -170,7 +170,7 @@
     {
       "id": 6,
       "name": "UI Restructure - Simplify Main Menu",
-      "status": "pending",
+      "status": "complete",
       "description": "Simplify main menu, move secondary params to popovers",
       "tasks": [
         "Keep in main menu: Population, Mutation checkbox, Max Nodes, Max Muscles",
@@ -200,7 +200,7 @@
     {
       "id": 7,
       "name": "Pure Mode Cleanup",
-      "status": "pending",
+      "status": "complete",
       "description": "Hide irrelevant frequency params when pure mode selected",
       "rationale": "In pure mode, neural network directly controls muscles - no base oscillation, so frequency/amplitude/phase are vestigial",
       "tasks": [
