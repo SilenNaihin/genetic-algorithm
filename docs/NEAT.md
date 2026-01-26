@@ -15,7 +15,7 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 |-----------|--------|----------|-------|
 | NEAT Genome Schema | **Complete** | `backend/app/schemas/neat.py` | NeuronGene, ConnectionGene, NEATGenome, InnovationCounter |
 | Network Execution | **Complete** | `backend/app/neural/neat_network.py` | create_minimal_neat_genome, topological_sort, neat_forward, would_create_cycle |
-| Structural Mutations | Not started | `backend/app/genetics/neat_mutation.py` | |
+| Structural Mutations | **Complete** | `backend/app/genetics/neat_mutation.py` | mutate_add_connection, mutate_add_node, mutate_toggle_connection, mutate_neat_weights, mutate_neat_biases, mutate_neat_genome |
 | NEAT Crossover | Not started | `backend/app/genetics/neat_crossover.py` | |
 | Compatibility Distance | Not started | `backend/app/genetics/neat_distance.py` | |
 | Speciation Integration | Not started | `backend/app/genetics/speciation.py` | Add `distance_fn` param |
