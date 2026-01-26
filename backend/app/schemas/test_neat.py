@@ -5,33 +5,32 @@ import pytest
 from app.schemas.neat import (
     ConnectionGene,
     InnovationCounter,
-    NEATConfig,
     NEATGenome,
-    NodeGene,
+    NeuronGene,
 )
 
 
-class TestNodeGene:
-    """Tests for NodeGene schema."""
+class TestNeuronGene:
+    """Tests for NeuronGene schema."""
 
-    def test_input_node(self):
-        node = NodeGene(id=0, type='input')
-        assert node.id == 0
-        assert node.type == 'input'
-        assert node.bias == 0.0
-        assert node.innovation is None
+    def test_input_neuron(self):
+        neuron = NeuronGene(id=0, type='input')
+        assert neuron.id == 0
+        assert neuron.type == 'input'
+        assert neuron.bias == 0.0
+        assert neuron.innovation is None
 
-    def test_hidden_node_with_innovation(self):
-        node = NodeGene(id=10, type='hidden', bias=0.5, innovation=42)
-        assert node.id == 10
-        assert node.type == 'hidden'
-        assert node.bias == 0.5
-        assert node.innovation == 42
+    def test_hidden_neuron_with_innovation(self):
+        neuron = NeuronGene(id=10, type='hidden', bias=0.5, innovation=42)
+        assert neuron.id == 10
+        assert neuron.type == 'hidden'
+        assert neuron.bias == 0.5
+        assert neuron.innovation == 42
 
-    def test_output_node_with_bias(self):
-        node = NodeGene(id=5, type='output', bias=-0.5)
-        assert node.bias == -0.5
-        assert node.innovation is None
+    def test_output_neuron_with_bias(self):
+        neuron = NeuronGene(id=5, type='output', bias=-0.5)
+        assert neuron.bias == -0.5
+        assert neuron.innovation is None
 
 
 class TestConnectionGene:
@@ -59,10 +58,10 @@ class TestNEATGenome:
     def minimal_genome(self) -> NEATGenome:
         """Create a minimal NEAT genome (2 inputs, 1 output, fully connected)."""
         return NEATGenome(
-            nodes=[
-                NodeGene(id=0, type='input'),
-                NodeGene(id=1, type='input'),
-                NodeGene(id=2, type='output', bias=-0.5),
+            neurons=[
+                NeuronGene(id=0, type='input'),
+                NeuronGene(id=1, type='input'),
+                NeuronGene(id=2, type='output', bias=-0.5),
             ],
             connections=[
                 ConnectionGene(from_node=0, to_node=2, weight=0.5, innovation=0),
@@ -70,25 +69,25 @@ class TestNEATGenome:
             ],
         )
 
-    def test_get_input_nodes(self, minimal_genome: NEATGenome):
-        inputs = minimal_genome.get_input_nodes()
+    def test_get_input_neurons(self, minimal_genome: NEATGenome):
+        inputs = minimal_genome.get_input_neurons()
         assert len(inputs) == 2
         assert all(n.type == 'input' for n in inputs)
 
-    def test_get_output_nodes(self, minimal_genome: NEATGenome):
-        outputs = minimal_genome.get_output_nodes()
+    def test_get_output_neurons(self, minimal_genome: NEATGenome):
+        outputs = minimal_genome.get_output_neurons()
         assert len(outputs) == 1
         assert outputs[0].type == 'output'
 
-    def test_get_hidden_nodes_empty(self, minimal_genome: NEATGenome):
-        hidden = minimal_genome.get_hidden_nodes()
+    def test_get_hidden_neurons_empty(self, minimal_genome: NEATGenome):
+        hidden = minimal_genome.get_hidden_neurons()
         assert len(hidden) == 0
 
-    def test_get_hidden_nodes_with_hidden(self, minimal_genome: NEATGenome):
-        minimal_genome.nodes.append(
-            NodeGene(id=3, type='hidden', innovation=0)
+    def test_get_hidden_neurons_with_hidden(self, minimal_genome: NEATGenome):
+        minimal_genome.neurons.append(
+            NeuronGene(id=3, type='hidden', innovation=0)
         )
-        hidden = minimal_genome.get_hidden_nodes()
+        hidden = minimal_genome.get_hidden_neurons()
         assert len(hidden) == 1
         assert hidden[0].id == 3
 
@@ -102,28 +101,28 @@ class TestNEATGenome:
         assert len(enabled) == 1
         assert enabled[0].innovation == 1
 
-    def test_get_node_by_id(self, minimal_genome: NEATGenome):
-        node = minimal_genome.get_node_by_id(2)
-        assert node is not None
-        assert node.type == 'output'
+    def test_get_neuron_by_id(self, minimal_genome: NEATGenome):
+        neuron = minimal_genome.get_neuron_by_id(2)
+        assert neuron is not None
+        assert neuron.type == 'output'
 
-    def test_get_node_by_id_not_found(self, minimal_genome: NEATGenome):
-        node = minimal_genome.get_node_by_id(99)
-        assert node is None
+    def test_get_neuron_by_id_not_found(self, minimal_genome: NEATGenome):
+        neuron = minimal_genome.get_neuron_by_id(99)
+        assert neuron is None
 
     def test_connection_exists(self, minimal_genome: NEATGenome):
         assert minimal_genome.connection_exists(0, 2) is True
         assert minimal_genome.connection_exists(2, 0) is False
         assert minimal_genome.connection_exists(0, 1) is False
 
-    def test_max_node_id(self, minimal_genome: NEATGenome):
-        assert minimal_genome.max_node_id() == 2
+    def test_max_neuron_id(self, minimal_genome: NEATGenome):
+        assert minimal_genome.max_neuron_id() == 2
 
     def test_max_innovation(self, minimal_genome: NEATGenome):
         assert minimal_genome.max_innovation() == 1
 
     def test_max_innovation_empty(self):
-        genome = NEATGenome(nodes=[], connections=[])
+        genome = NEATGenome(neurons=[], connections=[])
         assert genome.max_innovation() == 0
 
 
@@ -196,35 +195,3 @@ class TestInnovationCounter:
         inn2 = counter.get_connection_innovation(0, 5)
         assert inn2 == 1  # New innovation after cache clear
         assert inn1 != inn2
-
-
-class TestNEATConfig:
-    """Tests for NEATConfig defaults and validation."""
-
-    def test_defaults(self):
-        config = NEATConfig()
-        assert config.use_neat is False
-        assert config.add_connection_rate == 0.05
-        assert config.add_node_rate == 0.03
-        assert config.max_hidden_nodes == 16
-
-    def test_custom_values(self):
-        config = NEATConfig(
-            use_neat=True,
-            add_connection_rate=0.1,
-            max_hidden_nodes=32,
-        )
-        assert config.use_neat is True
-        assert config.add_connection_rate == 0.1
-        assert config.max_hidden_nodes == 32
-
-    def test_validation_bounds(self):
-        # Should not raise
-        NEATConfig(add_connection_rate=0.0)
-        NEATConfig(add_connection_rate=0.5)
-
-        # Should raise
-        with pytest.raises(ValueError):
-            NEATConfig(add_connection_rate=-0.1)
-        with pytest.raises(ValueError):
-            NEATConfig(add_connection_rate=0.6)

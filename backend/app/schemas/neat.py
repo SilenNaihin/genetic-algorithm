@@ -3,6 +3,9 @@ NEAT (NeuroEvolution of Augmenting Topologies) genome schemas.
 
 Defines the gene-based representation for evolving network topology.
 See docs/NEAT.md for technical details.
+
+Note: We use "NeuronGene" (not "NodeGene") to avoid collision with
+the body NodeGene in genome.py which represents physical spheres.
 """
 
 from typing import Literal
@@ -10,22 +13,24 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class NodeGene(BaseModel):
-    """A node (neuron) in a NEAT genome.
+class NeuronGene(BaseModel):
+    """A neuron in a NEAT genome.
 
-    Input and output nodes are created at genome initialization.
-    Hidden nodes are added through structural mutations.
+    Input and output neurons are created at genome initialization.
+    Hidden neurons are added through structural mutations (add_node).
+
+    Note: Named "NeuronGene" to avoid collision with body "NodeGene" in genome.py.
     """
 
-    id: int = Field(..., description="Unique node identifier within the genome")
+    id: int = Field(..., description="Unique neuron identifier within the genome")
     type: Literal['input', 'hidden', 'output'] = Field(
-        ..., description="Node type determines position in network"
+        ..., description="Neuron type determines position in network"
     )
     bias: float = Field(default=0.0, description="Bias term added before activation")
-    # Innovation number for hidden nodes (None for input/output which are fixed)
+    # Innovation number for hidden neurons (None for input/output which are fixed)
     innovation: int | None = Field(
         default=None,
-        description="Innovation ID for hidden nodes (enables crossover alignment)"
+        description="Innovation ID for hidden neurons (enables crossover alignment)"
     )
 
 
@@ -46,63 +51,63 @@ class ConnectionGene(BaseModel):
 
 
 class NEATGenome(BaseModel):
-    """A complete NEAT genome with nodes and connections.
+    """A complete NEAT genome with neurons and connections.
 
     Represents a neural network topology that can evolve through:
     - Weight mutations (perturb existing weights)
-    - Add connection (connect two unconnected nodes)
-    - Add node (split an existing connection)
+    - Add connection (connect two unconnected neurons)
+    - Add node (split an existing connection with new hidden neuron)
     - Toggle connection (enable/disable)
     """
 
-    nodes: list[NodeGene] = Field(
+    neurons: list[NeuronGene] = Field(
         default_factory=list,
-        description="All nodes in the network (input, hidden, output)"
+        description="All neurons in the network (input, hidden, output)"
     )
     connections: list[ConnectionGene] = Field(
         default_factory=list,
-        description="All connections between nodes"
+        description="All connections between neurons"
     )
     activation: Literal['tanh', 'relu', 'sigmoid'] = Field(
         default='tanh',
-        description="Activation function for hidden and output nodes"
+        description="Activation function for hidden and output neurons"
     )
 
-    def get_input_nodes(self) -> list[NodeGene]:
-        """Get all input nodes."""
-        return [n for n in self.nodes if n.type == 'input']
+    def get_input_neurons(self) -> list[NeuronGene]:
+        """Get all input neurons."""
+        return [n for n in self.neurons if n.type == 'input']
 
-    def get_output_nodes(self) -> list[NodeGene]:
-        """Get all output nodes."""
-        return [n for n in self.nodes if n.type == 'output']
+    def get_output_neurons(self) -> list[NeuronGene]:
+        """Get all output neurons."""
+        return [n for n in self.neurons if n.type == 'output']
 
-    def get_hidden_nodes(self) -> list[NodeGene]:
-        """Get all hidden nodes."""
-        return [n for n in self.nodes if n.type == 'hidden']
+    def get_hidden_neurons(self) -> list[NeuronGene]:
+        """Get all hidden neurons."""
+        return [n for n in self.neurons if n.type == 'hidden']
 
     def get_enabled_connections(self) -> list[ConnectionGene]:
         """Get all enabled connections."""
         return [c for c in self.connections if c.enabled]
 
-    def get_node_by_id(self, node_id: int) -> NodeGene | None:
-        """Find a node by its ID."""
-        for node in self.nodes:
-            if node.id == node_id:
-                return node
+    def get_neuron_by_id(self, neuron_id: int) -> NeuronGene | None:
+        """Find a neuron by its ID."""
+        for neuron in self.neurons:
+            if neuron.id == neuron_id:
+                return neuron
         return None
 
-    def connection_exists(self, from_node: int, to_node: int) -> bool:
+    def connection_exists(self, from_neuron: int, to_neuron: int) -> bool:
         """Check if a connection already exists (enabled or disabled)."""
         return any(
-            c.from_node == from_node and c.to_node == to_node
+            c.from_node == from_neuron and c.to_node == to_neuron
             for c in self.connections
         )
 
-    def max_node_id(self) -> int:
-        """Get the highest node ID in the genome."""
-        if not self.nodes:
+    def max_neuron_id(self) -> int:
+        """Get the highest neuron ID in the genome."""
+        if not self.neurons:
             return -1
-        return max(n.id for n in self.nodes)
+        return max(n.id for n in self.neurons)
 
     def max_innovation(self) -> int:
         """Get the highest innovation number in connections."""
@@ -166,70 +171,24 @@ class InnovationCounter(BaseModel):
         self.node_cache = {}
 
 
-class NEATConfig(BaseModel):
-    """Configuration for NEAT evolution."""
-
-    # Enable NEAT (vs fixed topology)
-    use_neat: bool = Field(default=False, description="Use NEAT topology evolution")
-
-    # Structural mutation rates
-    add_connection_rate: float = Field(
-        default=0.05, ge=0.0, le=0.5,
-        description="Probability of adding a new connection per genome"
-    )
-    add_node_rate: float = Field(
-        default=0.03, ge=0.0, le=0.3,
-        description="Probability of adding a new node per genome"
-    )
-    enable_connection_rate: float = Field(
-        default=0.02, ge=0.0, le=0.2,
-        description="Probability of re-enabling a disabled connection"
-    )
-    disable_connection_rate: float = Field(
-        default=0.01, ge=0.0, le=0.2,
-        description="Probability of disabling an enabled connection"
-    )
-
-    # Weight mutation (applied to all connections)
-    weight_mutate_rate: float = Field(
-        default=0.8, ge=0.0, le=1.0,
-        description="Probability of any weight mutation occurring"
-    )
-    weight_perturb_rate: float = Field(
-        default=0.9, ge=0.0, le=1.0,
-        description="Of mutations: probability of perturb vs full reset"
-    )
-    weight_perturb_magnitude: float = Field(
-        default=0.2, ge=0.0, le=2.0,
-        description="Std dev for weight perturbation"
-    )
-
-    # Compatibility distance coefficients (for speciation)
-    excess_coefficient: float = Field(
-        default=1.0, ge=0.0, le=5.0,
-        description="Weight for excess genes in compatibility distance"
-    )
-    disjoint_coefficient: float = Field(
-        default=1.0, ge=0.0, le=5.0,
-        description="Weight for disjoint genes in compatibility distance"
-    )
-    weight_coefficient: float = Field(
-        default=0.4, ge=0.0, le=3.0,
-        description="Weight for weight differences in compatibility distance"
-    )
-
-    # Topology limits (prevent bloat)
-    max_hidden_nodes: int = Field(
-        default=16, ge=1, le=64,
-        description="Maximum hidden nodes per genome"
-    )
-    max_connections: int = Field(
-        default=128, ge=1, le=512,
-        description="Maximum connections per genome"
-    )
-
-    # Initial topology
-    initial_connection_density: float = Field(
-        default=1.0, ge=0.0, le=1.0,
-        description="Fraction of possible input->output connections at start (1.0 = fully connected)"
-    )
+# NEAT configuration parameters are added to existing configs:
+# - SimulationConfig (src/types/simulation.ts, backend/app/schemas/simulation.py)
+# - EvolutionConfig (backend/app/schemas/genetics.py)
+#
+# This keeps all evolution params in one place rather than a separate NEATConfig.
+# See neat-prd.json tasks 1.10-1.11 for the integration.
+#
+# NEAT params to add:
+#   use_neat: bool                     # Toggle NEAT vs fixed topology
+#   neat_add_connection_rate: float    # Structural mutation rate
+#   neat_add_node_rate: float          # Structural mutation rate
+#   neat_max_hidden_neurons: int       # Bloat prevention
+#   neat_excess_coefficient: float     # Speciation distance tuning
+#   neat_disjoint_coefficient: float   # Speciation distance tuning
+#   neat_weight_coefficient: float     # Speciation distance tuning
+#
+# When use_neat=True:
+#   - use_speciation is auto-enabled (NEAT requires it)
+#   - use_fitness_sharing is auto-disabled (redundant)
+#   - neural_hidden_size is ignored (topology evolves)
+#   - Speciation uses neat_genome_distance() instead of neural_genome_distance()

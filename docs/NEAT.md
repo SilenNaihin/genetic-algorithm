@@ -13,7 +13,7 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 
 | Component | Status | Location | Notes |
 |-----------|--------|----------|-------|
-| NEAT Genome Schema | **Complete** | `backend/app/schemas/neat.py` | NodeGene, ConnectionGene, NEATGenome, InnovationCounter, NEATConfig |
+| NEAT Genome Schema | **Complete** | `backend/app/schemas/neat.py` | NeuronGene, ConnectionGene, NEATGenome, InnovationCounter |
 | Network Execution | Not started | `backend/app/neural/neat_network.py` | |
 | Structural Mutations | Not started | `backend/app/genetics/neat_mutation.py` | |
 | NEAT Crossover | Not started | `backend/app/genetics/neat_crossover.py` | |
@@ -37,6 +37,9 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | Fitness sharing + NEAT | Disable sharing when NEAT enabled | Speciation already protects diversity |
 | Batching strategy | Per-creature first, optimize later | Correctness over performance initially |
 | Innovation scope | Per-run | Simpler, allows parallel runs |
+| Config location | Add to existing SimulationConfig/EvolutionConfig | Keeps all evolution params together |
+| UI approach | Option C - NEAT toggle transforms Neural panel | Shows NEAT is neural approach, shares time encoding/proprioception |
+| Naming | `NeuronGene` not `NodeGene` | Avoids collision with body `NodeGene` in genome.py |
 
 ---
 
@@ -105,10 +108,11 @@ neural_genome = {
 }
 ```
 
-### NEAT: Connection + Node Genes
+### NEAT: Connection + Neuron Genes
 ```python
+# Note: We use "NeuronGene" (not "NodeGene") to avoid collision with body NodeGene
 neat_genome = {
-    'nodes': [
+    'neurons': [
         {'id': 0, 'type': 'input', 'bias': 0.0},
         {'id': 1, 'type': 'input', 'bias': 0.0},
         # ... more inputs
@@ -117,8 +121,8 @@ neat_genome = {
         {'id': 18, 'type': 'hidden', 'bias': 0.0, 'innovation': 42},
     ],
     'connections': [
-        {'from': 0, 'to': 8, 'weight': 0.5, 'enabled': True, 'innovation': 1},
-        {'from': 1, 'to': 8, 'weight': -0.3, 'enabled': True, 'innovation': 2},
+        {'from_node': 0, 'to_node': 8, 'weight': 0.5, 'enabled': True, 'innovation': 1},
+        {'from_node': 1, 'to_node': 8, 'weight': -0.3, 'enabled': True, 'innovation': 2},
         # ...
     ],
     'activation': 'tanh'
@@ -578,25 +582,62 @@ class SpeciesRecord(Base):
 
 ---
 
-## UI Changes
+## UI Architecture (Option C)
 
-### Neural Panel
+NEAT toggle transforms the Neural panel rather than creating a separate panel.
+This keeps related params together since NEAT is fundamentally a neural approach.
 
-Add NEAT toggle and config:
+### Neural Panel with NEAT
 
 ```
-[x] Use NEAT (evolve topology)
-
-Structural Mutations
-├── Add Connection Rate: [====|----] 0.05
-├── Add Node Rate:       [===|-----] 0.03
-└── Max Hidden Nodes:    [16]
-
-Speciation
-├── Compatibility Threshold: [===|-----] 3.0
-├── Stagnation Limit:        [15] generations
-└── Species Elitism:         [1] per species
+Neural Panel:
+┌────────────────────────────────────────────────────┐
+│ [x] Use NEAT (evolve topology)    ← Master toggle  │
+├────────────────────────────────────────────────────┤
+│ Time Encoding: [cyclic ▼]         ← Still applies  │
+│ [x] Proprioception                ← Still applies  │
+│ Activation: [tanh ▼]              ← Still applies  │
+├────────────────────────────────────────────────────┤
+│ Hidden Size: [8]          ← HIDDEN when NEAT on    │
+├────────────────────────────────────────────────────┤
+│ ▼ NEAT Topology (collapsible, shown when NEAT on)  │
+│   Add Connection Rate: [====|----] 0.05            │
+│   Add Node Rate:       [===|-----] 0.03            │
+│   Max Hidden Neurons:  [16]                        │
+│                                                    │
+│ ▼ NEAT Speciation Coefficients (for distance fn)   │
+│   Excess Coefficient:   [1.0]                      │
+│   Disjoint Coefficient: [1.0]                      │
+│   Weight Coefficient:   [0.4]                      │
+└────────────────────────────────────────────────────┘
 ```
+
+### Automatic Behavior When NEAT Enabled
+
+- `use_speciation` → **auto-enabled** (NEAT requires speciation)
+- `use_fitness_sharing` → **auto-disabled** (redundant with speciation)
+- `neural_hidden_size` → **ignored** (topology evolves)
+- Speciation distance function → **switches to `neat_genome_distance()`**
+
+### Config Integration
+
+NEAT params are added to existing configs (not a separate NEATConfig):
+
+```python
+# In SimulationConfig / EvolutionConfig:
+use_neat: bool = False
+
+# Structural mutations (only used when use_neat=True)
+neat_add_connection_rate: float = 0.05
+neat_add_node_rate: float = 0.03
+neat_max_hidden_neurons: int = 16
+
+# NEAT speciation coefficients (only used when use_neat=True)
+neat_excess_coefficient: float = 1.0
+neat_disjoint_coefficient: float = 1.0
+neat_weight_coefficient: float = 0.4
+```
+
 
 ### Network Visualizer
 
