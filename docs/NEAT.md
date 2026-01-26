@@ -1,6 +1,44 @@
-# NEAT Implementation Plan
+# NEAT Technical Reference
 
-This document outlines how to implement NEAT (NeuroEvolution of Augmenting Topologies) in Evolution Lab, building on our existing infrastructure.
+Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementation in Evolution Lab.
+
+**Implementation checklist**: See `neat-prd.json`
+
+> **Maintenance Note**: Keep this document updated with actual implementation details as we build.
+> This is the living technical reference - update code examples to match real implementation.
+
+---
+
+## Implementation Status
+
+| Component | Status | Location | Notes |
+|-----------|--------|----------|-------|
+| NEAT Genome Schema | **Complete** | `backend/app/schemas/neat.py` | NodeGene, ConnectionGene, NEATGenome, InnovationCounter, NEATConfig |
+| Network Execution | Not started | `backend/app/neural/neat_network.py` | |
+| Structural Mutations | Not started | `backend/app/genetics/neat_mutation.py` | |
+| NEAT Crossover | Not started | `backend/app/genetics/neat_crossover.py` | |
+| Compatibility Distance | Not started | `backend/app/genetics/neat_distance.py` | |
+| Speciation Integration | Not started | `backend/app/genetics/speciation.py` | Add `distance_fn` param |
+| Frontend UI | Not started | `app/components/menu/NeuralPanel.tsx` | |
+| Visualizer | Not started | `src/ui/NeuralVisualizer.ts` | |
+
+*Update this table as implementation progresses.*
+
+---
+
+## Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Recurrent connections | Phase 2 (feedforward first) | Simpler execution, creatures get temporal info from velocity/time inputs |
+| Initial topology | Option B (input→output connected) | Per NEAT paper, creatures can act immediately |
+| Node deletion | No (follow paper) | Disabled genes can re-enable, simpler bookkeeping |
+| Speciation | Reuse existing with pluggable distance | Same algorithm, different distance function for NEAT |
+| Fitness sharing + NEAT | Disable sharing when NEAT enabled | Speciation already protects diversity |
+| Batching strategy | Per-creature first, optimize later | Correctness over performance initially |
+| Innovation scope | Per-run | Simpler, allows parallel runs |
+
+---
 
 ## Why NEAT?
 
@@ -591,92 +629,6 @@ Generation 42
 
 ---
 
-## Implementation Phases
-
-### Phase 8a: Gene Representation (Backend)
-
-**Goal**: NEAT genome format that coexists with fixed topology
-
-1. Add `NEATGenome` Pydantic schema with nodes/connections
-2. Add innovation counter to Run model + migration
-3. Implement `create_minimal_neat_genome(input_size, output_size)`
-4. Implement `neat_genome_to_network()` forward pass (non-batched first)
-5. Add tests comparing NEAT forward pass to fixed topology equivalent
-
-**Files**:
-- `backend/app/schemas/neat.py` (new)
-- `backend/app/neural/neat_network.py` (new)
-- `backend/app/models/run.py` (add columns)
-- `backend/migrations/005_add_neat_columns.py` (new)
-
-### Phase 8b: Structural Mutations
-
-**Goal**: Networks can grow structure
-
-1. Implement `mutate_add_connection()` with innovation tracking
-2. Implement `mutate_add_node()` with connection splitting
-3. Implement `mutate_toggle_connection()` (enable/disable)
-4. Add structural mutations to `mutate_genome()` when `use_neat=True`
-5. Add tests for structural mutation correctness
-
-**Files**:
-- `backend/app/genetics/neat_mutation.py` (new)
-- `backend/app/genetics/mutation.py` (integrate)
-
-### Phase 8c: NEAT Crossover
-
-**Goal**: Meaningful crossover between different topologies
-
-1. Implement gene alignment by innovation ID
-2. Implement NEAT crossover rules (matching/disjoint/excess)
-3. Handle disabled gene inheritance
-4. Add tests for crossover correctness
-
-**Files**:
-- `backend/app/genetics/neat_crossover.py` (new)
-- `backend/app/genetics/crossover.py` (integrate)
-
-### Phase 8d: Speciation
-
-**Goal**: Protect novel topologies from competition
-
-1. Implement compatibility distance function
-2. Implement species assignment
-3. Implement within-species selection
-4. Implement species stagnation/culling
-5. Add species tracking to API responses
-6. Add tests for speciation behavior
-
-**Files**:
-- `backend/app/genetics/speciation.py` (new)
-- `backend/app/api/generations.py` (add species to response)
-
-### Phase 8e: Frontend Integration
-
-**Goal**: Users can enable and visualize NEAT
-
-1. Add NEAT toggle and config to NeuralPanel
-2. Update NeuralVisualizer for variable topology
-3. Add species stats to StatsPanel
-4. Update genome serialization in StorageService
-
-**Files**:
-- `app/components/menu/NeuralPanel.tsx`
-- `src/ui/NeuralVisualizer.ts`
-- `app/components/grid/StatsPanel.tsx`
-- `src/types/simulation.ts`
-
-### Phase 8f: Performance Optimization (Optional)
-
-**Goal**: Batched NEAT execution for large populations
-
-1. Implement batched sparse network representation
-2. Precompute topological sort per genome
-3. Benchmark vs per-creature forward pass
-4. Only use if significant speedup
-
----
-
 ## Testing Strategy
 
 ### Unit Tests
@@ -845,23 +797,97 @@ def fixed_to_neat_genome(fixed_genome: dict) -> dict:
 
 ## References
 
-- [Original NEAT Paper](https://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf) - Stanley & Miikkulainen, 2002
-- [NEAT-Python](https://neat-python.readthedocs.io/) - Reference implementation
-- [MarI/O](https://www.youtube.com/watch?v=qv6UVOQ0F44) - NEAT playing Super Mario World
-- [HyperNEAT](http://eplex.cs.ucf.edu/hyperNEATpage/) - Extension for large-scale networks
+### Papers
+
+- **NEAT**: [Evolving Neural Networks through Augmenting Topologies](https://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf) - Stanley & Miikkulainen, 2002
+  - The foundational paper. Introduces innovation numbers, speciation, and minimal topology initialization.
+
+- **HyperNEAT**: [A Hypercube-Based Encoding for Evolving Large-Scale Neural Networks](http://eplex.cs.ucf.edu/papers/stanley_alife09.pdf) - Stanley et al., 2009
+  - Uses CPPNs to generate weights for large networks. Future consideration for many-muscle creatures.
+
+- **NEAT-MODS**: [Autonomous Evolution of Topographic Regularities](https://www.cs.ucf.edu/~kstanley/neat.html) - Stanley, 2004
+  - Multi-objective variant. Could be useful for balancing fitness vs efficiency.
+
+### Implementations
+
+- [NEAT-Python](https://neat-python.readthedocs.io/) - Well-documented Python implementation
+- [SharpNEAT](https://sharpneat.sourceforge.io/) - High-performance C# implementation
+- [MarI/O](https://www.youtube.com/watch?v=qv6UVOQ0F44) - Famous demo of NEAT playing Super Mario World
+
+### Related
+
+- [Fitness Sharing Paper](https://www.complex-systems.com/abstracts/v01_i04_a04/) - Goldberg & Richardson, 1987
+  - Original fitness sharing for GA diversity. We use speciation instead for NEAT.
 
 ---
 
-## Open Questions
+## Speciation Integration
 
-1. **Recurrent connections**: Allow or disallow? Disallowing is simpler but limits expressiveness.
+NEAT requires speciation but we're already implementing it (Phase 10). The only difference is the **distance function**:
 
-2. **Batching strategy**: Per-creature forward pass vs sparse batched? Start simple, optimize if needed.
+### Fixed Topology (current)
+```python
+def neural_genome_distance(genome_a, genome_b):
+    """Compare flat weight arrays."""
+    weights_a = genome_a['neuralGenome']['weights']
+    weights_b = genome_b['neuralGenome']['weights']
+    return sum(abs(a - b) for a, b in zip(weights_a, weights_b)) / len(weights_a)
+```
 
-3. **Innovation counter scope**: Per-run or global? Per-run is simpler and allows parallel runs.
+### NEAT
+```python
+def neat_genome_distance(genome_a, genome_b, config):
+    """Compare by innovation IDs: excess + disjoint + weight diff."""
+    # See Compatibility Distance section above
+```
 
-4. **Initial topology**: Start with zero connections (fully minimal) or input→output fully connected?
+### Integration Approach
 
-5. **Speciation interaction with fitness sharing**: Use both or just speciation? May be redundant.
+Make `assign_species()` accept a distance function parameter:
 
-6. **Node deletion**: NEAT paper doesn't delete nodes. Allow pruning of unused nodes?
+```python
+def assign_species(
+    genomes: list[dict],
+    fitness_scores: list[float],
+    threshold: float,
+    distance_fn = neural_genome_distance  # Default for fixed topology
+) -> list[Species]:
+    """Assign genomes to species using provided distance function."""
+    # Same algorithm, just uses distance_fn instead of hardcoded function
+```
+
+When NEAT is enabled:
+```python
+if config.use_neat:
+    distance_fn = lambda a, b: neat_genome_distance(a, b, config)
+    # Also auto-disable fitness sharing (redundant with speciation)
+```
+
+---
+
+## Future Considerations
+
+### Recurrent NEAT (Phase 2)
+
+Feedforward-only is simpler but recurrent connections enable:
+- Temporal memory (remember past states)
+- Rhythm generation without external time input
+- More complex behaviors
+
+Implementation would require:
+- Allow cycles in `mutate_add_connection()`
+- Track previous activations per node
+- Process nodes in fixed order (not topological)
+
+### Node Pruning (Maybe Later)
+
+Classic NEAT accumulates dead nodes. If bloat becomes problematic:
+- Remove nodes with no enabled connections
+- Would need to handle innovation ID implications
+
+### HyperNEAT (Future)
+
+For very large networks (many muscles), HyperNEAT uses a CPPN to generate weights:
+- Scales better than direct encoding
+- Exploits geometric regularities
+- Significant additional complexity
