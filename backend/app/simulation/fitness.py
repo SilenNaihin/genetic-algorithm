@@ -546,8 +546,9 @@ def check_disqualifications(
     if B == 0:
         return torch.zeros(0, dtype=torch.bool, device=device)
 
-    # Check for NaN positions
+    # Check for NaN or Inf positions (numerical instability)
     has_nan = torch.isnan(batch.positions).any(dim=(1, 2))  # [B]
+    has_inf = torch.isinf(batch.positions).any(dim=(1, 2))  # [B]
 
     # Check for physics explosion (any node too far from origin)
     # Only check valid nodes
@@ -561,7 +562,7 @@ def check_disqualifications(
     too_high = max_height > config.height_threshold
 
     # Combined disqualification
-    disqualified = has_nan | too_far | too_high
+    disqualified = has_nan | has_inf | too_far | too_high
 
     return disqualified
 
@@ -695,6 +696,35 @@ def update_fitness_state(
     # Check for disqualification
     newly_disqualified = check_disqualifications(batch, config)
     state.disqualified = state.disqualified | newly_disqualified
+
+    # Freeze disqualified creatures to prevent them from flying further into infinity
+    # This zeros their velocities so they stop moving
+    if state.disqualified.any():
+        freeze_disqualified_creatures(batch, state.disqualified)
+
+
+@torch.no_grad()
+def freeze_disqualified_creatures(
+    batch: CreatureBatch,
+    disqualified: torch.Tensor,
+) -> None:
+    """
+    Freeze disqualified creatures by zeroing their velocities.
+
+    This prevents creatures that have been disqualified (e.g., flew too far)
+    from continuing to move and potentially causing numerical issues.
+
+    Args:
+        batch: CreatureBatch (modified in place)
+        disqualified: [B] boolean tensor of disqualified creatures
+    """
+    if not disqualified.any():
+        return
+
+    # Zero velocities for disqualified creatures
+    # disqualified: [B] -> [B, 1, 1] for broadcasting with [B, N, 3]
+    mask = disqualified.unsqueeze(-1).unsqueeze(-1)  # [B, 1, 1]
+    batch.velocities = torch.where(mask, torch.zeros_like(batch.velocities), batch.velocities)
 
 
 @torch.no_grad()

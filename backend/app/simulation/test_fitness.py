@@ -405,6 +405,96 @@ class TestDisqualification:
 
         assert disqualified[0].item()
 
+    def test_inf_position_disqualified(self):
+        """Creature with Inf position should be disqualified."""
+        genome = make_simple_creature()
+        batch = creature_genomes_to_batch([genome])
+
+        # Set position to infinity
+        batch.positions[0, 0, 0] = float('inf')
+
+        disqualified = check_disqualifications(batch)
+
+        assert disqualified[0].item()
+
+    def test_negative_inf_position_disqualified(self):
+        """Creature with -Inf position should be disqualified."""
+        genome = make_simple_creature()
+        batch = creature_genomes_to_batch([genome])
+
+        # Set position to negative infinity
+        batch.positions[0, 0, 2] = float('-inf')
+
+        disqualified = check_disqualifications(batch)
+
+        assert disqualified[0].item()
+
+
+class TestFreezeDisqualified:
+    """Tests for freezing disqualified creatures."""
+
+    def test_disqualified_creature_frozen(self):
+        """Disqualified creatures should have velocities zeroed."""
+        from app.simulation.fitness import freeze_disqualified_creatures
+        import torch
+
+        genome = make_simple_creature()
+        batch = creature_genomes_to_batch([genome])
+
+        # Set some velocity
+        batch.velocities[0, 0] = torch.tensor([1.0, 2.0, 3.0])
+
+        # Mark as disqualified
+        disqualified = torch.tensor([True])
+
+        freeze_disqualified_creatures(batch, disqualified)
+
+        # Velocities should be zero
+        assert (batch.velocities[0, 0] == 0).all()
+
+    def test_non_disqualified_creature_not_frozen(self):
+        """Non-disqualified creatures should keep their velocities."""
+        from app.simulation.fitness import freeze_disqualified_creatures
+        import torch
+
+        genome = make_simple_creature()
+        batch = creature_genomes_to_batch([genome])
+
+        # Set some velocity
+        original_vel = torch.tensor([1.0, 2.0, 3.0])
+        batch.velocities[0, 0] = original_vel.clone()
+
+        # Not disqualified
+        disqualified = torch.tensor([False])
+
+        freeze_disqualified_creatures(batch, disqualified)
+
+        # Velocities should be unchanged
+        assert torch.allclose(batch.velocities[0, 0], original_vel)
+
+    def test_mixed_batch_freezing(self):
+        """Only disqualified creatures in batch should be frozen."""
+        from app.simulation.fitness import freeze_disqualified_creatures
+        import torch
+
+        genome1 = make_simple_creature()
+        genome2 = make_simple_creature()
+        batch = creature_genomes_to_batch([genome1, genome2])
+
+        # Set velocities for both
+        batch.velocities[0, 0] = torch.tensor([1.0, 2.0, 3.0])
+        batch.velocities[1, 0] = torch.tensor([4.0, 5.0, 6.0])
+
+        # Only first is disqualified
+        disqualified = torch.tensor([True, False])
+
+        freeze_disqualified_creatures(batch, disqualified)
+
+        # First should be frozen
+        assert (batch.velocities[0, 0] == 0).all()
+        # Second should keep velocity
+        assert batch.velocities[1, 0, 0].item() == 4.0
+
 
 # =============================================================================
 # Test: Frequency Violation
