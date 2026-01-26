@@ -60,6 +60,10 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 - **NN Update Jitter**: Added `nn_update_interval` (default 4) to reduce jitter
   - NN outputs cached and reused between updates (15 updates/sec instead of 60)
   - Smoother creature movement in neural modes
+- **Extension Limit Edge Cases**: Fixed `apply_extension_limit` with small/zero/negative base lengths
+  - Now clamps base_rest_lengths to minimum 0.01 before calculations
+  - Ensures max_length >= min_length in all cases
+  - Found via integration stress testing (52 edge case tests)
 
 ### Added
 - **Configurable Physics FPS**: Control simulation fidelity with 15-120 FPS physics
