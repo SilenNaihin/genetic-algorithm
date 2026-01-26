@@ -135,7 +135,10 @@ export function useSimulation() {
   );
 
   /**
-   * Update longest survivor tracking
+   * Update longest survivor tracking.
+   * Keeps the BEST performance (highest fitness) for the longest survivor,
+   * not necessarily the latest generation's result.
+   * Also sets _bestPerformanceGeneration so replay fetches the correct frames.
    */
   const updateLongestSurvivor = useCallback(
     (results: CreatureSimulationResult[], gen: number) => {
@@ -145,16 +148,56 @@ export function useSimulation() {
       if (validResults.length === 0) return;
 
       // Find creature with highest survivalStreak
-      const longestSurvivor = validResults.reduce((longest, r) =>
+      const newLongest = validResults.reduce((longest, r) =>
         (r.genome.survivalStreak || 0) > (longest.genome.survivalStreak || 0) ? r : longest
       , validResults[0]);
 
-      const streak = longestSurvivor.genome.survivalStreak || 0;
-      const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
+      const newStreak = newLongest.genome.survivalStreak || 0;
+      if (newStreak <= 0) return;
 
-      if (streak > 0 && streak > currentLongestGens) {
-        setLongestSurvivor(longestSurvivor, streak, gen);
+      const state = useEvolutionStore.getState();
+      const current = state.longestSurvivingCreature;
+      const currentStreak = state.longestSurvivingGenerations;
+
+      // No current longest -> set new one with _bestPerformanceGeneration
+      if (!current) {
+        const resultWithGen = {
+          ...newLongest,
+          genome: { ...newLongest.genome, _bestPerformanceGeneration: gen },
+        };
+        setLongestSurvivor(resultWithGen, newStreak, gen);
+        return;
       }
+
+      const isSameCreature = newLongest.genome.id === current.genome.id;
+      const hasHigherStreak = newStreak > currentStreak;
+      const hasHigherFitness = newLongest.finalFitness > current.finalFitness;
+
+      if (!isSameCreature && hasHigherStreak) {
+        // New creature with higher streak takes the title
+        const resultWithGen = {
+          ...newLongest,
+          genome: { ...newLongest.genome, _bestPerformanceGeneration: gen },
+        };
+        setLongestSurvivor(resultWithGen, newStreak, gen);
+      } else if (isSameCreature && hasHigherFitness) {
+        // Same creature with better performance -> update result and generation
+        const resultWithGen = {
+          ...newLongest,
+          genome: { ...newLongest.genome, _bestPerformanceGeneration: gen },
+        };
+        setLongestSurvivor(resultWithGen, newStreak, gen);
+      } else if (isSameCreature && !hasHigherFitness) {
+        // Same creature with worse/equal performance -> keep best result, preserve _bestPerformanceGeneration
+        const updatedGenome = {
+          ...current.genome,
+          survivalStreak: newStreak,
+          // Keep the original _bestPerformanceGeneration
+        };
+        const updatedResult = { ...current, genome: updatedGenome };
+        setLongestSurvivor(updatedResult, newStreak, gen);
+      }
+      // Otherwise: different creature with equal/lower streak -> no update
     },
     [setLongestSurvivor]
   );
@@ -261,12 +304,39 @@ export function useSimulation() {
     const deadCreatures = sortedResults.slice(survivorCount);
 
     // Check for dying creatures that might be longest survivors
+    // Use same smart logic: keep best performance, set _bestPerformanceGeneration for replay
     for (const dead of deadCreatures) {
       const streak = dead.genome.survivalStreak || 0;
       if (streak > 0) {
-        const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
-        if (streak > currentLongestGens) {
-          setLongestSurvivor(dead, streak, currentGen + 1);
+        const state = useEvolutionStore.getState();
+        const current = state.longestSurvivingCreature;
+        const currentStreak = state.longestSurvivingGenerations;
+
+        if (streak > currentStreak) {
+          const isSameCreature = current && dead.genome.id === current.genome.id;
+          if (isSameCreature) {
+            // Same creature dying - keep their best performance, preserve _bestPerformanceGeneration
+            const hasHigherFitness = dead.finalFitness > current.finalFitness;
+            if (hasHigherFitness) {
+              const resultWithGen = {
+                ...dead,
+                genome: { ...dead.genome, _bestPerformanceGeneration: currentGen },
+              };
+              setLongestSurvivor(resultWithGen, streak, currentGen + 1);
+            } else {
+              // Keep best result with original _bestPerformanceGeneration
+              const updatedGenome = { ...current.genome, survivalStreak: streak };
+              const updatedResult = { ...current, genome: updatedGenome };
+              setLongestSurvivor(updatedResult, streak, currentGen + 1);
+            }
+          } else {
+            // New creature takes the title
+            const resultWithGen = {
+              ...dead,
+              genome: { ...dead.genome, _bestPerformanceGeneration: currentGen },
+            };
+            setLongestSurvivor(resultWithGen, streak, currentGen + 1);
+          }
         }
       }
     }
@@ -519,12 +589,39 @@ export function useSimulation() {
             const survivorCount = Math.floor(sortedPrev.length * (1 - currentConfig.cullPercentage));
             const dyingCreatures = sortedPrev.slice(survivorCount);
 
+            // Use same smart logic: keep best performance, set _bestPerformanceGeneration for replay
             for (const dead of dyingCreatures) {
               const streak = dead.genome.survivalStreak || 0;
               if (streak > 0) {
-                const currentLongestGens = useEvolutionStore.getState().longestSurvivingGenerations;
+                const state = useEvolutionStore.getState();
+                const current = state.longestSurvivingCreature;
+                const currentLongestGens = state.longestSurvivingGenerations;
+
                 if (streak > currentLongestGens) {
-                  setLongestSurvivor(dead, streak, currentGen + 1);
+                  const isSameCreature = current && dead.genome.id === current.genome.id;
+                  if (isSameCreature) {
+                    // Same creature dying - keep their best performance, preserve _bestPerformanceGeneration
+                    const hasHigherFitness = dead.finalFitness > current.finalFitness;
+                    if (hasHigherFitness) {
+                      const resultWithGen = {
+                        ...dead,
+                        genome: { ...dead.genome, _bestPerformanceGeneration: currentGen },
+                      };
+                      setLongestSurvivor(resultWithGen, streak, currentGen + 1);
+                    } else {
+                      // Keep best result with original _bestPerformanceGeneration
+                      const updatedGenome = { ...current.genome, survivalStreak: streak };
+                      const updatedResult = { ...current, genome: updatedGenome };
+                      setLongestSurvivor(updatedResult, streak, currentGen + 1);
+                    }
+                  } else {
+                    // New creature takes the title
+                    const resultWithGen = {
+                      ...dead,
+                      genome: { ...dead.genome, _bestPerformanceGeneration: currentGen },
+                    };
+                    setLongestSurvivor(resultWithGen, streak, currentGen + 1);
+                  }
                 }
               }
             }

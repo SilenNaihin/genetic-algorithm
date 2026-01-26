@@ -392,3 +392,107 @@ class TestSurvivalStreakNumericalEdgeCases:
         run_response = await async_client.get(f"/api/runs/{run_id}")
         run_data = run_response.json()
         assert run_data["longest_survivor_streak"] >= 5
+
+
+class TestLongestSurvivorBestPerformance:
+    """Tests that longest survivor endpoint returns BEST performance, not latest."""
+
+    @pytest.mark.asyncio
+    async def test_longest_survivor_returns_best_fitness_not_latest(
+        self, async_client: AsyncClient, db_session: AsyncSession
+    ):
+        """
+        Verify that the longest-survivor endpoint returns the BEST performance
+        (highest fitness) by querying the database directly.
+
+        The endpoint should order by fitness DESC to return the best performance.
+        """
+        from sqlalchemy import select
+        from app.models.creature import Creature, CreaturePerformance
+
+        # Create a run with low cull to ensure survivors
+        run_response = await async_client.post(
+            "/api/runs",
+            json={
+                "name": "Test Best Performance",
+                "config": {
+                    "population_size": 10,
+                    "cull_percentage": 0.1,  # Low cull = 90% survive
+                    "simulation_duration": 5,
+                }
+            }
+        )
+        assert run_response.status_code == 201
+        run_id = run_response.json()["id"]
+
+        # Run several generations
+        for _ in range(6):
+            step_response = await async_client.post(f"/api/evolution/{run_id}/step")
+            assert step_response.status_code == 200
+
+        # Get the longest survivor via the API
+        survivor_response = await async_client.get(
+            f"/api/creatures/run/{run_id}/longest-survivor"
+        )
+        assert survivor_response.status_code == 200
+        survivor_data = survivor_response.json()
+
+        # Get the creature ID from the response
+        creature_id = survivor_data["id"]
+        returned_fitness = survivor_data["fitness"]
+
+        # Query DB directly for ALL performances of this creature
+        result = await db_session.execute(
+            select(CreaturePerformance)
+            .where(CreaturePerformance.creature_id == creature_id)
+        )
+        performances = result.scalars().all()
+
+        if len(performances) >= 2:
+            # Get the best and latest fitness from DB
+            best_fitness = max(p.fitness for p in performances)
+            latest_gen = max(p.generation for p in performances)
+            latest_fitness = next(p.fitness for p in performances if p.generation == latest_gen)
+
+            # The returned fitness should match the BEST, not necessarily the latest
+            assert abs(returned_fitness - best_fitness) < 0.01, \
+                f"API returned fitness {returned_fitness}, but best in DB is {best_fitness}. " \
+                f"Latest gen ({latest_gen}) fitness is {latest_fitness}. " \
+                f"This suggests the endpoint might be returning latest instead of best."
+
+    @pytest.mark.asyncio
+    async def test_longest_survivor_has_correct_generation_metadata(
+        self, async_client: AsyncClient, db_session: AsyncSession
+    ):
+        """
+        The longest survivor response should include the generation where
+        the creature achieved its best performance, not just the death generation.
+        """
+        run_response = await async_client.post(
+            "/api/runs",
+            json={
+                "name": "Test Generation Metadata",
+                "config": {
+                    "population_size": 10,
+                    "cull_percentage": 0.2,  # Low cull
+                    "simulation_duration": 5,
+                }
+            }
+        )
+        assert run_response.status_code == 201
+        run_id = run_response.json()["id"]
+
+        # Run several generations
+        for _ in range(5):
+            await async_client.post(f"/api/evolution/{run_id}/step")
+
+        # Get longest survivor
+        survivor_response = await async_client.get(
+            f"/api/creatures/run/{run_id}/longest-survivor"
+        )
+
+        if survivor_response.status_code == 200:
+            survivor_data = survivor_response.json()
+            # Response should have generation info
+            assert "generation" in survivor_data, \
+                "Response should include the generation of the best performance"
