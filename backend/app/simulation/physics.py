@@ -1203,10 +1203,14 @@ def apply_extension_limit(
     Returns:
         [B, M] clamped rest lengths
     """
-    min_length = base_rest_lengths / max_extension_ratio
-    max_length = base_rest_lengths * max_extension_ratio
+    # Handle edge cases: ensure base_rest_lengths is at least 0.01 for calculations
+    safe_base = torch.clamp(base_rest_lengths, min=0.01)
+    min_length = safe_base / max_extension_ratio
+    max_length = safe_base * max_extension_ratio
     # Ensure min is at least 0.01 for physics safety
     min_length = torch.clamp(min_length, min=0.01)
+    # Ensure max >= min (handles any edge cases)
+    max_length = torch.maximum(max_length, min_length)
     return torch.clamp(rest_lengths, min=min_length, max=max_length)
 
 
