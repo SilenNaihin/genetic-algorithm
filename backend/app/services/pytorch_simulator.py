@@ -93,8 +93,12 @@ class PyTorchSimulator:
         # Convert genomes to tensor batch
         batch = creature_genomes_to_batch(genomes, device=self.device)
 
-        # Check for frequency violations before simulation
-        freq_violations = check_frequency_violations(batch, fitness_config)
+        # Check for frequency violations before simulation (only for hybrid mode)
+        # In pure mode, frequency is not used - neural net directly controls muscles
+        if config.neural_mode == 'pure':
+            freq_violations = torch.zeros(batch.batch_size, dtype=torch.bool, device=self.device)
+        else:
+            freq_violations = check_frequency_violations(batch, fitness_config)
 
         # Initialize pellets and fitness state
         pellet_batch = initialize_pellets(batch, arena_size=config.arena_size)
