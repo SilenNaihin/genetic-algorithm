@@ -3,6 +3,8 @@ Mutation operators for genetic evolution.
 
 Ported from TypeScript src/genetics/Mutation.ts.
 Works with genome dicts (matching API schema).
+
+For NEAT genomes, use mutate_genome_neat() or set use_neat=True in mutate_genome().
 """
 
 import math
@@ -575,5 +577,186 @@ def mutate_genome(
             mutated_neural = adapt_neural_topology(mutated_neural, new_muscle_count)
 
         new_genome['neuralGenome'] = mutated_neural
+
+    return new_genome
+
+
+# =============================================================================
+# NEAT MUTATION INTEGRATION
+# =============================================================================
+
+
+@dataclass
+class NEATMutationConfig:
+    """Configuration for NEAT-specific mutations.
+
+    These parameters control structural mutation rates that affect network topology.
+    Weight/bias mutations still use the standard neural_rate and neural_magnitude.
+    """
+
+    # Structural mutation rates
+    add_connection_rate: float = 0.05  # Per-genome probability to add a connection
+    add_node_rate: float = 0.03  # Per-genome probability to add a node
+    enable_rate: float = 0.02  # Per-genome probability to re-enable a disabled connection
+    disable_rate: float = 0.01  # Per-genome probability to disable a connection
+
+    # Weight mutation params (applied to all weights)
+    weight_mutation_rate: float = 0.8  # Probability genome's weights are mutated
+    weight_perturb_rate: float = 0.9  # Of mutations: perturb vs reset
+    weight_perturb_magnitude: float = 0.2  # Std dev for Gaussian perturbation
+
+    # Topology limits
+    max_hidden_nodes: int = 16  # Maximum hidden neurons to prevent bloat
+
+
+def mutate_genome_neat(
+    genome: dict,
+    innovation_counter,
+    config: MutationConfig | None = None,
+    constraints: GenomeConstraints | None = None,
+    neat_config: NEATMutationConfig | None = None,
+) -> dict:
+    """
+    Mutate a genome that uses NEAT for its neural network.
+
+    This mutates the body (nodes/muscles) using standard mutation,
+    and the neural network (neatGenome) using NEAT structural mutations.
+
+    Args:
+        genome: Genome dict with 'neatGenome' key containing NEATGenome
+        innovation_counter: InnovationCounter for tracking structural mutations
+        config: Standard mutation config for body mutations
+        constraints: Genome constraints
+        neat_config: NEAT-specific mutation config
+
+    Returns:
+        New mutated genome
+    """
+    # Import here to avoid circular dependencies
+    from app.genetics.neat_mutation import mutate_neat_genome
+    from app.schemas.neat import NEATGenome, InnovationCounter
+
+    if config is None:
+        config = MutationConfig()
+    if constraints is None:
+        constraints = GenomeConstraints()
+    if neat_config is None:
+        neat_config = NEATMutationConfig()
+
+    # First, mutate the body (nodes, muscles) using standard mutation
+    # But skip neural genome mutation - we'll handle that with NEAT
+    new_genome = _mutate_body_only(genome, config, constraints)
+
+    # Now mutate the NEAT genome if present
+    neat_genome = genome.get('neatGenome') or genome.get('neat_genome')
+    if neat_genome:
+        # Convert to NEATGenome if it's a dict
+        if isinstance(neat_genome, dict):
+            neat_genome = NEATGenome(**neat_genome)
+
+        # Convert innovation_counter if needed
+        if isinstance(innovation_counter, dict):
+            innovation_counter = InnovationCounter(**innovation_counter)
+
+        # Apply NEAT mutations
+        mutated_neat = mutate_neat_genome(
+            neat_genome,
+            innovation_counter,
+            add_connection_rate=neat_config.add_connection_rate,
+            add_node_rate=neat_config.add_node_rate,
+            enable_rate=neat_config.enable_rate,
+            disable_rate=neat_config.disable_rate,
+            weight_mutation_rate=neat_config.weight_mutation_rate,
+            weight_perturb_rate=neat_config.weight_perturb_rate,
+            weight_perturb_magnitude=neat_config.weight_perturb_magnitude,
+            max_hidden_nodes=neat_config.max_hidden_nodes,
+        )
+
+        # Store as dict for JSON serialization
+        new_genome['neatGenome'] = mutated_neat.model_dump()
+
+    return new_genome
+
+
+def _mutate_body_only(
+    genome: dict,
+    config: MutationConfig,
+    constraints: GenomeConstraints,
+) -> dict:
+    """
+    Mutate only the body part of a genome (nodes, muscles), not neural.
+
+    This is used by mutate_genome_neat to handle body mutations while
+    NEAT handles neural mutations separately.
+    """
+    nodes = genome.get('nodes', [])
+    muscles = genome.get('muscles', [])
+
+    # Mutate nodes and create ID mapping
+    new_nodes = []
+    old_to_new_id: dict[str, str] = {}
+
+    for node in nodes:
+        new_node = mutate_node(node, config, constraints)
+        old_to_new_id[node['id']] = new_node['id']
+        new_nodes.append(new_node)
+
+    # Mutate muscles with updated node references
+    new_muscles = []
+    for muscle in muscles:
+        new_muscle = mutate_muscle(muscle, config, constraints)
+        old_a = muscle.get('nodeA') or muscle.get('node_a', '')
+        old_b = muscle.get('nodeB') or muscle.get('node_b', '')
+        new_muscle['nodeA'] = old_to_new_id.get(old_a, old_a)
+        new_muscle['nodeB'] = old_to_new_id.get(old_b, old_b)
+        new_muscles.append(new_muscle)
+
+    # Build new genome
+    new_genome = {
+        'id': generate_id('creature'),
+        'generation': genome.get('generation', 0),
+        'parentIds': genome.get('parentIds', genome.get('parent_ids', [])),
+        'survivalStreak': genome.get('survivalStreak', genome.get('survival_streak', 0)),
+        'nodes': new_nodes,
+        'muscles': new_muscles,
+        'globalFrequencyMultiplier': genome.get('globalFrequencyMultiplier', genome.get('global_frequency_multiplier', 1.0)),
+        'controllerType': genome.get('controllerType', genome.get('controller_type', 'oscillator')),
+    }
+
+    # Mutate global frequency multiplier
+    if random.random() < config.rate:
+        new_genome['globalFrequencyMultiplier'] = mutate_value(
+            new_genome['globalFrequencyMultiplier'],
+            0.3, 2.0,
+            config.magnitude
+        )
+
+    # Mutate color if present
+    color = genome.get('color')
+    if color:
+        new_color = dict(color)
+        if random.random() < config.rate * 0.5:
+            new_color['h'] = (color.get('h', 0.5) + (random.random() * 0.1 - 0.05) + 1) % 1
+        new_genome['color'] = new_color
+
+    # Structural mutations for body (not neural)
+    if random.random() < config.structural_rate:
+        result = add_node(new_genome, constraints)
+        if result:
+            node, muscle = result
+            new_genome['nodes'].append(node)
+            new_genome['muscles'].append(muscle)
+
+    if random.random() < config.structural_rate:
+        result = remove_node(new_genome, constraints)
+        if result:
+            node_id, muscle_ids = result
+            new_genome['nodes'] = [n for n in new_genome['nodes'] if n['id'] != node_id]
+            new_genome['muscles'] = [m for m in new_genome['muscles'] if m['id'] not in muscle_ids]
+
+    if random.random() < config.structural_rate:
+        new_muscle = add_muscle(new_genome, constraints)
+        if new_muscle:
+            new_genome['muscles'].append(new_muscle)
 
     return new_genome

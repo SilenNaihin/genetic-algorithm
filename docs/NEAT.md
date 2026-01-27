@@ -19,6 +19,7 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | NEAT Crossover | **Complete** | `backend/app/genetics/neat_crossover.py` | align_genes, neat_crossover, neat_crossover_equal_fitness, crossover_biases |
 | Compatibility Distance | **Complete** | `backend/app/genetics/neat_distance.py` | neat_genome_distance, neat_genome_distance_from_dict, create_neat_distance_fn |
 | Speciation Integration | **Complete** | `backend/app/genetics/speciation.py` | Already has `distance_fn` param |
+| Mutation Integration | **Complete** | `backend/app/genetics/mutation.py` | mutate_genome_neat, NEATMutationConfig |
 | Frontend UI | Not started | `app/components/menu/NeuralPanel.tsx` | |
 | Visualizer | Not started | `src/ui/NeuralVisualizer.ts` | |
 

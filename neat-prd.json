@@ -105,7 +105,7 @@
       "backend_mutation_integration": {
         "id": "1.7",
         "name": "Mutation Integration",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/genetics/mutation.py",
         "new_file": false,
         "description": "Route to NEAT mutations when use_neat=True",
