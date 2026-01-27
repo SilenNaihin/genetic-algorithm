@@ -131,7 +131,7 @@
       "backend_genetics_schema": {
         "id": "1.10",
         "name": "Genetics Config Schema",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/schemas/genetics.py",
         "new_file": false,
         "description": "Add NEAT fields to EvolutionConfig",
@@ -143,6 +143,12 @@
           "neat_disjoint_coefficient: float = 1.0",
           "neat_weight_coefficient: float = 0.4",
           "max_hidden_nodes: int = 16"
+        ],
+        "also_added": [
+          "InnovationCounterState schema for persisting innovation counters",
+          "innovation_counter field on EvolveRequest/Response",
+          "use_neat field on GeneratePopulationRequest",
+          "innovation_counter field on GeneratePopulationResponse"
         ]
       },
       "backend_simulation_schema": {
@@ -230,7 +236,27 @@
         "status": "pending",
         "file": "src/ui/NeuralVisualizer.ts",
         "new_file": false,
-        "description": "Handle variable topology: layout by depth, skip connections, disabled as dashed"
+        "description": "Handle variable topology: layout by depth, skip connections, disabled as dashed",
+        "details": {
+          "topology_changes": [
+            "Accept NEATGenome instead of/in addition to fixed-topology NeuralGenomeData",
+            "Compute node positions based on topological depth (not fixed layers)",
+            "Draw skip connections (input->output, input->deep hidden)",
+            "Show disabled connections as dashed lines",
+            "Handle variable hidden layer sizes per creature"
+          ],
+          "frame_activations": [
+            "Update FrameActivations interface to handle variable hidden sizes",
+            "Backend returns per-node activations indexed by node ID",
+            "Map node IDs to visualization positions",
+            "Support both fixed-topology and NEAT activation formats"
+          ],
+          "related_files": [
+            "src/types/simulation.ts (FrameActivations interface)",
+            "app/components/modals/ReplayModal.tsx (passes activations to visualizer)",
+            "backend/app/services/pytorch_simulator.py (returns NEAT activations)"
+          ]
+        }
       },
       "frontend_stats": {
         "id": "1.20",

@@ -22,8 +22,15 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | Mutation Integration | **Complete** | `backend/app/genetics/mutation.py` | mutate_genome_neat, NEATMutationConfig |
 | Crossover Integration | **Complete** | `backend/app/genetics/crossover.py` | single_point_crossover, uniform_crossover, clone_genome now support use_neat param |
 | Population Integration | **Complete** | `backend/app/genetics/population.py` | EvolutionConfig has NEAT fields, evolve_population uses NEAT operators when use_neat=True |
+| Genetics Config Schema | **Complete** | `backend/app/schemas/genetics.py` | EvolutionConfig, InnovationCounterState, EvolveRequest/Response with NEAT fields |
+| Simulation Config Schema | Not started | `backend/app/schemas/simulation.py` | |
+| Simulator NEAT Support | Not started | `backend/app/services/pytorch_simulator.py` | |
+| Run Model/Migration | Not started | `backend/app/models/run.py` | |
+| API Changes | Not started | `backend/app/api/evolution.py` | |
+| Frontend Types | Not started | `src/types/simulation.ts` | |
 | Frontend UI | Not started | `app/components/menu/NeuralPanel.tsx` | |
-| Visualizer | Not started | `src/ui/NeuralVisualizer.ts` | |
+| Visualizer | Not started | `src/ui/NeuralVisualizer.ts` | Needs NEAT topology support + frame activations |
+| Storage Service | Not started | `src/services/StorageService.ts` | |
 
 *Update this table as implementation progresses.*
 

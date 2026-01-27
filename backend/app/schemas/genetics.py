@@ -75,6 +75,17 @@ class EvolutionConfig(BaseModel):
     use_neural_net: bool = True
     neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
 
+    # NEAT (NeuroEvolution of Augmenting Topologies)
+    use_neat: bool = False  # Enable NEAT for variable-topology neural networks
+    neat_add_connection_rate: float = Field(default=0.05, ge=0.0, le=1.0)  # Probability to add connection
+    neat_add_node_rate: float = Field(default=0.03, ge=0.0, le=1.0)  # Probability to add node
+    neat_enable_rate: float = Field(default=0.02, ge=0.0, le=1.0)  # Probability to re-enable connection
+    neat_disable_rate: float = Field(default=0.01, ge=0.0, le=1.0)  # Probability to disable connection
+    neat_excess_coefficient: float = Field(default=1.0, ge=0.0, le=10.0)  # Weight for excess genes in distance
+    neat_disjoint_coefficient: float = Field(default=1.0, ge=0.0, le=10.0)  # Weight for disjoint genes in distance
+    neat_weight_coefficient: float = Field(default=0.4, ge=0.0, le=10.0)  # Weight for weight differences in distance
+    neat_max_hidden_nodes: int = Field(default=16, ge=1, le=128)  # Maximum hidden neurons to prevent bloat
+
 
 class PopulationStats(BaseModel):
     """Statistics about a population."""
@@ -87,6 +98,13 @@ class PopulationStats(BaseModel):
     avg_muscles: float
 
 
+class InnovationCounterState(BaseModel):
+    """State of innovation counters for NEAT (persisted across generations)."""
+
+    next_connection: int = Field(default=0, ge=0)  # Next connection innovation number
+    next_node: int = Field(default=0, ge=0)  # Next node innovation number
+
+
 class EvolveRequest(BaseModel):
     """Request to evolve a population one generation."""
 
@@ -94,6 +112,8 @@ class EvolveRequest(BaseModel):
     fitness_scores: list[float]  # Fitness for each genome (same order)
     config: EvolutionConfig = Field(default_factory=EvolutionConfig)
     generation: int = 0  # Current generation (for decay calculations)
+    # NEAT innovation counter state (optional, used to persist counter across generations)
+    innovation_counter: InnovationCounterState | None = None
 
 
 class EvolveResponse(BaseModel):
@@ -102,6 +122,8 @@ class EvolveResponse(BaseModel):
     genomes: list[CreatureGenome]
     generation: int
     stats: PopulationStats
+    # NEAT innovation counter state (returned when use_neat=True)
+    innovation_counter: InnovationCounterState | None = None
 
 
 class GeneratePopulationRequest(BaseModel):
@@ -116,6 +138,8 @@ class GeneratePopulationRequest(BaseModel):
     time_encoding: Literal['none', 'sin', 'raw', 'cyclic', 'sin_raw'] = 'cyclic'
     use_proprioception: bool = False
     proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'
+    # NEAT
+    use_neat: bool = False  # Use NEAT for variable-topology neural networks
 
 
 class GeneratePopulationResponse(BaseModel):
@@ -123,3 +147,5 @@ class GeneratePopulationResponse(BaseModel):
 
     genomes: list[CreatureGenome]
     count: int
+    # NEAT innovation counter state (returned when use_neat=True)
+    innovation_counter: InnovationCounterState | None = None
