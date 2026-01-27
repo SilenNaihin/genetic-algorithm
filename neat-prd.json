@@ -81,7 +81,7 @@
       "backend_distance": {
         "id": "1.5",
         "name": "Compatibility Distance",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/genetics/neat_distance.py",
         "new_file": true,
         "description": "NEAT genome distance for speciation",
@@ -96,7 +96,7 @@
       "backend_speciation_update": {
         "id": "1.6",
         "name": "Speciation Distance Function",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/genetics/speciation.py",
         "new_file": false,
         "description": "Add distance_fn parameter to assign_species()",
