@@ -409,5 +409,36 @@
         }
       }
     ]
+  },
+  "maybe_add": {
+    "description": "Alternative mutation strategies to explore if Gaussian mutation proves insufficient",
+    "mutation_variants": [
+      {
+        "name": "Cauchy Mutation",
+        "description": "Heavy-tailed distribution for more aggressive exploration",
+        "rationale": "Cauchy distribution has infinite variance - occasionally produces very large mutations that can escape local optima. Good for exploring far from current solution.",
+        "parameters": {
+          "rate": "Probability of mutating each weight (default 0.1)",
+          "gamma": "Scale parameter controlling tail heaviness (default 0.1)"
+        },
+        "code_snippet": "cauchy_noise = gamma * torch.tan(np.pi * (u - 0.5))"
+      },
+      {
+        "name": "Mutation with Reset",
+        "description": "Gaussian mutation plus occasional complete weight reset",
+        "rationale": "Combines local search (Gaussian) with global search (reset). Reset probability adds 'extinction events' that can break out of deep local optima.",
+        "parameters": {
+          "rate": "Probability of Gaussian mutation (default 0.1)",
+          "sigma": "Gaussian standard deviation (default 0.3)",
+          "reset_prob": "Probability of complete weight reset (default 0.05)"
+        },
+        "code_snippet": "new_genome = torch.where(reset_mask, torch.randn(genome.shape), new_genome)"
+      }
+    ],
+    "implementation_notes": [
+      "Could add as dropdown option alongside current Gaussian mutation",
+      "Reset mutation particularly useful if fitness plateaus for many generations",
+      "Cauchy requires careful gamma tuning - too high causes random search"
+    ]
   }
 }
