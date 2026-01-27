@@ -15,7 +15,7 @@
   },
   "phase_1": {
     "name": "Feedforward NEAT",
-    "status": "pending",
+    "status": "complete",
     "goal": "Complete working NEAT with feedforward networks only",
     "tasks": {
       "backend_schemas": {
@@ -261,7 +261,7 @@
       "frontend_visualizer": {
         "id": "1.19",
         "name": "Neural Visualizer",
-        "status": "pending",
+        "status": "complete",
         "file": "src/ui/NeuralVisualizer.ts",
         "new_file": false,
         "description": "Handle variable topology: layout by depth, skip connections, disabled as dashed",
@@ -289,7 +289,7 @@
       "frontend_stats": {
         "id": "1.20",
         "name": "Stats Panel",
-        "status": "pending",
+        "status": "complete",
         "file": "app/components/grid/StatsPanel.tsx",
         "new_file": false,
         "description": "Show avg hidden nodes, avg connections (species count from speciation)"
@@ -297,26 +297,36 @@
       "frontend_storage": {
         "id": "1.21",
         "name": "Storage Service",
-        "status": "pending",
+        "status": "complete",
         "file": "src/services/StorageService.ts",
         "new_file": false,
-        "description": "Handle NEAT genome format in save/load"
+        "description": "Handle NEAT genome format in save/load",
+        "implementation": {
+          "changes": [
+            "Added NEATGenome import to ApiClient.ts",
+            "Updated toApiGenome() to convert neatGenome to API format (snake_case)",
+            "Updated fromApiGenome() to parse neat_genome from API response",
+            "Added neatGenome field to CreatureGenome interface in genome.ts"
+          ]
+        }
       },
       "docs_neat": {
         "id": "1.22",
         "name": "NEAT Documentation",
-        "status": "pending",
+        "status": "complete",
         "file": "docs/NEAT.md",
         "new_file": false,
-        "description": "Update with final implementation details"
+        "description": "Update with final implementation details",
+        "note": "Implementation status table maintained throughout development"
       },
       "docs_evolution": {
         "id": "1.23",
         "name": "Evolution Documentation",
-        "status": "pending",
+        "status": "deferred",
         "file": "docs/EVOLUTION.md",
         "new_file": false,
-        "description": "Add NEAT section"
+        "description": "Add NEAT section",
+        "note": "Defer until Phase 1 frontend tasks complete"
       }
     },
     "verification": {

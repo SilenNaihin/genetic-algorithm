@@ -9,12 +9,16 @@
  * - Node activations (color intensity)
  * - Dynamic node sizing based on layer sizes
  *
+ * Supports two network types:
+ * 1. Fixed topology (NeuralGenomeData) - standard feedforward with fixed layers
+ * 2. NEAT topology (NEATGenome) - variable topology with arbitrary connections
+ *
  * Note: This is pure UI code. Weights are read directly from genome data
  * (which comes from the backend). No neural network computation happens here.
  */
 
 import type { NeuralGenomeData, NeuralTopology } from '../neural';
-import type { FrameActivations } from '../types';
+import type { FrameActivations, NEATGenome, NeuronGene, ConnectionGene } from '../types';
 import { getActivation } from '../neural';
 
 /**
@@ -34,6 +38,79 @@ interface ForwardResult {
   hidden: number[];
   outputs: number[];
   outputs_raw?: number[];  // Pre-dead-zone outputs (pure mode only)
+}
+
+/** NEAT visualization data - extracted from NEATGenome for rendering */
+interface NEATVisualizationData {
+  neurons: NeuronGene[];
+  connections: ConnectionGene[];
+  neuronDepths: Map<number, number>;  // Neuron ID -> depth for Y positioning
+  maxDepth: number;
+}
+
+/** NEAT activation data with node ID mapping */
+interface NEATActivations {
+  byNodeId: Map<number, number>;  // Neuron ID -> activation value
+  inputs: number[];
+  hidden: number[];
+  outputs: number[];
+  outputs_raw?: number[];
+}
+
+/**
+ * Calculate depth for each neuron in a NEAT network (for visualization layout).
+ * Input neurons have depth 0, output neurons have max depth.
+ * Hidden neurons are placed based on their longest path from inputs.
+ */
+function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, number>; maxDepth: number } {
+  const inputIds = new Set(genome.neurons.filter(n => n.type === 'input').map(n => n.id));
+  const outputIds = new Set(genome.neurons.filter(n => n.type === 'output').map(n => n.id));
+
+  // Build outgoing adjacency list
+  const outgoing = new Map<number, Set<number>>();
+  for (const n of genome.neurons) {
+    outgoing.set(n.id, new Set());
+  }
+  for (const conn of genome.connections) {
+    if (conn.enabled) {
+      outgoing.get(conn.fromNode)?.add(conn.toNode);
+    }
+  }
+
+  // BFS from inputs to calculate max depth
+  const depths = new Map<number, number>();
+  for (const inputId of inputIds) {
+    depths.set(inputId, 0);
+  }
+
+  const queue = [...inputIds];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDepth = depths.get(current) ?? 0;
+
+    for (const target of outgoing.get(current) ?? []) {
+      const newDepth = currentDepth + 1;
+      if (!depths.has(target) || newDepth > depths.get(target)!) {
+        depths.set(target, newDepth);
+        queue.push(target);
+      }
+    }
+  }
+
+  // Find max depth and ensure all outputs have the same (max) depth
+  let maxDepth = Math.max(...depths.values(), 1);
+  for (const outputId of outputIds) {
+    depths.set(outputId, maxDepth);
+  }
+
+  // Any neuron not reached gets depth 0 (disconnected)
+  for (const neuron of genome.neurons) {
+    if (!depths.has(neuron.id)) {
+      depths.set(neuron.id, 0);
+    }
+  }
+
+  return { depths, maxDepth };
 }
 
 /**
@@ -148,6 +225,11 @@ export class NeuralVisualizer {
   private proprioception: ProprioceptionConfig = { enabled: false, inputs: 'all', numMuscles: 0, numNodes: 0 };
   // Note: deadZone display is now handled by comparing raw vs post-dead-zone values
 
+  // NEAT-specific state
+  private neatData: NEATVisualizationData | null = null;
+  private neatActivations: NEATActivations | null = null;
+  private isNEAT: boolean = false;
+
   constructor(container: HTMLElement, options: Partial<NeuralVisualizerOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -171,7 +253,7 @@ export class NeuralVisualizer {
   }
 
   /**
-   * Set the neural genome to visualize.
+   * Set the neural genome to visualize (fixed topology).
    * Extracts weights directly from genome data - no NeuralNetwork class needed.
    */
   setGenome(genome: NeuralGenomeData | undefined, muscleNames: string[]): void {
@@ -180,9 +262,17 @@ export class NeuralVisualizer {
       this.topology = null;
       this.activationFn = null;
       this.muscleNames = [];
+      this.isNEAT = false;
+      this.neatData = null;
+      this.neatActivations = null;
       this.render();
       return;
     }
+
+    // Clear NEAT data when using fixed topology
+    this.isNEAT = false;
+    this.neatData = null;
+    this.neatActivations = null;
 
     // Extract weights directly from genome data
     this.weights = extractWeightMatrices(genome.weights, genome.topology);
@@ -190,6 +280,54 @@ export class NeuralVisualizer {
     this.activationFn = getActivation(genome.activation);
     this.muscleNames = muscleNames;
     this.lastResult = null;
+    this.render();
+  }
+
+  /**
+   * Set a NEAT genome to visualize (variable topology).
+   * Computes neuron depths for layout and prepares connection data.
+   */
+  setNEATGenome(genome: NEATGenome | undefined, muscleNames: string[]): void {
+    if (!genome) {
+      this.neatData = null;
+      this.neatActivations = null;
+      this.isNEAT = false;
+      this.muscleNames = [];
+      this.render();
+      return;
+    }
+
+    // Clear fixed topology data
+    this.weights = null;
+    this.topology = null;
+    this.activationFn = null;
+    this.lastResult = null;
+
+    // Set up NEAT visualization
+    this.isNEAT = true;
+    this.muscleNames = muscleNames;
+
+    // Compute neuron depths for layout
+    const { depths, maxDepth } = computeNEATNeuronDepths(genome);
+
+    this.neatData = {
+      neurons: genome.neurons,
+      connections: genome.connections,
+      neuronDepths: depths,
+      maxDepth,
+    };
+
+    // Create a synthetic topology for input count etc.
+    const inputCount = genome.neurons.filter(n => n.type === 'input').length;
+    const hiddenCount = genome.neurons.filter(n => n.type === 'hidden').length;
+    const outputCount = genome.neurons.filter(n => n.type === 'output').length;
+    this.topology = {
+      inputSize: inputCount,
+      hiddenSize: hiddenCount,
+      outputSize: outputCount,
+    };
+
+    this.neatActivations = null;
     this.render();
   }
 
@@ -236,6 +374,47 @@ export class NeuralVisualizer {
         outputs_raw: activations.outputs_raw?.slice(0, this.topology.outputSize),
       };
     }
+
+    // For NEAT, also build node ID -> activation map
+    if (this.isNEAT && this.neatData && !Array.isArray(activations)) {
+      const byNodeId = new Map<number, number>();
+
+      // Map inputs by sorted input neuron IDs
+      const inputNeurons = this.neatData.neurons
+        .filter(n => n.type === 'input')
+        .sort((a, b) => a.id - b.id);
+      const inputVals = activations.inputs || [];
+      inputNeurons.forEach((n, i) => {
+        byNodeId.set(n.id, inputVals[i] ?? 0);
+      });
+
+      // Map hidden by sorted hidden neuron IDs
+      const hiddenNeurons = this.neatData.neurons
+        .filter(n => n.type === 'hidden')
+        .sort((a, b) => a.id - b.id);
+      const hiddenVals = activations.hidden || [];
+      hiddenNeurons.forEach((n, i) => {
+        byNodeId.set(n.id, hiddenVals[i] ?? 0);
+      });
+
+      // Map outputs by sorted output neuron IDs
+      const outputNeurons = this.neatData.neurons
+        .filter(n => n.type === 'output')
+        .sort((a, b) => a.id - b.id);
+      const outputVals = activations.outputs || [];
+      outputNeurons.forEach((n, i) => {
+        byNodeId.set(n.id, outputVals[i] ?? 0);
+      });
+
+      this.neatActivations = {
+        byNodeId,
+        inputs: inputVals,
+        hidden: hiddenVals,
+        outputs: outputVals,
+        outputs_raw: activations.outputs_raw,
+      };
+    }
+
     this.render();
   }
 
@@ -294,6 +473,9 @@ export class NeuralVisualizer {
     this.lastResult = null;
     this.timeEncoding = 'none';
     this.proprioception = { enabled: false, inputs: 'all', numMuscles: 0, numNodes: 0 };
+    this.isNEAT = false;
+    this.neatData = null;
+    this.neatActivations = null;
     this.render();
   }
 
@@ -333,6 +515,12 @@ export class NeuralVisualizer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('No neural network', width / 2, height / 2);
+      return;
+    }
+
+    // Branch to NEAT-specific rendering if applicable
+    if (this.isNEAT && this.neatData) {
+      this.renderNEAT();
       return;
     }
 
@@ -395,6 +583,326 @@ export class NeuralVisualizer {
     ctx.fillText(`In (${displayInputSize})`, 5, layerY[0]);
     ctx.fillText(`H (${hiddenSize})`, 5, layerY[1]);
     ctx.fillText(`Out (${outputSize})`, 5, layerY[2]);
+  }
+
+  /**
+   * Render NEAT network with variable topology.
+   * Neurons are positioned by depth (inputs at top, outputs at bottom, hidden in between).
+   * Supports skip connections and disabled connections (shown as dashed).
+   */
+  private renderNEAT(): void {
+    if (!this.neatData || !this.topology) return;
+
+    const { width, height } = this.options;
+    const ctx = this.ctx;
+    const { neurons, connections, neuronDepths, maxDepth } = this.neatData;
+
+    // Separate neurons by type
+    const inputNeurons = neurons.filter(n => n.type === 'input').sort((a, b) => a.id - b.id);
+    const hiddenNeurons = neurons.filter(n => n.type === 'hidden').sort((a, b) => a.id - b.id);
+    const outputNeurons = neurons.filter(n => n.type === 'output').sort((a, b) => a.id - b.id);
+
+    // Get non-padded inputs for display
+    const { labels: inputLabels } = this.getNonPaddedInputs();
+    const displayInputSize = inputLabels.length;
+
+    // Vertical layout padding
+    const topPadding = 35;
+    const bottomPadding = 45;
+    const sidePadding = 8;
+    const availableHeight = height - topPadding - bottomPadding;
+
+    // Calculate Y positions based on depth
+    const getYForDepth = (depth: number) => {
+      if (maxDepth <= 1) return height / 2;
+      return topPadding + (depth / maxDepth) * availableHeight;
+    };
+
+    // Calculate positions for all neurons
+    const neuronPositions = new Map<number, { x: number; y: number }>();
+
+    // Input neurons (depth 0) - filter to non-padded
+    const inputX = this.getNodeXPositions(displayInputSize, width, sidePadding);
+    inputNeurons.slice(0, displayInputSize).forEach((n, i) => {
+      neuronPositions.set(n.id, { x: inputX[i], y: getYForDepth(0) });
+    });
+
+    // Hidden neurons - group by depth for horizontal positioning
+    const hiddenByDepth = new Map<number, NeuronGene[]>();
+    for (const n of hiddenNeurons) {
+      const depth = neuronDepths.get(n.id) ?? 1;
+      if (!hiddenByDepth.has(depth)) hiddenByDepth.set(depth, []);
+      hiddenByDepth.get(depth)!.push(n);
+    }
+
+    for (const [depth, neuronsAtDepth] of hiddenByDepth) {
+      const xPositions = this.getNodeXPositions(neuronsAtDepth.length, width, sidePadding);
+      neuronsAtDepth.forEach((n, i) => {
+        neuronPositions.set(n.id, { x: xPositions[i], y: getYForDepth(depth) });
+      });
+    }
+
+    // Output neurons (max depth)
+    const outputX = this.getNodeXPositions(outputNeurons.length, width, sidePadding);
+    outputNeurons.forEach((n, i) => {
+      neuronPositions.set(n.id, { x: outputX[i], y: getYForDepth(maxDepth) });
+    });
+
+    // Get activations
+    const getActivation = (neuronId: number): number => {
+      return this.neatActivations?.byNodeId.get(neuronId) ?? 0;
+    };
+
+    // Calculate node radius
+    const maxLayerSize = Math.max(
+      displayInputSize,
+      Math.max(...[...hiddenByDepth.values()].map(arr => arr.length), 0),
+      outputNeurons.length
+    );
+    const nodeRadius = this.calculateNodeRadius(maxLayerSize || 1, width, sidePadding);
+
+    // Draw connections first (behind nodes)
+    for (const conn of connections) {
+      const fromPos = neuronPositions.get(conn.fromNode);
+      const toPos = neuronPositions.get(conn.toNode);
+      if (!fromPos || !toPos) continue;
+
+      const fromActivation = getActivation(conn.fromNode);
+      const signal = fromActivation * conn.weight;
+
+      this.drawNEATConnection(
+        ctx,
+        fromPos.x, fromPos.y,
+        toPos.x, toPos.y,
+        conn.weight,
+        signal,
+        conn.enabled
+      );
+    }
+
+    // Draw input nodes with labels
+    const displayedInputNeurons = inputNeurons.slice(0, displayInputSize);
+    const inputActivations = displayedInputNeurons.map(n => getActivation(n.id));
+    const inputPositions = displayedInputNeurons.map(n => neuronPositions.get(n.id)!);
+    for (let i = 0; i < inputPositions.length; i++) {
+      const pos = inputPositions[i];
+      this.drawSingleNode(ctx, pos.x, pos.y, inputActivations[i], nodeRadius);
+    }
+    // Draw input labels
+    this.drawNEATNodeLabels(ctx, inputPositions.map(p => p.x), getYForDepth(0), inputActivations, nodeRadius, inputLabels, 'top');
+
+    // Draw hidden nodes (no labels)
+    for (const [_depth, neuronsAtDepth] of hiddenByDepth) {
+      for (const n of neuronsAtDepth) {
+        const pos = neuronPositions.get(n.id);
+        if (pos) {
+          this.drawSingleNode(ctx, pos.x, pos.y, getActivation(n.id), nodeRadius);
+        }
+      }
+    }
+
+    // Draw output nodes with labels
+    const outputActivations = outputNeurons.map(n => getActivation(n.id));
+    const outputPositions = outputNeurons.map(n => neuronPositions.get(n.id)!);
+    const outputLabels = this.muscleNames.length > 0
+      ? this.muscleNames.map(name => `M${name}`)
+      : Array.from({ length: outputNeurons.length }, (_, i) => `O${i + 1}`);
+
+    const rawOutputs = this.neatActivations?.outputs_raw || outputActivations;
+    for (let i = 0; i < outputPositions.length; i++) {
+      const pos = outputPositions[i];
+      const rawVal = rawOutputs[i] ?? outputActivations[i];
+      const postVal = outputActivations[i];
+      const wasZeroed = Math.abs(rawVal) > 0.001 && Math.abs(postVal) < 0.001;
+      this.drawOutputNode(ctx, pos.x, pos.y, rawVal, nodeRadius, wasZeroed);
+    }
+    // Draw output labels
+    this.drawNEATOutputLabels(ctx, outputPositions.map(p => p.x), getYForDepth(maxDepth), rawOutputs, nodeRadius, outputLabels);
+
+    // Draw layer labels
+    ctx.fillStyle = '#666';
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`In (${displayInputSize})`, 5, getYForDepth(0));
+    if (hiddenNeurons.length > 0) {
+      ctx.fillText(`H (${hiddenNeurons.length})`, 5, height / 2);
+    }
+    ctx.fillText(`Out (${outputNeurons.length})`, 5, getYForDepth(maxDepth));
+
+    // Draw "NEAT" indicator
+    ctx.fillStyle = 'var(--accent, #6366f1)';
+    ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('NEAT', width - 5, 12);
+  }
+
+  /**
+   * Draw a NEAT connection with support for disabled connections (dashed).
+   */
+  private drawNEATConnection(
+    ctx: CanvasRenderingContext2D,
+    x1: number, y1: number,
+    x2: number, y2: number,
+    weight: number,
+    signal: number,
+    enabled: boolean
+  ): void {
+    const weightMag = Math.abs(weight);
+    const signalMag = Math.abs(signal);
+    const isPositiveSignal = signal >= 0;
+
+    // Skip very weak weights to reduce visual noise
+    if (weightMag < 0.03 && enabled) return;
+
+    // Normalize signal and weight
+    const normalizedSignal = Math.min(signalMag / 1.0, 1);
+    const normalizedWeight = Math.min(weightMag / 1.5, 1);
+
+    let hue: number;
+    let saturation: number;
+    let lightness: number;
+    let alpha: number;
+
+    if (!enabled) {
+      // Disabled connection - gray dashed line
+      hue = 0;
+      saturation = 0;
+      lightness = 35;
+      alpha = 0.3;
+    } else if (signalMag < 0.02) {
+      // Near-zero signal - dim gray
+      hue = 0;
+      saturation = 0;
+      lightness = 25 + normalizedWeight * 15;
+      alpha = 0.1 + normalizedWeight * 0.15;
+    } else if (isPositiveSignal) {
+      // Positive signal - cyan/green
+      hue = 160;
+      saturation = 50 + normalizedSignal * 40;
+      lightness = 35 + normalizedSignal * 30;
+      alpha = 0.2 + normalizedSignal * 0.5;
+    } else {
+      // Negative signal - red/orange
+      hue = 10;
+      saturation = 50 + normalizedSignal * 40;
+      lightness = 35 + normalizedSignal * 30;
+      alpha = 0.2 + normalizedSignal * 0.5;
+    }
+
+    // Line width
+    const baseWidth = enabled ? (0.3 + normalizedWeight * 1.0) : 0.5;
+    const lineWidth = (!enabled || signalMag < 0.02) ? baseWidth : baseWidth + normalizedSignal * 1.0;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+    ctx.lineWidth = lineWidth;
+
+    // Dashed line for disabled connections
+    if (!enabled) {
+      ctx.setLineDash([4, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    ctx.stroke();
+    ctx.setLineDash([]);  // Reset dash pattern
+  }
+
+  /**
+   * Draw labels for NEAT input/hidden nodes.
+   */
+  private drawNEATNodeLabels(
+    ctx: CanvasRenderingContext2D,
+    xPositions: number[],
+    y: number,
+    activations: number[],
+    nodeRadius: number,
+    labels: string[],
+    labelPosition: 'top' | 'bottom'
+  ): void {
+    const spacing = xPositions.length > 1 ? Math.abs(xPositions[1] - xPositions[0]) : 50;
+    const fontSize = Math.min(9, Math.max(6, spacing * 0.4));
+
+    for (let i = 0; i < xPositions.length; i++) {
+      const x = xPositions[i];
+      const activation = activations[i] ?? 0;
+      const label = labels[i] ?? `${i}`;
+
+      ctx.save();
+      ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, monospace`;
+
+      const shortLabel = label.length > 6 ? label.slice(0, 6) : label;
+      const absValue = Math.abs(activation).toFixed(2);
+      const sign = activation < 0 ? '-' : ' ';
+      const valueStr = sign + absValue;
+
+      const textY = labelPosition === 'top'
+        ? y - nodeRadius - 3
+        : y + nodeRadius + 3 + fontSize;
+
+      ctx.textBaseline = labelPosition === 'top' ? 'bottom' : 'top';
+
+      const labelWidth = ctx.measureText(shortLabel + ' ').width;
+      const totalWidth = ctx.measureText(shortLabel + ' ' + valueStr).width;
+      const startX = x - totalWidth / 2;
+
+      ctx.fillStyle = '#aaa';
+      ctx.textAlign = 'left';
+      ctx.fillText(shortLabel + ' ', startX, textY);
+
+      ctx.fillStyle = activation >= 0 ? '#6ee7b7' : '#fca5a5';
+      ctx.fillText(valueStr, startX + labelWidth, textY);
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Draw labels for NEAT output nodes.
+   */
+  private drawNEATOutputLabels(
+    ctx: CanvasRenderingContext2D,
+    xPositions: number[],
+    y: number,
+    activations: number[],
+    nodeRadius: number,
+    labels: string[]
+  ): void {
+    const spacing = xPositions.length > 1 ? Math.abs(xPositions[1] - xPositions[0]) : 50;
+    const fontSize = Math.min(9, Math.max(6, spacing * 0.4));
+
+    for (let i = 0; i < xPositions.length; i++) {
+      const x = xPositions[i];
+      const activation = activations[i] ?? 0;
+      const label = labels[i] ?? `O${i + 1}`;
+
+      ctx.save();
+      ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, monospace`;
+
+      const shortLabel = label.length > 6 ? label.slice(0, 6) : label;
+      const absValue = Math.abs(activation).toFixed(2);
+      const sign = activation < 0 ? '-' : ' ';
+      const valueStr = sign + absValue;
+
+      const textY = y + nodeRadius + 3 + fontSize;
+      ctx.textBaseline = 'top';
+
+      const labelWidth = ctx.measureText(shortLabel + ' ').width;
+      const totalWidth = ctx.measureText(shortLabel + ' ' + valueStr).width;
+      const startX = x - totalWidth / 2;
+
+      ctx.fillStyle = '#aaa';
+      ctx.textAlign = 'left';
+      ctx.fillText(shortLabel + ' ', startX, textY);
+
+      ctx.fillStyle = activation > 0 ? '#6ee7b7' : activation < 0 ? '#fca5a5' : '#666';
+      ctx.fillText(valueStr, startX + labelWidth, textY);
+
+      ctx.restore();
+    }
   }
 
   /**

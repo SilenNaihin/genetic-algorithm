@@ -1,4 +1,5 @@
 import type { NeuralGenomeData } from '../neural/NeuralGenome';
+import type { NEATGenome } from './simulation';
 
 export interface Vector3 {
   x: number;
@@ -78,6 +79,9 @@ export interface CreatureGenome {
 
   // Neural network weights (only used when controllerType === 'neural')
   neuralGenome?: NeuralGenomeData;
+
+  // NEAT genome (variable topology neural network, alternative to neuralGenome)
+  neatGenome?: NEATGenome;
 
   // Visual
   color: HSL;

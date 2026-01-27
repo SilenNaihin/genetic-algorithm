@@ -5,7 +5,7 @@
  * Handles JSON serialization, error handling, and type conversion.
  */
 
-import type { SimulationConfig } from '../types/simulation';
+import type { SimulationConfig, NEATGenome } from '../types/simulation';
 import type { CreatureGenome } from '../types/genome';
 
 // Base URL for backend API
@@ -263,6 +263,27 @@ export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
     };
   }
 
+  // Convert NEATGenome to API format (snake_case)
+  let neatGenome = null;
+  if (genome.neatGenome) {
+    neatGenome = {
+      neurons: genome.neatGenome.neurons.map(n => ({
+        id: n.id,
+        type: n.type,
+        bias: safeNum(n.bias, 0),
+        innovation: n.innovation ?? null,
+      })),
+      connections: genome.neatGenome.connections.map(c => ({
+        from_node: c.fromNode,
+        to_node: c.toNode,
+        weight: safeNum(c.weight, 0),
+        enabled: c.enabled,
+        innovation: c.innovation,
+      })),
+      activation: genome.neatGenome.activation,
+    };
+  }
+
   return {
     id: genome.id,
     generation: safeNum(genome.generation, 0),
@@ -294,6 +315,7 @@ export function toApiGenome(genome: CreatureGenome): Record<string, unknown> {
     global_frequency_multiplier: safeNum(genome.globalFrequencyMultiplier, 1.0),
     controller_type: genome.controllerType,
     neural_genome: neuralGenome,
+    neat_genome: neatGenome,
     color: genome.color,
     ancestry_chain: genome.ancestryChain || [],
   };
@@ -349,6 +371,31 @@ export function fromApiGenome(api: Record<string, unknown>): CreatureGenome {
     };
   }
 
+  // Convert NEAT genome from API format
+  const neatGenomeData = api.neat_genome ?? api.neatGenome;
+  let neatGenome: NEATGenome | undefined = undefined;
+  if (neatGenomeData) {
+    const ng = neatGenomeData as Record<string, unknown>;
+    const neurons = (ng.neurons as Array<Record<string, unknown>>).map(n => ({
+      id: n.id as number,
+      type: n.type as 'input' | 'hidden' | 'output',
+      bias: n.bias as number,
+      innovation: n.innovation as number | undefined,
+    }));
+    const connections = (ng.connections as Array<Record<string, unknown>>).map(c => ({
+      fromNode: (c.from_node ?? c.fromNode) as number,
+      toNode: (c.to_node ?? c.toNode) as number,
+      weight: c.weight as number,
+      enabled: c.enabled as boolean,
+      innovation: c.innovation as number,
+    }));
+    neatGenome = {
+      neurons,
+      connections,
+      activation: (ng.activation ?? 'tanh') as string,
+    };
+  }
+
   // Convert ancestry chain (supports both camelCase and snake_case)
   const rawAncestry = (api.ancestry_chain ?? api.ancestryChain ?? []) as Array<Record<string, unknown>>;
   const ancestryChain = rawAncestry.map(a => ({
@@ -370,6 +417,7 @@ export function fromApiGenome(api: Record<string, unknown>): CreatureGenome {
     globalFrequencyMultiplier: (api.global_frequency_multiplier ?? api.globalFrequencyMultiplier ?? 1.0) as number,
     controllerType: (api.controller_type ?? api.controllerType ?? 'oscillator') as 'oscillator' | 'neural',
     neuralGenome,
+    neatGenome,
     color: (api.color ?? { h: 0.5, s: 0.7, l: 0.5 }) as { h: number; s: number; l: number },
     ancestryChain,
   };

@@ -253,6 +253,42 @@ export function StatsPanel() {
         <span className="stat-value danger">{hasResults ? worst.toFixed(1) : '-'}</span>
       </div>
 
+      {/* NEAT topology stats - only show when NEAT is enabled */}
+      {config.useNEAT && hasResults && (() => {
+        const neatResults = validResults.filter(r => r.genome.neatGenome);
+        if (neatResults.length === 0) return null;
+
+        const avgHiddenNodes = neatResults.reduce((sum, r) => {
+          const hidden = r.genome.neatGenome!.neurons.filter(n => n.type === 'hidden').length;
+          return sum + hidden;
+        }, 0) / neatResults.length;
+
+        const avgConnections = neatResults.reduce((sum, r) => {
+          const enabled = r.genome.neatGenome!.connections.filter(c => c.enabled).length;
+          return sum + enabled;
+        }, 0) / neatResults.length;
+
+        const avgTotalConnections = neatResults.reduce((sum, r) => {
+          return sum + r.genome.neatGenome!.connections.length;
+        }, 0) / neatResults.length;
+
+        return (
+          <>
+            <div className="stat-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+              <span className="stat-label">Avg Hidden Nodes</span>
+              <span className="stat-value">{avgHiddenNodes.toFixed(1)}</span>
+            </div>
+            <div className="stat-row">
+              <span className="stat-label">Avg Connections</span>
+              <span className="stat-value">
+                {avgConnections.toFixed(1)}
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}> / {avgTotalConnections.toFixed(1)}</span>
+              </span>
+            </div>
+          </>
+        );
+      })()}
+
       {/* Longest Survivor */}
       {longestSurvivingCreature && (
         <div

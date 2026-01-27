@@ -348,7 +348,12 @@ export function ReplayModal() {
       return `${nodeAIndex}-${nodeBIndex}`;
     });
 
-    visualizer.setGenome(genome.neuralGenome, muscleNames);
+    // Set genome - use NEAT or fixed topology
+    if (genome.neatGenome) {
+      visualizer.setNEATGenome(genome.neatGenome, muscleNames);
+    } else {
+      visualizer.setGenome(genome.neuralGenome, muscleNames);
+    }
     // Set time encoding for accurate input labels
     visualizer.setTimeEncoding(config.timeEncoding || 'none');
     // Set proprioception config for input labels
@@ -558,7 +563,8 @@ export function ReplayModal() {
   }
 
   const genome = loadedResult.genome;
-  const hasNeuralGenome = genome.neuralGenome && genome.controllerType === 'neural';
+  const hasNeuralGenome = (genome.neuralGenome || genome.neatGenome) && genome.controllerType === 'neural';
+  const isNEAT = !!genome.neatGenome;
 
   // Calculate max fitness from fitnessOverTime for progress bar scaling
   const maxFitness = Math.max(...(loadedResult.fitnessOverTime || [0]), 0.1);
@@ -949,6 +955,7 @@ export function ReplayModal() {
                   <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
                     <div style={{ marginBottom: '4px' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Mode:</span> {config.neuralMode || 'hybrid'}
+                      {isNEAT && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>(NEAT)</span>}
                     </div>
                     <div style={{ marginBottom: '4px' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Topology:</span>{' '}
@@ -964,15 +971,40 @@ export function ReplayModal() {
                           else actualInputs += 47;
                         }
                         return actualInputs;
-                      })()} → {genome.neuralGenome!.topology.hiddenSize} →{' '}
-                      {genome.neuralGenome!.topology.outputSize}
+                      })()}
+                      {isNEAT ? (
+                        <>
+                          {' → '}
+                          {genome.neatGenome!.neurons.filter(n => n.type === 'hidden').length}
+                          {' → '}
+                          {genome.neatGenome!.neurons.filter(n => n.type === 'output').length}
+                        </>
+                      ) : (
+                        <>
+                          {' → '}
+                          {genome.neuralGenome!.topology.hiddenSize}
+                          {' → '}
+                          {genome.neuralGenome!.topology.outputSize}
+                        </>
+                      )}
                     </div>
                     <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Activation:</span> {genome.neuralGenome!.activation}
+                      <span style={{ color: 'var(--text-muted)' }}>Activation:</span>{' '}
+                      {isNEAT ? genome.neatGenome!.activation : genome.neuralGenome!.activation}
                     </div>
-                    <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Weights:</span> {genome.neuralGenome!.weights.length}
-                    </div>
+                    {isNEAT ? (
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Connections:</span>{' '}
+                        {genome.neatGenome!.connections.filter(c => c.enabled).length}
+                        {' / '}
+                        {genome.neatGenome!.connections.length}
+                        {' (enabled/total)'}
+                      </div>
+                    ) : (
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Weights:</span> {genome.neuralGenome!.weights.length}
+                      </div>
+                    )}
 
                     {/* Color key - above sensor inputs */}
                     <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
