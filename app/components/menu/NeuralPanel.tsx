@@ -118,20 +118,22 @@ export function NeuralPanel() {
             </select>
           </div>
 
-          {/* Hidden Size */}
-          <div style={{ marginBottom: '16px' }}>
-            <ParamSlider
-              name="Hidden Size"
-              value={config.neuralHiddenSize}
-              displayValue={String(config.neuralHiddenSize)}
-              min={4}
-              max={32}
-              step={4}
-              onChange={(v) => setConfig({ neuralHiddenSize: v })}
-              tooltip={TOOLTIPS.hiddenSize}
-              width="100%"
-            />
-          </div>
+          {/* Hidden Size - hide when NEAT is enabled (topology is variable) */}
+          {!config.useNEAT && (
+            <div style={{ marginBottom: '16px' }}>
+              <ParamSlider
+                name="Hidden Size"
+                value={config.neuralHiddenSize}
+                displayValue={String(config.neuralHiddenSize)}
+                min={4}
+                max={32}
+                step={4}
+                onChange={(v) => setConfig({ neuralHiddenSize: v })}
+                tooltip={TOOLTIPS.hiddenSize}
+                width="100%"
+              />
+            </div>
+          )}
 
           {/* Activation */}
           <div style={{ marginBottom: '16px' }}>
@@ -354,6 +356,66 @@ export function NeuralPanel() {
                   <option value="ground">Ground Contact (per node)</option>
                 </select>
               </div>
+            )}
+          </div>
+
+          {/* NEAT Section (Variable Topology) */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={labelStyle}>
+                NEAT (Variable Topology)
+                <InfoTooltip text={TOOLTIPS.neat} />
+              </span>
+              <input
+                type="checkbox"
+                checked={config.useNEAT}
+                onChange={(e) => setConfig({ useNEAT: e.target.checked })}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+              />
+            </div>
+
+            {config.useNEAT && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Add Connection %"
+                    value={config.neatAddConnectionRate * 100}
+                    displayValue={`${Math.round(config.neatAddConnectionRate * 100)}%`}
+                    min={1}
+                    max={20}
+                    step={1}
+                    onChange={(v) => setConfig({ neatAddConnectionRate: v / 100 })}
+                    tooltip={TOOLTIPS.neatAddConnectionRate}
+                    width="100%"
+                  />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Add Node %"
+                    value={config.neatAddNodeRate * 100}
+                    displayValue={`${Math.round(config.neatAddNodeRate * 100)}%`}
+                    min={1}
+                    max={10}
+                    step={1}
+                    onChange={(v) => setConfig({ neatAddNodeRate: v / 100 })}
+                    tooltip={TOOLTIPS.neatAddNodeRate}
+                    width="100%"
+                  />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <ParamSlider
+                    name="Max Hidden Nodes"
+                    value={config.neatMaxHiddenNodes}
+                    displayValue={String(config.neatMaxHiddenNodes)}
+                    min={4}
+                    max={64}
+                    step={4}
+                    onChange={(v) => setConfig({ neatMaxHiddenNodes: v })}
+                    tooltip={TOOLTIPS.neatMaxHiddenNodes}
+                    width="100%"
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>

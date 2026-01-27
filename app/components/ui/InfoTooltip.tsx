@@ -158,6 +158,12 @@ export const TOOLTIPS = {
   speciation: 'Speciation groups creatures by genome similarity. Selection happens within each species, protecting diverse solutions from being outcompeted. Unlike fitness sharing which penalizes similarity, speciation guarantees each distinct strategy survives. Inspired by NEAT (Stanley & Miikkulainen, 2002).',
   compatibilityThreshold: 'Genome distance threshold for species membership. Lower values (0.3-0.5): many small species, strong diversity. Higher values (1.5-3.0): few large species, weak diversity. Creatures beyond this distance from all species representatives form new species.',
 
+  // NEAT (NeuroEvolution of Augmenting Topologies)
+  neat: 'NEAT allows neural networks to evolve their own topology. Starts with minimal structure (inputs directly connected to outputs) and gradually adds hidden neurons and connections. Based on Stanley & Miikkulainen (2002). Enables open-ended complexity growth but evolves slower than fixed topology.',
+  neatAddConnectionRate: 'Probability of adding a new connection between neurons per generation. New connections allow information to flow through different paths. Higher rates (10-20%) explore more topologies but may add unnecessary complexity. Default 5%.',
+  neatAddNodeRate: 'Probability of adding a new hidden neuron per generation. New neurons increase network capacity but require evolution to learn their weights. Keep lower than connection rate (per NEAT paper). Default 3%.',
+  neatMaxHiddenNodes: 'Maximum hidden neurons per network. Prevents complexity bloat. Networks stop growing structurally when they hit this limit but can still evolve weights. Default 16.',
+
   // Proprioception (body-sensing)
   proprioception: 'Add body-sensing inputs to the neural network. Creatures can sense their own body state: muscle strain (stretch/compression), node velocities (how fast body parts move), and ground contact (which nodes touch ground). Experimental feature that increases network input size based on creature topology.',
   proprioceptionInputs: 'Which proprioception inputs to include. Input count depends on creature topology (varies with mutations). Strain: 1 per muscle. Velocity: 3 per node (xyz). Ground: 1 per node. All: combined. More inputs = richer sensing but harder to evolve. Unused slots (from padding to max) are masked to 0.',

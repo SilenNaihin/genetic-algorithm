@@ -29,7 +29,7 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | API Changes | **Complete** | `backend/app/api/evolution.py` | Load/save innovation counter, pass NEAT config to evolve/simulate |
 | Backend Tests | **Complete** | Various test files | 143 NEAT-related tests pass |
 | Frontend Types | **Complete** | `src/types/simulation.ts` | NEAT config fields + NEATGenome, NeuronGene, ConnectionGene, InnovationCounterState |
-| Frontend UI | Not started | `app/components/menu/NeuralPanel.tsx` | |
+| Frontend UI | **Complete** | `app/components/menu/NeuralPanel.tsx` | NEAT toggle, Add Connection/Node rates, Max Hidden Nodes sliders |
 | Visualizer | Not started | `src/ui/NeuralVisualizer.ts` | Needs NEAT topology support + frame activations |
 | Storage Service | Not started | `src/services/StorageService.ts` | |
 
