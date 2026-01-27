@@ -206,7 +206,7 @@
       "backend_tests": {
         "id": "1.16",
         "name": "Backend Tests",
-        "status": "pending",
+        "status": "complete",
         "files": [
           "backend/app/neural/test_neat_network.py",
           "backend/app/genetics/test_neat_mutation.py",
@@ -220,18 +220,26 @@
       "frontend_types": {
         "id": "1.17",
         "name": "TypeScript Types",
-        "status": "pending",
+        "status": "complete",
         "file": "src/types/simulation.ts",
         "new_file": false,
         "description": "Add NEAT config fields and NEATGenome interface",
         "fields": [
           "useNEAT: boolean",
-          "addConnectionRate: number",
-          "addNodeRate: number",
+          "neatAddConnectionRate: number",
+          "neatAddNodeRate: number",
+          "neatEnableRate: number",
+          "neatDisableRate: number",
           "neatExcessCoefficient: number",
           "neatDisjointCoefficient: number",
           "neatWeightCoefficient: number",
-          "maxHiddenNodes: number"
+          "neatMaxHiddenNodes: number"
+        ],
+        "types_added": [
+          "NeuronGene",
+          "ConnectionGene",
+          "NEATGenome",
+          "InnovationCounterState"
         ]
       },
       "frontend_neural_panel": {

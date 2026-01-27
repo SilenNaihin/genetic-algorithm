@@ -87,6 +87,17 @@ export interface SimulationConfig {
   compatibilityThreshold: number;     // Genome distance threshold for same species (0.1-3.0)
   minSpeciesSize: number;             // Minimum survivors per species (1-20)
 
+  // NEAT (NeuroEvolution of Augmenting Topologies)
+  useNEAT: boolean;                   // Enable NEAT for variable-topology neural networks
+  neatAddConnectionRate: number;      // Probability to add a new connection (0.01-0.2)
+  neatAddNodeRate: number;            // Probability to add a new hidden node (0.01-0.1)
+  neatEnableRate: number;             // Probability to re-enable a disabled connection (0.01-0.1)
+  neatDisableRate: number;            // Probability to disable an enabled connection (0.01-0.1)
+  neatExcessCoefficient: number;      // Weight for excess genes in compatibility distance (0-10)
+  neatDisjointCoefficient: number;    // Weight for disjoint genes in compatibility distance (0-10)
+  neatWeightCoefficient: number;      // Weight for weight differences in compatibility distance (0-10)
+  neatMaxHiddenNodes: number;         // Maximum hidden neurons to prevent bloat (1-128)
+
   // Proprioception (body-sensing inputs)
   useProprioception: boolean;         // Enable body-sensing inputs (muscle strain, node velocities, ground contact)
   proprioceptionInputs: 'strain' | 'velocity' | 'ground' | 'all';  // Which proprioception inputs to include
@@ -169,6 +180,17 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   useSpeciation: false,          // Off by default - enable to protect diverse solutions
   compatibilityThreshold: 1.0,   // Genome distance threshold for same species
   minSpeciesSize: 2,             // Minimum survivors per species
+
+  // NEAT defaults
+  useNEAT: false,                // Off by default - enable for variable topology
+  neatAddConnectionRate: 0.05,   // 5% chance to add connection per genome
+  neatAddNodeRate: 0.03,         // 3% chance to add node per genome
+  neatEnableRate: 0.02,          // 2% chance to re-enable disabled connection
+  neatDisableRate: 0.01,         // 1% chance to disable enabled connection
+  neatExcessCoefficient: 1.0,    // Standard weight for excess genes
+  neatDisjointCoefficient: 1.0,  // Standard weight for disjoint genes
+  neatWeightCoefficient: 0.4,    // Lower weight for weight differences (per NEAT paper)
+  neatMaxHiddenNodes: 16,        // Reasonable limit for complexity
 
   // Proprioception defaults
   useProprioception: false,      // Off by default - experimental feature
@@ -283,4 +305,46 @@ export interface FrameActivations {
   hidden: number[];   // Hidden layer activations
   outputs: number[];  // Muscle outputs (post-dead-zone)
   outputs_raw?: number[];  // Raw muscle outputs before dead zone (pure mode only)
+}
+
+// =============================================================================
+// NEAT (NeuroEvolution of Augmenting Topologies) Types
+// =============================================================================
+
+/**
+ * NEAT neuron gene - represents a node in the neural network.
+ */
+export interface NeuronGene {
+  id: number;                           // Unique neuron ID
+  type: 'input' | 'hidden' | 'output';  // Neuron type
+  bias: number;                         // Bias value (0 for input neurons)
+  innovation?: number;                  // Innovation number (only for hidden neurons)
+}
+
+/**
+ * NEAT connection gene - represents a connection between neurons.
+ */
+export interface ConnectionGene {
+  fromNode: number;      // Source neuron ID
+  toNode: number;        // Target neuron ID
+  weight: number;        // Connection weight
+  enabled: boolean;      // Whether connection is active
+  innovation: number;    // Innovation number for gene alignment
+}
+
+/**
+ * NEAT genome - variable topology neural network.
+ */
+export interface NEATGenome {
+  neurons: NeuronGene[];        // All neurons (input, hidden, output)
+  connections: ConnectionGene[];  // All connections
+  activation: string;           // Activation function ('tanh', 'relu', etc.)
+}
+
+/**
+ * Innovation counter state - persisted across generations for NEAT runs.
+ */
+export interface InnovationCounterState {
+  nextConnection: number;  // Next connection innovation number
+  nextNode: number;        // Next node innovation number
 }
