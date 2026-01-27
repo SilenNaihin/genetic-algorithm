@@ -95,6 +95,17 @@ class SimulationConfig(BaseModel):
     compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
     min_species_size: int = Field(default=2, ge=1, le=20)
 
+    # NEAT (NeuroEvolution of Augmenting Topologies)
+    use_neat: bool = False  # Enable NEAT for variable-topology neural networks
+    neat_add_connection_rate: float = Field(default=0.05, ge=0.0, le=1.0)  # Probability to add connection
+    neat_add_node_rate: float = Field(default=0.03, ge=0.0, le=1.0)  # Probability to add node
+    neat_enable_rate: float = Field(default=0.02, ge=0.0, le=1.0)  # Probability to re-enable connection
+    neat_disable_rate: float = Field(default=0.01, ge=0.0, le=1.0)  # Probability to disable connection
+    neat_excess_coefficient: float = Field(default=1.0, ge=0.0, le=10.0)  # Weight for excess genes in distance
+    neat_disjoint_coefficient: float = Field(default=1.0, ge=0.0, le=10.0)  # Weight for disjoint genes in distance
+    neat_weight_coefficient: float = Field(default=0.4, ge=0.0, le=10.0)  # Weight for weight differences in distance
+    neat_max_hidden_nodes: int = Field(default=16, ge=1, le=128)  # Maximum hidden neurons to prevent bloat
+
     # Proprioception (body-sensing inputs)
     use_proprioception: bool = False
     proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'

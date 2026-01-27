@@ -154,7 +154,7 @@
       "backend_simulation_schema": {
         "id": "1.11",
         "name": "Simulation Config Schema",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/schemas/simulation.py",
         "new_file": false,
         "description": "Add same NEAT fields to SimulationConfig"
