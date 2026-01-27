@@ -3,16 +3,106 @@ Crossover operators for genetic evolution.
 
 Ported from TypeScript src/genetics/Crossover.ts.
 Works with genome dicts (matching API schema).
+
+When use_neat=True, routes to NEAT crossover for neural networks.
 """
 
 import math
 import random
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
 from .mutation import generate_id, distance, normalize, GenomeConstraints
+from .neat_crossover import (
+    neat_crossover,
+    neat_crossover_equal_fitness,
+    crossover_biases,
+)
+from app.schemas.neat import NEATGenome
 
 DEFAULT_OUTPUT_BIAS = 0.0
+
+# Fitness comparison tolerance for "equal fitness" in NEAT crossover
+NEAT_EQUAL_FITNESS_TOLERANCE = 1e-6
+
+
+def has_neat_genome(genome: dict) -> bool:
+    """Check if a genome has a NEAT neural network."""
+    neat = genome.get('neatGenome') or genome.get('neat_genome')
+    return neat is not None and isinstance(neat, dict)
+
+
+def get_neat_genome(genome: dict) -> NEATGenome | None:
+    """Extract NEAT genome from a creature genome dict."""
+    neat_dict = genome.get('neatGenome') or genome.get('neat_genome')
+    if neat_dict is None:
+        return None
+    if isinstance(neat_dict, NEATGenome):
+        return neat_dict
+    return NEATGenome(**neat_dict)
+
+
+def crossover_neat_genomes(
+    parent1: dict,
+    parent2: dict,
+    fitness1: float | None = None,
+    fitness2: float | None = None,
+    disabled_gene_inherit_rate: float = 0.75,
+) -> dict | None:
+    """
+    Crossover NEAT genomes from two parents.
+
+    Args:
+        parent1: First parent creature genome
+        parent2: Second parent creature genome
+        fitness1: Fitness of parent 1 (optional, defaults to equal fitness mode)
+        fitness2: Fitness of parent 2 (optional, defaults to equal fitness mode)
+        disabled_gene_inherit_rate: Probability disabled genes stay disabled
+
+    Returns:
+        Child NEAT genome as dict, or None if parents don't have NEAT genomes
+    """
+    neat1 = get_neat_genome(parent1)
+    neat2 = get_neat_genome(parent2)
+
+    if neat1 is None or neat2 is None:
+        # If only one parent has NEAT, clone it
+        if neat1 is not None:
+            return neat1.model_dump()
+        if neat2 is not None:
+            return neat2.model_dump()
+        return None
+
+    # Use fitness to determine crossover mode
+    if fitness1 is None or fitness2 is None:
+        # No fitness info - use equal fitness mode
+        child = neat_crossover_equal_fitness(
+            neat1,
+            neat2,
+            disabled_gene_inherit_rate=disabled_gene_inherit_rate,
+        )
+    elif abs(fitness1 - fitness2) < NEAT_EQUAL_FITNESS_TOLERANCE:
+        # Equal fitness - use equal fitness mode
+        child = neat_crossover_equal_fitness(
+            neat1,
+            neat2,
+            disabled_gene_inherit_rate=disabled_gene_inherit_rate,
+        )
+    else:
+        # Different fitness - use standard NEAT crossover
+        child = neat_crossover(
+            neat1,
+            neat2,
+            fitness1,
+            fitness2,
+            disabled_gene_inherit_rate=disabled_gene_inherit_rate,
+        )
+
+    # Optionally crossover biases
+    crossover_biases(neat1, neat2, child)
+
+    return child.model_dump()
 
 
 def lerp(a: float, b: float, t: float) -> float:
@@ -56,6 +146,10 @@ def single_point_crossover(
     constraints: GenomeConstraints | None = None,
     neural_crossover_method: str = 'interpolation',
     sbx_eta: float = 2.0,
+    use_neat: bool = False,
+    fitness1: float | None = None,
+    fitness2: float | None = None,
+    disabled_gene_inherit_rate: float = 0.75,
 ) -> dict:
     """
     Single-point crossover on genome properties.
@@ -67,6 +161,10 @@ def single_point_crossover(
         constraints: Genome constraints
         neural_crossover_method: Method for neural weight crossover ('interpolation', 'uniform', 'sbx')
         sbx_eta: Distribution index for SBX crossover (0.5-5.0)
+        use_neat: If True, use NEAT crossover for neural networks
+        fitness1: Fitness of parent1 (used for NEAT crossover to determine fitter parent)
+        fitness2: Fitness of parent2 (used for NEAT crossover to determine fitter parent)
+        disabled_gene_inherit_rate: For NEAT, probability disabled genes stay disabled
 
     Returns:
         Child genome
@@ -187,29 +285,43 @@ def single_point_crossover(
 
     # Handle neural genome crossover
     neural_genome = None
-    neural1 = parent1.get('neuralGenome') or parent1.get('neural_genome')
-    neural2 = parent2.get('neuralGenome') or parent2.get('neural_genome')
+    neat_genome = None
 
-    if neural1 and neural2:
-        # Use configured crossover method for neural weights
-        if neural_crossover_method == 'uniform':
-            neural_genome = uniform_crossover_neural_weights(neural1, neural2)
-        elif neural_crossover_method == 'sbx':
-            neural_genome = sbx_crossover_neural_weights(neural1, neural2, sbx_eta)
-        else:  # 'interpolation' (default)
-            neural_genome = crossover_neural_weights(neural1, neural2)
-        # Adapt if muscle count changed
-        if get_output_size(neural_genome) != len(child_muscles):
-            neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
-    elif neural1:
-        neural_genome = clone_neural_genome(neural1)
-        if get_output_size(neural_genome) != len(child_muscles):
-            neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
+    # Check for NEAT genomes first
+    if use_neat and (has_neat_genome(parent1) or has_neat_genome(parent2)):
+        # Use NEAT crossover for variable-topology networks
+        neat_genome = crossover_neat_genomes(
+            parent1,
+            parent2,
+            fitness1=fitness1,
+            fitness2=fitness2,
+            disabled_gene_inherit_rate=disabled_gene_inherit_rate,
+        )
+    else:
+        # Standard fixed-topology neural network crossover
+        neural1 = parent1.get('neuralGenome') or parent1.get('neural_genome')
+        neural2 = parent2.get('neuralGenome') or parent2.get('neural_genome')
+
+        if neural1 and neural2:
+            # Use configured crossover method for neural weights
+            if neural_crossover_method == 'uniform':
+                neural_genome = uniform_crossover_neural_weights(neural1, neural2)
+            elif neural_crossover_method == 'sbx':
+                neural_genome = sbx_crossover_neural_weights(neural1, neural2, sbx_eta)
+            else:  # 'interpolation' (default)
+                neural_genome = crossover_neural_weights(neural1, neural2)
+            # Adapt if muscle count changed
+            if get_output_size(neural_genome) != len(child_muscles):
+                neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
+        elif neural1:
+            neural_genome = clone_neural_genome(neural1)
+            if get_output_size(neural_genome) != len(child_muscles):
+                neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
 
     gen1 = parent1.get('generation', 0)
     gen2 = parent2.get('generation', 0)
 
-    return {
+    result = {
         'id': generate_id('creature'),
         'generation': max(gen1, gen2) + 1,
         'survivalStreak': 0,
@@ -222,15 +334,26 @@ def single_point_crossover(
             random.random()
         ),
         'controllerType': parent1.get('controllerType', parent1.get('controller_type', 'oscillator')),
-        'neuralGenome': neural_genome,
         'color': lerp_hsl(parent1.get('color'), parent2.get('color'), random.random()),
     }
+
+    # Add the appropriate neural network field
+    if neat_genome is not None:
+        result['neatGenome'] = neat_genome
+    elif neural_genome is not None:
+        result['neuralGenome'] = neural_genome
+
+    return result
 
 
 def uniform_crossover(
     parent1: dict,
     parent2: dict,
     constraints: GenomeConstraints | None = None,
+    use_neat: bool = False,
+    fitness1: float | None = None,
+    fitness2: float | None = None,
+    disabled_gene_inherit_rate: float = 0.75,
 ) -> dict:
     """
     Uniform crossover - randomly pick each gene from either parent.
@@ -239,6 +362,10 @@ def uniform_crossover(
         parent1: First parent genome
         parent2: Second parent genome
         constraints: Genome constraints
+        use_neat: If True, use NEAT crossover for neural networks
+        fitness1: Fitness of parent1 (used for NEAT crossover)
+        fitness2: Fitness of parent2 (used for NEAT crossover)
+        disabled_gene_inherit_rate: For NEAT, probability disabled genes stay disabled
 
     Returns:
         Child genome
@@ -319,22 +446,36 @@ def uniform_crossover(
 
     # Handle neural genome
     neural_genome = None
-    neural1 = parent1.get('neuralGenome') or parent1.get('neural_genome')
-    neural2 = parent2.get('neuralGenome') or parent2.get('neural_genome')
+    neat_genome = None
 
-    if neural1 and neural2:
-        neural_genome = uniform_crossover_neural_weights(neural1, neural2)
-        if get_output_size(neural_genome) != len(child_muscles):
-            neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
-    elif neural1:
-        neural_genome = clone_neural_genome(neural1)
-        if get_output_size(neural_genome) != len(child_muscles):
-            neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
+    # Check for NEAT genomes first
+    if use_neat and (has_neat_genome(parent1) or has_neat_genome(parent2)):
+        # Use NEAT crossover for variable-topology networks
+        neat_genome = crossover_neat_genomes(
+            parent1,
+            parent2,
+            fitness1=fitness1,
+            fitness2=fitness2,
+            disabled_gene_inherit_rate=disabled_gene_inherit_rate,
+        )
+    else:
+        # Standard fixed-topology neural network crossover
+        neural1 = parent1.get('neuralGenome') or parent1.get('neural_genome')
+        neural2 = parent2.get('neuralGenome') or parent2.get('neural_genome')
+
+        if neural1 and neural2:
+            neural_genome = uniform_crossover_neural_weights(neural1, neural2)
+            if get_output_size(neural_genome) != len(child_muscles):
+                neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
+        elif neural1:
+            neural_genome = clone_neural_genome(neural1)
+            if get_output_size(neural_genome) != len(child_muscles):
+                neural_genome = adapt_neural_topology(neural_genome, len(child_muscles))
 
     gen1 = parent1.get('generation', 0)
     gen2 = parent2.get('generation', 0)
 
-    return {
+    result = {
         'id': generate_id('creature'),
         'generation': max(gen1, gen2) + 1,
         'survivalStreak': 0,
@@ -343,9 +484,16 @@ def uniform_crossover(
         'muscles': child_muscles,
         'globalFrequencyMultiplier': parent1.get('globalFrequencyMultiplier', 1.0) if random.random() < 0.5 else parent2.get('globalFrequencyMultiplier', 1.0),
         'controllerType': parent1.get('controllerType', 'oscillator'),
-        'neuralGenome': neural_genome,
         'color': lerp_hsl(parent1.get('color'), parent2.get('color'), 0.5),
     }
+
+    # Add the appropriate neural network field
+    if neat_genome is not None:
+        result['neatGenome'] = neat_genome
+    elif neural_genome is not None:
+        result['neuralGenome'] = neural_genome
+
+    return result
 
 
 def clone_genome(
@@ -419,11 +567,21 @@ def clone_genome(
         })
 
     # Clone neural genome if present
-    neural_genome = genome.get('neuralGenome') or genome.get('neural_genome')
-    if neural_genome:
-        neural_genome = clone_neural_genome(neural_genome)
+    neural_genome = None
+    neat_genome = None
 
-    return {
+    # Check for NEAT genome first
+    neat_dict = genome.get('neatGenome') or genome.get('neat_genome')
+    if neat_dict:
+        # Deep clone the NEAT genome
+        neat_genome = deepcopy(neat_dict) if isinstance(neat_dict, dict) else neat_dict.model_dump()
+    else:
+        # Check for standard neural genome
+        neural_dict = genome.get('neuralGenome') or genome.get('neural_genome')
+        if neural_dict:
+            neural_genome = clone_neural_genome(neural_dict)
+
+    result = {
         'id': generate_id('creature'),
         'generation': genome.get('generation', 0) + 1,
         'survivalStreak': 0,
@@ -432,9 +590,16 @@ def clone_genome(
         'muscles': new_muscles,
         'globalFrequencyMultiplier': genome.get('globalFrequencyMultiplier', genome.get('global_frequency_multiplier', 1.0)),
         'controllerType': genome.get('controllerType', genome.get('controller_type', 'oscillator')),
-        'neuralGenome': neural_genome,
         'color': dict(genome.get('color') or {'h': 0.5, 's': 0.7, 'l': 0.5}),
     }
+
+    # Add the appropriate neural network field
+    if neat_genome is not None:
+        result['neatGenome'] = neat_genome
+    elif neural_genome is not None:
+        result['neuralGenome'] = neural_genome
+
+    return result
 
 
 # =============================================================================

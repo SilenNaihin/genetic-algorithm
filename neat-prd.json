@@ -114,7 +114,7 @@
       "backend_crossover_integration": {
         "id": "1.8",
         "name": "Crossover Integration",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/genetics/crossover.py",
         "new_file": false,
         "description": "Route to NEAT crossover when use_neat=True",

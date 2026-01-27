@@ -796,7 +796,8 @@ class TestCrossoverEdgeCases:
 
         child = single_point_crossover(parent1, parent2, constraints)
 
-        assert child['neuralGenome'] is None
+        # Either key is missing or value is None - both are valid
+        assert child.get('neuralGenome') is None
 
     def test_crossover_produces_zero_muscles(self, constraints):
         """If crossover somehow produces 0 muscles (node mapping failure), neural should adapt."""
@@ -892,7 +893,8 @@ class TestCloneEdgeCases:
         }
 
         cloned = clone_genome(genome, constraints)
-        assert cloned['neuralGenome'] is None
+        # Either key is missing or value is None - both are valid
+        assert cloned.get('neuralGenome') is None
         assert len(cloned['muscles']) == 1
 
     def test_clone_deep_copy_isolation(self, genome_with_neural, constraints):
