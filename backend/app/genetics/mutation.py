@@ -248,13 +248,17 @@ def add_node(
     """
     Add a new node to the genome with a connecting muscle.
 
-    Returns (node, muscle) tuple or None if at limits.
+    Returns (node, muscle) tuple or None if at limits or no existing nodes.
     """
     nodes = genome.get('nodes', [])
     muscles = genome.get('muscles', [])
 
     # Check limits
     if len(nodes) >= constraints.max_nodes or len(muscles) >= constraints.max_muscles:
+        return None
+
+    # Can't add node if no existing nodes to connect to
+    if len(nodes) == 0:
         return None
 
     # Create new node near an existing node
