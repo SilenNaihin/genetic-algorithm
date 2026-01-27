@@ -20,6 +20,7 @@ from app.genetics.population import (
     GenomeConstraints,
     EvolutionConfig,
 )
+from app.schemas.neat import InnovationCounter
 
 router = APIRouter()
 
@@ -109,6 +110,14 @@ async def run_generation(
     # Track survivor IDs for animation states
     survivor_ids: set[str] = set()
 
+    # Load or create innovation counter for NEAT
+    innovation_counter = None
+    if config.use_neat:
+        innovation_counter = InnovationCounter(
+            next_connection=run.innovation_counter_connection,
+            next_node=run.innovation_counter_node,
+        )
+
     # Get genomes for this generation
     if current_gen == 0:
         # Generate initial population with neural network support
@@ -128,6 +137,8 @@ async def run_generation(
             time_encoding=config.time_encoding,
             use_proprioception=config.use_proprioception,
             proprioception_inputs=config.proprioception_inputs,
+            use_neat=config.use_neat,
+            innovation_counter=innovation_counter,
         )
     else:
         # Get previous generation performances (sorted by fitness)
@@ -192,6 +203,16 @@ async def run_generation(
             'use_speciation': config.use_speciation,
             'compatibility_threshold': config.compatibility_threshold,
             'min_species_size': config.min_species_size,
+            # NEAT config
+            'use_neat': config.use_neat,
+            'neat_add_connection_rate': config.neat_add_connection_rate,
+            'neat_add_node_rate': config.neat_add_node_rate,
+            'neat_enable_rate': config.neat_enable_rate,
+            'neat_disable_rate': config.neat_disable_rate,
+            'neat_excess_coefficient': config.neat_excess_coefficient,
+            'neat_disjoint_coefficient': config.neat_disjoint_coefficient,
+            'neat_weight_coefficient': config.neat_weight_coefficient,
+            'neat_max_hidden_nodes': config.neat_max_hidden_nodes,
         }
 
         # Compute adaptive mutation boost if enabled
@@ -228,6 +249,7 @@ async def run_generation(
             fitness_scores=prev_fitness,
             config=evolution_config,
             generation=current_gen - 1,
+            innovation_counter=innovation_counter,
         )
 
         # Only generate new IDs for offspring (survivalStreak == 0)
@@ -268,6 +290,9 @@ async def run_generation(
             "time_encoding": config.time_encoding,
             "use_proprioception": config.use_proprioception,
             "proprioception_inputs": config.proprioception_inputs,
+            # NEAT config
+            "use_neat": config.use_neat,
+            "neat_max_hidden_nodes": config.neat_max_hidden_nodes,
         },
     )
     simulation_time_ms = int((time.time() - start_time) * 1000)
@@ -445,6 +470,11 @@ async def run_generation(
             run.longest_survivor_id = genome["id"]
             run.longest_survivor_generation = current_gen
 
+    # Save NEAT innovation counter state
+    if innovation_counter is not None:
+        run.innovation_counter_connection = innovation_counter.next_connection
+        run.innovation_counter_node = innovation_counter.next_node
+
     await db.commit()
 
     # Build creature data for frontend display
@@ -464,7 +494,8 @@ async def run_generation(
             "survival_streak": genome.get("survivalStreak", genome.get("survival_streak", 0)),
         })
 
-    return {
+    # Build response
+    response = {
         "generation": current_gen,
         "best_fitness": best_fitness,
         "avg_fitness": avg_fitness,
@@ -474,6 +505,15 @@ async def run_generation(
         "creature_count": len(genomes),
         "creatures": creatures_data,
     }
+
+    # Include innovation counter state for NEAT runs
+    if innovation_counter is not None:
+        response["innovation_counter"] = {
+            "next_connection": innovation_counter.next_connection,
+            "next_node": innovation_counter.next_node,
+        }
+
+    return response
 
 
 @router.post("/{run_id}/step")

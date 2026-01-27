@@ -190,10 +190,18 @@
       "backend_api": {
         "id": "1.15",
         "name": "API Changes",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/api/evolution.py",
         "new_file": false,
-        "description": "Accept NEAT config, return innovation counter state in response"
+        "description": "Accept NEAT config, return innovation counter state in response",
+        "implementation": {
+          "changes": [
+            "Load/save innovation counter from/to Run model",
+            "Pass NEAT config to generate_population and evolve_population",
+            "Pass NEAT config to simulator",
+            "Return innovation_counter in response"
+          ]
+        }
       },
       "backend_tests": {
         "id": "1.16",
