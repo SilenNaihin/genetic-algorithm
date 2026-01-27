@@ -3,6 +3,13 @@ Population management for genetic evolution.
 
 Ported from TypeScript src/genetics/Population.ts.
 Handles genome generation, evolution, and population statistics.
+
+When use_neat=True, uses NEAT-specific operations:
+- Creates minimal NEAT genomes instead of fixed-topology neural networks
+- Uses NEAT crossover for variable-topology networks
+- Uses NEAT mutation with structural operators
+- Uses NEAT distance function for speciation
+- Tracks innovation counter for gene alignment
 """
 
 import math
@@ -18,7 +25,9 @@ from .selection import (
 )
 from .mutation import (
     mutate_genome,
+    mutate_genome_neat,
     MutationConfig,
+    NEATMutationConfig,
     GenomeConstraints,
     generate_id,
     random_unit_vector,
@@ -30,7 +39,10 @@ from .crossover import (
 )
 from .fitness_sharing import apply_fitness_sharing
 from .speciation import apply_speciation
+from .neat_distance import create_neat_distance_fn
 from app.neural.network import get_input_size
+from app.neural.neat_network import create_minimal_neat_genome
+from app.schemas.neat import InnovationCounter
 
 
 @dataclass
@@ -118,6 +130,17 @@ class EvolutionConfig:
     max_frequency: float = 2.0
     max_amplitude: float = 0.5
 
+    # NEAT configuration
+    use_neat: bool = False  # Use NEAT for variable-topology neural networks
+    neat_add_connection_rate: float = 0.05  # Per-genome probability to add a connection
+    neat_add_node_rate: float = 0.03  # Per-genome probability to add a node
+    neat_enable_rate: float = 0.02  # Per-genome probability to re-enable connection
+    neat_disable_rate: float = 0.01  # Per-genome probability to disable connection
+    neat_excess_coefficient: float = 1.0  # Weight for excess genes in distance
+    neat_disjoint_coefficient: float = 1.0  # Weight for disjoint genes in distance
+    neat_weight_coefficient: float = 0.4  # Weight for weight differences in distance
+    neat_max_hidden_nodes: int = 16  # Maximum hidden neurons to prevent bloat
+
 
 def calculate_decayed_rate(
     generation: int,
@@ -183,6 +206,8 @@ def generate_random_genome(
     time_encoding: str = 'cyclic',
     use_proprioception: bool = False,
     proprioception_inputs: str = 'all',
+    use_neat: bool = False,
+    innovation_counter: InnovationCounter | None = None,
 ) -> dict:
     """
     Generate a random creature genome.
@@ -196,6 +221,8 @@ def generate_random_genome(
         time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
         use_proprioception: Whether to include proprioception inputs
         proprioception_inputs: Which proprioception inputs to use ('strain', 'velocity', 'ground', 'all')
+        use_neat: Whether to create NEAT genome instead of fixed-topology
+        innovation_counter: Innovation counter for NEAT (optional, created if None and use_neat=True)
 
     Returns:
         Random genome dict
@@ -280,6 +307,7 @@ def generate_random_genome(
 
     # Create neural genome if enabled
     neural_genome = None
+    neat_genome = None
     controller_type = 'oscillator'
 
     if use_neural_net and len(muscles) > 0:
@@ -287,15 +315,27 @@ def generate_random_genome(
         input_size = get_input_size(
             neural_mode, time_encoding, use_proprioception, proprioception_inputs
         )
-        neural_genome = initialize_neural_genome(
-            num_muscles=len(muscles),
-            hidden_size=neural_hidden_size,
-            input_size=input_size,
-            output_bias=neural_output_bias,
-        )
+
+        if use_neat:
+            # Create NEAT genome with minimal topology
+            neat_genome_obj = create_minimal_neat_genome(
+                input_size=input_size,
+                output_size=len(muscles),
+                output_bias=neural_output_bias,
+                innovation_counter=innovation_counter,
+            )
+            neat_genome = neat_genome_obj.model_dump()
+        else:
+            # Create fixed-topology neural genome
+            neural_genome = initialize_neural_genome(
+                num_muscles=len(muscles),
+                hidden_size=neural_hidden_size,
+                input_size=input_size,
+                output_bias=neural_output_bias,
+            )
         controller_type = 'neural'
 
-    return {
+    result = {
         'id': generate_id('creature'),
         'generation': 0,
         'survivalStreak': 0,
@@ -304,13 +344,20 @@ def generate_random_genome(
         'muscles': muscles,
         'globalFrequencyMultiplier': random_range(0.8, 1.2),
         'controllerType': controller_type,
-        'neuralGenome': neural_genome,
         'color': {
             'h': random.random(),
             's': random_range(0.5, 0.9),
             'l': random_range(0.4, 0.6),
         },
     }
+
+    # Add appropriate neural network field
+    if neat_genome is not None:
+        result['neatGenome'] = neat_genome
+    elif neural_genome is not None:
+        result['neuralGenome'] = neural_genome
+
+    return result
 
 
 def create_muscle(
@@ -359,6 +406,8 @@ def generate_population(
     time_encoding: str = 'cyclic',
     use_proprioception: bool = False,
     proprioception_inputs: str = 'all',
+    use_neat: bool = False,
+    innovation_counter: InnovationCounter | None = None,
 ) -> list[dict]:
     """
     Generate an initial population of random genomes.
@@ -373,10 +422,16 @@ def generate_population(
         time_encoding: Time encoding for hybrid mode ('cyclic', 'sin', 'raw')
         use_proprioception: Whether to include proprioception inputs
         proprioception_inputs: Which proprioception inputs to use ('strain', 'velocity', 'ground', 'all')
+        use_neat: Whether to create NEAT genomes instead of fixed-topology
+        innovation_counter: Innovation counter for NEAT (shared across population)
 
     Returns:
         List of genome dicts
     """
+    # Create innovation counter if using NEAT and not provided
+    if use_neat and innovation_counter is None:
+        innovation_counter = InnovationCounter()
+
     return [
         generate_random_genome(
             constraints=constraints,
@@ -387,6 +442,8 @@ def generate_population(
             time_encoding=time_encoding,
             use_proprioception=use_proprioception,
             proprioception_inputs=proprioception_inputs,
+            use_neat=use_neat,
+            innovation_counter=innovation_counter,
         )
         for _ in range(size)
     ]
@@ -438,6 +495,7 @@ def evolve_population(
     fitness_scores: list[float],
     config: EvolutionConfig | dict | None = None,
     generation: int = 0,
+    innovation_counter: InnovationCounter | None = None,
 ) -> tuple[list[dict], PopulationStats]:
     """
     Evolve a population to the next generation.
@@ -445,11 +503,18 @@ def evolve_population(
     Survivors (top performers) pass through unchanged.
     New creatures fill culled slots via crossover or mutation.
 
+    When config.use_neat=True, uses NEAT-specific operations:
+    - NEAT crossover aligns genes by innovation number
+    - NEAT mutation includes structural operators (add node/connection)
+    - NEAT distance function for speciation
+    - Innovation counter tracks structural mutations
+
     Args:
         genomes: Current population genomes
         fitness_scores: Fitness values for each genome
         config: Evolution configuration (includes adaptive_boost_level if computed externally)
         generation: Current generation number
+        innovation_counter: Innovation counter for NEAT (tracks structural mutations)
 
     Returns:
         Tuple of (new genomes, population stats)
@@ -498,7 +563,21 @@ def evolve_population(
             min_frequency=config.get('min_frequency', 0.5),
             max_frequency=config.get('max_frequency', 2.0),
             max_amplitude=config.get('max_amplitude', 0.5),
+            # NEAT configuration
+            use_neat=config.get('use_neat', False),
+            neat_add_connection_rate=config.get('neat_add_connection_rate', 0.05),
+            neat_add_node_rate=config.get('neat_add_node_rate', 0.03),
+            neat_enable_rate=config.get('neat_enable_rate', 0.02),
+            neat_disable_rate=config.get('neat_disable_rate', 0.01),
+            neat_excess_coefficient=config.get('neat_excess_coefficient', 1.0),
+            neat_disjoint_coefficient=config.get('neat_disjoint_coefficient', 1.0),
+            neat_weight_coefficient=config.get('neat_weight_coefficient', 0.4),
+            neat_max_hidden_nodes=config.get('neat_max_hidden_nodes', 16),
         )
+
+    # Create innovation counter if using NEAT and not provided
+    if config.use_neat and innovation_counter is None:
+        innovation_counter = InnovationCounter()
 
     # Build constraints from config
     constraints = GenomeConstraints(
@@ -532,12 +611,21 @@ def evolve_population(
     if config.use_speciation:
         # Speciation groups creatures by genome similarity
         # Selection happens within each species, protecting diverse solutions
+        # Use NEAT distance function if NEAT is enabled
+        distance_fn = None
+        if config.use_neat:
+            distance_fn = create_neat_distance_fn(
+                excess_coefficient=config.neat_excess_coefficient,
+                disjoint_coefficient=config.neat_disjoint_coefficient,
+                weight_coefficient=config.neat_weight_coefficient,
+            )
         survivors, _species_list = apply_speciation(
             genomes,
             selection_fitness,
             config.compatibility_threshold,
             survival_rate,
             config.min_species_size,
+            distance_fn=distance_fn,
         )
     elif config.selection_method == 'truncation':
         # Strict cutoff - only top performers survive
@@ -644,6 +732,20 @@ def evolve_population(
         neural_magnitude=config.weight_mutation_magnitude,
     )
 
+    # Build NEAT mutation config if using NEAT
+    neat_config = None
+    if config.use_neat:
+        neat_config = NEATMutationConfig(
+            add_connection_rate=config.neat_add_connection_rate,
+            add_node_rate=config.neat_add_node_rate,
+            enable_rate=config.neat_enable_rate,
+            disable_rate=config.neat_disable_rate,
+            weight_mutation_rate=effective_neural_rate,
+            weight_perturb_rate=0.9,
+            weight_perturb_magnitude=config.weight_mutation_magnitude,
+            max_hidden_nodes=config.neat_max_hidden_nodes,
+        )
+
     # Start with survivors
     new_genomes = list(survivor_genomes)
     target_size = config.population_size
@@ -670,10 +772,16 @@ def evolve_population(
                 parent2 = weighted_random_select(survivors, probabilities)
                 attempts += 1
 
+            # Use NEAT crossover if enabled
+            parent1_fitness = survivor_fitness_map.get(parent1['id'], 0)
+            parent2_fitness = survivor_fitness_map.get(parent2['id'], 0)
             child = single_point_crossover(
                 parent1, parent2, constraints,
                 neural_crossover_method=config.neural_crossover_method,
-                sbx_eta=config.sbx_eta
+                sbx_eta=config.sbx_eta,
+                use_neat=config.use_neat,
+                fitness1=parent1_fitness,
+                fitness2=parent2_fitness,
             )
             reproduction_type = 'crossover'
             # Build ancestry chain from both parents
@@ -693,7 +801,14 @@ def evolve_population(
         # Apply mutation to offspring (whether from crossover or clone)
         # This is standard GA behavior - mutation happens AFTER crossover
         if use_mutation:
-            child = mutate_genome(child, mutation_config, constraints)
+            if config.use_neat:
+                # Use NEAT mutation for variable-topology networks
+                child = mutate_genome_neat(
+                    child, innovation_counter, mutation_config, constraints, neat_config
+                )
+            else:
+                # Use standard mutation for fixed-topology networks
+                child = mutate_genome(child, mutation_config, constraints)
             # Update reproduction type if mutation was the only operator
             if reproduction_type == 'clone':
                 reproduction_type = 'mutation'
@@ -704,6 +819,12 @@ def evolve_population(
         child['generation'] = next_gen
         child['survivalStreak'] = 0
         new_genomes.append(child)
+
+    # Clear innovation cache at end of generation (same structural mutation
+    # in different creatures within a generation should get same innovation ID,
+    # but next generation should start fresh)
+    if config.use_neat and innovation_counter is not None:
+        innovation_counter.clear_generation_cache()
 
     # Calculate stats
     stats = get_population_stats(genomes, fitness_scores, generation)
