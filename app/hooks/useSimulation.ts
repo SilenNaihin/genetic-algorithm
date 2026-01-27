@@ -159,13 +159,10 @@ export function useSimulation() {
       const current = state.longestSurvivingCreature;
       const currentStreak = state.longestSurvivingGenerations;
 
-      // No current longest -> set new one with _bestPerformanceGeneration
+      // No current longest -> set new one
+      // DON'T set _bestPerformanceGeneration - the backend will figure out the best
       if (!current) {
-        const resultWithGen = {
-          ...newLongest,
-          genome: { ...newLongest.genome, _bestPerformanceGeneration: gen },
-        };
-        setLongestSurvivor(resultWithGen, newStreak, gen);
+        setLongestSurvivor(newLongest, newStreak, gen);
         return;
       }
 
@@ -175,11 +172,9 @@ export function useSimulation() {
 
       if (!isSameCreature && hasHigherStreak) {
         // New creature with higher streak takes the title
-        const resultWithGen = {
-          ...newLongest,
-          genome: { ...newLongest.genome, _bestPerformanceGeneration: gen },
-        };
-        setLongestSurvivor(resultWithGen, newStreak, gen);
+        // DON'T set _bestPerformanceGeneration - we don't know their best generation
+        // The backend will figure it out by ordering by fitness DESC
+        setLongestSurvivor(newLongest, newStreak, gen);
       } else if (isSameCreature && hasHigherFitness) {
         // Same creature with better performance -> update result and generation
         const resultWithGen = {
@@ -331,11 +326,9 @@ export function useSimulation() {
             }
           } else {
             // New creature takes the title
-            const resultWithGen = {
-              ...dead,
-              genome: { ...dead.genome, _bestPerformanceGeneration: currentGen },
-            };
-            setLongestSurvivor(resultWithGen, streak, currentGen + 1);
+            // DON'T set _bestPerformanceGeneration - we don't know their best generation
+            // The backend will figure it out by ordering by fitness DESC
+            setLongestSurvivor(dead, streak, currentGen + 1);
           }
         }
       }
@@ -616,11 +609,9 @@ export function useSimulation() {
                     }
                   } else {
                     // New creature takes the title
-                    const resultWithGen = {
-                      ...dead,
-                      genome: { ...dead.genome, _bestPerformanceGeneration: currentGen },
-                    };
-                    setLongestSurvivor(resultWithGen, streak, currentGen + 1);
+                    // DON'T set _bestPerformanceGeneration - we don't know their best generation
+                    // The backend will figure it out by ordering by fitness DESC
+                    setLongestSurvivor(dead, streak, currentGen + 1);
                   }
                 }
               }

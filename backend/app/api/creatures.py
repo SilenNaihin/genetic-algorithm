@@ -180,7 +180,7 @@ async def get_creature_frames(
     Get frame data for a creature (for replay).
 
     If generation is provided, returns frames for that generation.
-    Otherwise, returns frames from the latest generation that has them.
+    Otherwise, returns frames from the generation with the BEST fitness.
     """
     # Build query for frames
     if generation is not None:
@@ -193,11 +193,17 @@ async def get_creature_frames(
         )
         frame = frame_result.scalar_one_or_none()
     else:
-        # Find latest frame record
+        # Find frame from the generation with BEST fitness (not latest)
+        # This ensures clicking on longest survivor shows their best performance
         frame_result = await db.execute(
             select(CreatureFrame)
+            .join(
+                CreaturePerformance,
+                (CreatureFrame.creature_id == CreaturePerformance.creature_id) &
+                (CreatureFrame.generation == CreaturePerformance.generation)
+            )
             .where(CreatureFrame.creature_id == creature_id)
-            .order_by(CreatureFrame.generation.desc())
+            .order_by(CreaturePerformance.fitness.desc())
             .limit(1)
         )
         frame = frame_result.scalar_one_or_none()
