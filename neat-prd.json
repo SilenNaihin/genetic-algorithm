@@ -174,7 +174,7 @@
       "backend_run_model": {
         "id": "1.13",
         "name": "Run Model Columns",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/models/run.py",
         "new_file": false,
         "description": "Add innovation_counter_connection and innovation_counter_node columns"
@@ -182,8 +182,8 @@
       "backend_migration": {
         "id": "1.14",
         "name": "Database Migration",
-        "status": "pending",
-        "file": "backend/migrations/006_add_neat_columns.py",
+        "status": "complete",
+        "file": "backend/alembic/versions/005_add_neat_innovation_counters.py",
         "new_file": true,
         "description": "Migration for innovation counter columns"
       },

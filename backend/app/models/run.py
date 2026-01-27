@@ -52,6 +52,10 @@ class Run(Base):
     adaptive_boost_level: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     gens_since_boost_change: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # NEAT innovation counters (persisted across generations)
+    innovation_counter_connection: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    innovation_counter_node: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     # Relationships
     generations: Mapped[list["Generation"]] = relationship(
         "Generation", back_populates="run", cascade="all, delete-orphan"

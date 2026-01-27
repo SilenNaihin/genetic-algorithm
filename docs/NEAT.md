@@ -25,7 +25,7 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | Genetics Config Schema | **Complete** | `backend/app/schemas/genetics.py` | EvolutionConfig, InnovationCounterState, EvolveRequest/Response with NEAT fields |
 | Simulation Config Schema | **Complete** | `backend/app/schemas/simulation.py` | SimulationConfig with NEAT fields (use_neat, mutation rates, distance coefficients) |
 | Simulator NEAT Support | **Complete** | `backend/app/services/pytorch_simulator.py` | NEATBatchedNetwork wrapper for per-creature forward pass |
-| Run Model/Migration | Not started | `backend/app/models/run.py` | |
+| Run Model/Migration | **Complete** | `backend/app/models/run.py`, `alembic/versions/005_...` | innovation_counter_connection, innovation_counter_node |
 | API Changes | Not started | `backend/app/api/evolution.py` | |
 | Frontend Types | Not started | `src/types/simulation.ts` | |
 | Frontend UI | Not started | `app/components/menu/NeuralPanel.tsx` | |
