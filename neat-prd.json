@@ -162,10 +162,14 @@
       "backend_simulator": {
         "id": "1.12",
         "name": "Simulator NEAT Support",
-        "status": "pending",
+        "status": "complete",
         "file": "backend/app/services/pytorch_simulator.py",
         "new_file": false,
-        "description": "Detect NEAT genomes, use neat_forward() for execution"
+        "description": "Detect NEAT genomes, use neat_forward() for execution",
+        "implementation": {
+          "new_class": "NEATBatchedNetwork in neat_network.py",
+          "simulator_changes": "_has_neat_genomes() detection, conditional network creation"
+        }
       },
       "backend_run_model": {
         "id": "1.13",

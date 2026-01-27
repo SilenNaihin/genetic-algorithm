@@ -36,6 +36,7 @@ from app.simulation.fitness import (
     check_frequency_violations,
 )
 from app.neural.network import BatchedNeuralNetwork, NeuralConfig
+from app.neural.neat_network import NEATBatchedNetwork
 
 
 def _safe_float(val: float, default: float = 0.0) -> float:
@@ -124,27 +125,40 @@ class PyTorchSimulator:
 
         # Run simulation based on controller type
         use_neural = config.use_neural_net and self._has_neural_genomes(genomes)
+        use_neat = self._has_neat_genomes(genomes)
 
         if use_neural:
-            # Create batched neural network
-            neural_genomes = [g.get("neuralGenome") or g.get("neural_genome") for g in genomes]
             num_muscles = [len(g.get("muscles", [])) for g in genomes]
 
-            nn_config = NeuralConfig(
-                neural_mode=config.neural_mode,
-                hidden_size=config.neural_hidden_size,
-                activation=config.neural_activation,
-                time_encoding=config.time_encoding,
-                use_proprioception=config.use_proprioception,
-                proprioception_inputs=config.proprioception_inputs,
-            )
+            if use_neat:
+                # Create NEAT batched network (variable topology)
+                neat_genomes = [g.get("neatGenome") or g.get("neat_genome") for g in genomes]
+                network = NEATBatchedNetwork.from_genome_dicts(
+                    neat_genomes=neat_genomes,
+                    num_muscles=num_muscles,
+                    max_muscles=15,
+                    max_hidden=config.neat_max_hidden_nodes,
+                    device=self.device,
+                )
+            else:
+                # Create fixed-topology batched neural network
+                neural_genomes = [g.get("neuralGenome") or g.get("neural_genome") for g in genomes]
 
-            network = BatchedNeuralNetwork.from_genomes(
-                neural_genomes=neural_genomes,
-                num_muscles=num_muscles,
-                config=nn_config,
-                device=self.device,
-            )
+                nn_config = NeuralConfig(
+                    neural_mode=config.neural_mode,
+                    hidden_size=config.neural_hidden_size,
+                    activation=config.neural_activation,
+                    time_encoding=config.time_encoding,
+                    use_proprioception=config.use_proprioception,
+                    proprioception_inputs=config.proprioception_inputs,
+                )
+
+                network = BatchedNeuralNetwork.from_genomes(
+                    neural_genomes=neural_genomes,
+                    num_muscles=num_muscles,
+                    config=nn_config,
+                    device=self.device,
+                )
 
             # Calculate frame interval based on physics FPS and desired frame rate
             physics_fps = int(1.0 / dt)
@@ -419,11 +433,24 @@ class PyTorchSimulator:
         )
 
     def _has_neural_genomes(self, genomes: list[dict]) -> bool:
-        """Check if any genome has neural network weights."""
+        """Check if any genome has neural network weights (fixed or NEAT)."""
         for g in genomes:
             controller = g.get("controllerType") or g.get("controller_type", "oscillator")
             if controller == "neural":
+                # Check for fixed-topology neural genome
                 neural = g.get("neuralGenome") or g.get("neural_genome")
                 if neural is not None:
                     return True
+                # Check for NEAT genome
+                neat = g.get("neatGenome") or g.get("neat_genome")
+                if neat is not None:
+                    return True
+        return False
+
+    def _has_neat_genomes(self, genomes: list[dict]) -> bool:
+        """Check if genomes use NEAT (variable topology)."""
+        for g in genomes:
+            neat = g.get("neatGenome") or g.get("neat_genome")
+            if neat is not None:
+                return True
         return False

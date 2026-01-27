@@ -24,7 +24,7 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | Population Integration | **Complete** | `backend/app/genetics/population.py` | EvolutionConfig has NEAT fields, evolve_population uses NEAT operators when use_neat=True |
 | Genetics Config Schema | **Complete** | `backend/app/schemas/genetics.py` | EvolutionConfig, InnovationCounterState, EvolveRequest/Response with NEAT fields |
 | Simulation Config Schema | **Complete** | `backend/app/schemas/simulation.py` | SimulationConfig with NEAT fields (use_neat, mutation rates, distance coefficients) |
-| Simulator NEAT Support | Not started | `backend/app/services/pytorch_simulator.py` | |
+| Simulator NEAT Support | **Complete** | `backend/app/services/pytorch_simulator.py` | NEATBatchedNetwork wrapper for per-creature forward pass |
 | Run Model/Migration | Not started | `backend/app/models/run.py` | |
 | API Changes | Not started | `backend/app/api/evolution.py` | |
 | Frontend Types | Not started | `src/types/simulation.ts` | |

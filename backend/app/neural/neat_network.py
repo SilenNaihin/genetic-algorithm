@@ -10,7 +10,9 @@ See docs/NEAT.md for technical details.
 import math
 import random
 from collections import deque
-from typing import Literal
+from typing import Literal, Optional
+
+import torch
 
 from app.schemas.neat import (
     ConnectionGene,
@@ -444,3 +446,160 @@ def get_neuron_depths(genome: NEATGenome) -> dict[int, int]:
             depth[neuron.id] = 0
 
     return depth
+
+
+class NEATBatchedNetwork:
+    """
+    Wrapper for NEAT genomes that provides BatchedNeuralNetwork-compatible interface.
+
+    Since NEAT networks have variable topology, we can't use true tensor batching.
+    Instead, this class iterates over genomes and collects results into tensors.
+
+    Implements the same interface as BatchedNeuralNetwork:
+    - forward(inputs) -> [B, max_muscles]
+    - forward_full(inputs) -> dict with inputs, hidden, outputs
+    - forward_with_dead_zone(inputs, dead_zone) -> [B, max_muscles]
+    - forward_full_with_dead_zone(inputs, dead_zone) -> dict
+    """
+
+    def __init__(
+        self,
+        genomes: list[NEATGenome],
+        num_muscles: list[int],
+        max_muscles: int = 15,
+        max_hidden: int = 64,
+        device: Optional[torch.device] = None,
+    ):
+        """
+        Initialize NEAT batched network.
+
+        Args:
+            genomes: List of NEATGenome objects
+            num_muscles: Number of muscles per creature (for output padding)
+            max_muscles: Maximum muscles (for output tensor size)
+            max_hidden: Maximum hidden neurons (for hidden tensor size)
+            device: Torch device
+        """
+        self.genomes = genomes
+        self.num_muscles = num_muscles
+        self.max_muscles = max_muscles
+        self.max_hidden = max_hidden
+        self.device = device or torch.device('cpu')
+        self.batch_size = len(genomes)
+
+    @torch.no_grad()
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through all NEAT networks.
+
+        Args:
+            inputs: [B, input_size] sensor inputs for each creature
+
+        Returns:
+            outputs: [B, max_muscles] neural network outputs in [-1, 1] range
+        """
+        outputs = torch.zeros(self.batch_size, self.max_muscles, device=self.device)
+
+        for i, genome in enumerate(self.genomes):
+            input_list = inputs[i].cpu().tolist()
+            output_list = neat_forward(genome, input_list)
+
+            # Pad/truncate outputs to match num_muscles for this creature
+            n_out = min(len(output_list), self.num_muscles[i])
+            for j in range(n_out):
+                outputs[i, j] = output_list[j]
+
+        return outputs
+
+    @torch.no_grad()
+    def forward_full(self, inputs: torch.Tensor) -> dict:
+        """
+        Forward pass returning full activation data for visualization.
+
+        Args:
+            inputs: [B, input_size] sensor inputs for each creature
+
+        Returns:
+            dict with:
+                - 'inputs': [B, input_size] the input tensor
+                - 'hidden': [B, max_hidden] hidden layer activations (padded)
+                - 'outputs': [B, max_muscles] output layer activations
+        """
+        input_size = inputs.shape[1]
+        outputs = torch.zeros(self.batch_size, self.max_muscles, device=self.device)
+        hidden = torch.zeros(self.batch_size, self.max_hidden, device=self.device)
+
+        for i, genome in enumerate(self.genomes):
+            input_list = inputs[i].cpu().tolist()
+            result = neat_forward_full(genome, input_list)
+
+            # Copy hidden activations (padded to max_hidden)
+            for j, h_val in enumerate(result['hidden'][:self.max_hidden]):
+                hidden[i, j] = h_val
+
+            # Copy outputs (padded to num_muscles)
+            n_out = min(len(result['outputs']), self.num_muscles[i])
+            for j in range(n_out):
+                outputs[i, j] = result['outputs'][j]
+
+        return {
+            'inputs': inputs,
+            'hidden': hidden,
+            'outputs': outputs,
+        }
+
+    @torch.no_grad()
+    def forward_with_dead_zone(self, inputs: torch.Tensor, dead_zone: float = 0.1) -> torch.Tensor:
+        """
+        Forward pass with dead zone applied (pure mode).
+
+        Small outputs (abs < dead_zone) are zeroed out.
+        """
+        output = self.forward(inputs)
+
+        if dead_zone > 0:
+            mask = torch.abs(output) < dead_zone
+            output = output.masked_fill(mask, 0.0)
+
+        return output
+
+    @torch.no_grad()
+    def forward_full_with_dead_zone(self, inputs: torch.Tensor, dead_zone: float = 0.1) -> dict:
+        """
+        Forward pass with dead zone applied, returning full activations (pure mode).
+
+        Returns:
+            dict with 'inputs', 'hidden', 'outputs', 'outputs_raw'
+        """
+        result = self.forward_full(inputs)
+
+        # Store raw outputs before dead zone
+        result['outputs_raw'] = result['outputs'].clone()
+
+        if dead_zone > 0:
+            mask = torch.abs(result['outputs']) < dead_zone
+            result['outputs'] = result['outputs'].masked_fill(mask, 0.0)
+
+        return result
+
+    @classmethod
+    def from_genome_dicts(
+        cls,
+        neat_genomes: list[dict],
+        num_muscles: list[int],
+        max_muscles: int = 15,
+        max_hidden: int = 64,
+        device: Optional[torch.device] = None,
+    ) -> "NEATBatchedNetwork":
+        """
+        Create NEATBatchedNetwork from genome dicts (from API).
+
+        Args:
+            neat_genomes: List of NEAT genome dicts
+            num_muscles: Number of muscles per creature
+            max_muscles: Maximum muscles
+            max_hidden: Maximum hidden neurons
+            device: Torch device
+        """
+        genomes = [NEATGenome(**g) for g in neat_genomes]
+        return cls(genomes, num_muscles, max_muscles, max_hidden, device)
