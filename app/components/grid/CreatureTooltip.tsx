@@ -39,13 +39,6 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, st
   };
   const disqualificationText = getDisqualificationText();
 
-  // Genetics info
-  const genCount = genome.generation;
-  const parentCount = genome.parentIds.length;
-  const lineageText = parentCount === 0 ? 'Original' :
-                      parentCount === 1 ? 'Mutant' :
-                      `Crossover (${parentCount} parents)`;
-
   // Lifecycle info
   const birthGen = result.birthGeneration;
   const deathGen = result.deathGeneration;
@@ -71,9 +64,7 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, st
     </div>
 
     <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-      <div style="font-size: 11px; color: var(--accent-light); margin-bottom: 4px;">Genetics</div>
-      ${tooltipRow('Generation', genCount)}
-      ${tooltipRow('Origin', lineageText, `color: ${parentCount === 0 ? '#7a8494' : parentCount === 1 ? '#f59e0b' : '#6366f1'}`)}
+      <div style="font-size: 11px; color: var(--accent-light); margin-bottom: 4px;">Lifecycle</div>
       ${birthGen !== undefined ? tooltipRow('Born', `Gen ${birthGen}`) : ''}
       ${!isAlive ? tooltipRow('Died', `Gen ${deathGen}`, 'color: #ef4444') : ''}
     </div>
