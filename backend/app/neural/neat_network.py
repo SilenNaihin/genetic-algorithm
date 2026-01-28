@@ -51,13 +51,11 @@ def create_minimal_neat_genome(
     output_bias: float = -0.5,
     activation: Literal['tanh', 'relu', 'sigmoid'] = 'tanh',
     innovation_counter: InnovationCounter | None = None,
+    bias_mode: Literal['none', 'node', 'bias_node'] = 'node',
+    connectivity: Literal['full', 'sparse', 'sparse_inputs', 'sparse_outputs', 'none'] = 'full',
 ) -> NEATGenome:
     """
-    Create a minimal NEAT genome with Option B topology.
-
-    Option B: All inputs connected directly to all outputs (no hidden neurons).
-    This gives creatures basic functionality immediately while allowing
-    evolution to add complexity as needed.
+    Create a minimal NEAT genome with configurable initial connectivity.
 
     Args:
         input_size: Number of input neurons (sensors)
@@ -65,51 +63,151 @@ def create_minimal_neat_genome(
         output_bias: Initial bias for output neurons (negative = harder to activate)
         activation: Activation function for hidden/output neurons
         innovation_counter: Optional counter for assigning innovation IDs
+        bias_mode: How biases are implemented:
+            - 'none': No biases
+            - 'node': Per-node bias attributes (default)
+            - 'bias_node': Special input neuron always=1.0 (original NEAT style)
+        connectivity: Initial network connectivity:
+            - 'full': All inputs connected to all outputs (standard NEAT)
+            - 'sparse_inputs': Each input connects to one random output (total = input_size)
+            - 'sparse_outputs': Each output gets one random input (total = output_size)
+            - 'sparse': Alias for 'sparse_outputs' (backwards compatibility)
+            - 'none': No initial connections (topology emerges from evolution)
 
     Returns:
-        NEATGenome with input_size inputs, output_size outputs, fully connected
+        NEATGenome with specified connectivity pattern
     """
     neurons: list[NeuronGene] = []
     connections: list[ConnectionGene] = []
 
-    # Create input neurons (IDs 0 to input_size-1)
+    # For bias_node mode, reserve ID 0 for the bias neuron
+    # Regular inputs start at ID 1
+    bias_node_id = 0 if bias_mode == 'bias_node' else None
+    input_start_id = 1 if bias_mode == 'bias_node' else 0
+
+    # Create bias neuron if using bias_node mode
+    if bias_mode == 'bias_node':
+        neurons.append(NeuronGene(
+            id=bias_node_id,
+            type='bias',  # Special type for bias node
+            bias=0.0,
+            innovation=None,
+        ))
+
+    # Create input neurons
     for i in range(input_size):
         neurons.append(NeuronGene(
-            id=i,
+            id=input_start_id + i,
             type='input',
             bias=0.0,  # Input neurons don't use bias
-            innovation=None,  # Input neurons don't have innovation IDs
+            innovation=None,
         ))
 
-    # Create output neurons (IDs input_size to input_size+output_size-1)
+    # Output neurons start after inputs (and bias node if present)
+    output_start_id = input_start_id + input_size
+
+    # Create output neurons
     for i in range(output_size):
         neurons.append(NeuronGene(
-            id=input_size + i,
+            id=output_start_id + i,
             type='output',
-            bias=output_bias,
-            innovation=None,  # Output neurons don't have innovation IDs
+            # Use node bias only if bias_mode is 'node', else 0
+            bias=output_bias if bias_mode == 'node' else 0.0,
+            innovation=None,
         ))
 
-    # Create connections from every input to every output (Option B)
+    # Create connections based on connectivity mode
     innovation = 0
-    for input_id in range(input_size):
-        for output_offset in range(output_size):
-            output_id = input_size + output_offset
 
-            # Get innovation ID from counter if provided, otherwise use sequential
+    if connectivity == 'full':
+        # Full connectivity: every input to every output (standard NEAT)
+        for i in range(input_size):
+            input_id = input_start_id + i
+            for output_offset in range(output_size):
+                output_id = output_start_id + output_offset
+
+                if innovation_counter is not None:
+                    inn_id = innovation_counter.get_connection_innovation(input_id, output_id)
+                else:
+                    inn_id = innovation
+                    innovation += 1
+
+                weight = random.uniform(-0.5, 0.5)
+
+                connections.append(ConnectionGene(
+                    from_node=input_id,
+                    to_node=output_id,
+                    weight=weight,
+                    enabled=True,
+                    innovation=inn_id,
+                ))
+
+    elif connectivity in ('sparse', 'sparse_outputs'):
+        # Sparse outputs: each output gets exactly one random input
+        # Total connections = output_size (inputs may be reused)
+        for output_offset in range(output_size):
+            output_id = output_start_id + output_offset
+            # Pick a random input for this output
+            input_id = input_start_id + random.randint(0, input_size - 1)
+
             if innovation_counter is not None:
                 inn_id = innovation_counter.get_connection_innovation(input_id, output_id)
             else:
                 inn_id = innovation
                 innovation += 1
 
-            # Random initial weight in [-0.5, 0.5]
             weight = random.uniform(-0.5, 0.5)
 
             connections.append(ConnectionGene(
                 from_node=input_id,
                 to_node=output_id,
                 weight=weight,
+                enabled=True,
+                innovation=inn_id,
+            ))
+
+    elif connectivity == 'sparse_inputs':
+        # Sparse inputs: each input connects to exactly one random output
+        # Total connections = input_size (outputs may have multiple or none)
+        for i in range(input_size):
+            input_id = input_start_id + i
+            # Pick a random output for this input
+            output_id = output_start_id + random.randint(0, output_size - 1)
+
+            if innovation_counter is not None:
+                inn_id = innovation_counter.get_connection_innovation(input_id, output_id)
+            else:
+                inn_id = innovation
+                innovation += 1
+
+            weight = random.uniform(-0.5, 0.5)
+
+            connections.append(ConnectionGene(
+                from_node=input_id,
+                to_node=output_id,
+                weight=weight,
+                enabled=True,
+                innovation=inn_id,
+            ))
+
+    # connectivity == 'none': no connections, topology emerges from evolution
+
+    # Create connections from bias node to all outputs (bias_node mode)
+    if bias_mode == 'bias_node':
+        for output_offset in range(output_size):
+            output_id = output_start_id + output_offset
+
+            if innovation_counter is not None:
+                inn_id = innovation_counter.get_connection_innovation(bias_node_id, output_id)
+            else:
+                inn_id = innovation
+                innovation += 1
+
+            # Initial bias weight (replaces the output_bias attribute)
+            connections.append(ConnectionGene(
+                from_node=bias_node_id,
+                to_node=output_id,
+                weight=output_bias,
                 enabled=True,
                 innovation=inn_id,
             ))
@@ -128,13 +226,13 @@ def topological_sort(genome: NEATGenome) -> list[int]:
     Returns neuron IDs in order such that each neuron is evaluated
     only after all neurons that feed into it have been evaluated.
 
-    Input neurons are not included (they're set directly from inputs).
+    Input and bias neurons are not included (they're set directly).
 
     Args:
         genome: NEAT genome to sort
 
     Returns:
-        List of neuron IDs in evaluation order (inputs excluded)
+        List of neuron IDs in evaluation order (inputs/bias excluded)
 
     Raises:
         ValueError: If the network contains a cycle (shouldn't happen in feedforward)
@@ -147,8 +245,8 @@ def topological_sort(genome: NEATGenome) -> list[int]:
         if conn.enabled:
             incoming[conn.to_node].add(conn.from_node)
 
-    # Get input neuron IDs (they have no dependencies)
-    input_ids = {n.id for n in genome.neurons if n.type == 'input'}
+    # Get input and bias neuron IDs (they have no dependencies, values set directly)
+    input_ids = {n.id for n in genome.neurons if n.type in ('input', 'bias')}
 
     # Kahn's algorithm for topological sort
     # Start with neurons that have no incoming connections OR only input connections
@@ -158,10 +256,11 @@ def topological_sort(genome: NEATGenome) -> list[int]:
         non_input_sources = sources - input_ids
         in_degree[neuron_id] = len(non_input_sources)
 
-    # Queue starts with all neurons that only depend on inputs
+    # Queue starts with all neurons that only depend on inputs/bias
+    # Exclude input and bias neurons (they're set directly, not evaluated)
     queue = deque([
         n.id for n in genome.neurons
-        if n.type != 'input' and in_degree[n.id] == 0
+        if n.type not in ('input', 'bias') and in_degree[n.id] == 0
     ])
 
     result: list[int] = []
@@ -183,8 +282,8 @@ def topological_sort(genome: NEATGenome) -> list[int]:
                 if in_degree[target_id] == 0:
                     queue.append(target_id)
 
-    # Check if we processed all non-input neurons
-    non_input_count = sum(1 for n in genome.neurons if n.type != 'input')
+    # Check if we processed all non-input/non-bias neurons
+    non_input_count = sum(1 for n in genome.neurons if n.type not in ('input', 'bias'))
     if len(result) != non_input_count:
         raise ValueError(
             f"Network contains a cycle! Processed {len(result)} of {non_input_count} non-input neurons"
@@ -202,7 +301,7 @@ def neat_forward(
 
     Args:
         genome: NEAT genome defining the network topology
-        inputs: Input values (one per input neuron)
+        inputs: Input values (one per input neuron, NOT including bias neuron)
 
     Returns:
         Output values (one per output neuron, in neuron ID order)
@@ -212,6 +311,7 @@ def neat_forward(
     """
     input_neurons = genome.get_input_neurons()
     output_neurons = genome.get_output_neurons()
+    bias_neurons = [n for n in genome.neurons if n.type == 'bias']
 
     if len(inputs) != len(input_neurons):
         raise ValueError(
@@ -223,6 +323,10 @@ def neat_forward(
 
     # Initialize neuron values
     neuron_values: dict[int, float] = {}
+
+    # Set bias neuron values (always 1.0)
+    for bias_neuron in bias_neurons:
+        neuron_values[bias_neuron.id] = 1.0
 
     # Set input values (sorted by ID to ensure consistent ordering)
     sorted_inputs = sorted(input_neurons, key=lambda n: n.id)
@@ -266,7 +370,7 @@ def neat_forward_full(
 
     Args:
         genome: NEAT genome defining the network topology
-        inputs: Input values (one per input neuron)
+        inputs: Input values (one per input neuron, NOT including bias neuron)
 
     Returns:
         Dictionary with 'inputs', 'hidden', 'outputs' activation lists
@@ -274,6 +378,7 @@ def neat_forward_full(
     input_neurons = genome.get_input_neurons()
     hidden_neurons = genome.get_hidden_neurons()
     output_neurons = genome.get_output_neurons()
+    bias_neurons = [n for n in genome.neurons if n.type == 'bias']
 
     if len(inputs) != len(input_neurons):
         raise ValueError(
@@ -282,6 +387,10 @@ def neat_forward_full(
 
     activate = ACTIVATIONS.get(genome.activation, tanh)
     neuron_values: dict[int, float] = {}
+
+    # Set bias neuron values (always 1.0)
+    for bias_neuron in bias_neurons:
+        neuron_values[bias_neuron.id] = 1.0
 
     # Set input values
     sorted_inputs = sorted(input_neurons, key=lambda n: n.id)

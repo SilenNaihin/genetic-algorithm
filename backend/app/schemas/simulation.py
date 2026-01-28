@@ -5,9 +5,9 @@ Matches the internal PyTorch simulation config (app/simulation/config.py)
 while providing Pydantic validation for API requests.
 """
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.genome import CreatureGenome
 
@@ -40,8 +40,8 @@ class SimulationConfig(BaseModel):
     mutation_magnitude: float = Field(default=0.3, ge=0.0, le=1.0)
     crossover_rate: float = Field(default=0.5, ge=0.0, le=1.0)
     elite_count: int = Field(default=5, ge=0, le=100)
-    use_mutation: bool = True
-    use_crossover: bool = False
+    use_mutation: bool = False
+    use_crossover: bool = True
 
     # Creature constraints
     min_nodes: int = Field(default=3, ge=2, le=20)
@@ -62,7 +62,8 @@ class SimulationConfig(BaseModel):
 
     # Neural network settings
     use_neural_net: bool = True
-    neural_mode: Literal['hybrid', 'pure'] = 'pure'
+    neural_mode: Literal['hybrid', 'pure', 'neat'] = 'pure'
+    bias_mode: Literal['none', 'node', 'bias_node'] = 'node'  # Bias implementation: none, per-node attribute, or bias input node
     time_encoding: Literal['none', 'cyclic', 'sin', 'raw', 'sin_raw'] = 'none'  # Time encoding (default: none for pure, cyclic recommended for hybrid)
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
     neural_activation: str = Field(default='tanh')
@@ -72,8 +73,8 @@ class SimulationConfig(BaseModel):
     neural_output_bias: float = Field(default=-0.1, ge=-2.0, le=2.0)
     fitness_efficiency_penalty: float = Field(default=0.1, ge=0.0, le=5.0)
     neural_dead_zone: float = Field(default=0.1, ge=0.0, le=1.0)
-    neural_update_hz: int = Field(default=15, ge=5, le=60)  # NN update frequency (Hz)
-    output_smoothing_alpha: float = Field(default=0.3, ge=0.05, le=1.0)  # Exponential smoothing (1.0 = no smoothing)
+    neural_update_hz: int = Field(default=10, ge=5, le=60)  # NN update frequency (Hz)
+    output_smoothing_alpha: float = Field(default=0.15, ge=0.05, le=1.0)  # Exponential smoothing (1.0 = no smoothing)
 
     # Adaptive mutation
     use_adaptive_mutation: bool = False
@@ -95,8 +96,8 @@ class SimulationConfig(BaseModel):
     compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
     min_species_size: int = Field(default=2, ge=1, le=20)
 
-    # NEAT (NeuroEvolution of Augmenting Topologies)
-    use_neat: bool = False  # Enable NEAT for variable-topology neural networks
+    # NEAT (NeuroEvolution of Augmenting Topologies) - configured when neural_mode == 'neat'
+    neat_initial_connectivity: Literal['full', 'sparse_inputs', 'sparse_outputs', 'none'] = 'full'  # Initial network connectivity
     neat_add_connection_rate: float = Field(default=0.05, ge=0.0, le=1.0)  # Probability to add connection
     neat_add_node_rate: float = Field(default=0.03, ge=0.0, le=1.0)  # Probability to add node
     neat_enable_rate: float = Field(default=0.02, ge=0.0, le=1.0)  # Probability to re-enable connection
@@ -124,6 +125,26 @@ class SimulationConfig(BaseModel):
     frame_rate: int = Field(default=15, ge=1, le=60)
     sparse_top_count: int = Field(default=10, ge=1, le=50)
     sparse_bottom_count: int = Field(default=10, ge=1, le=50)
+
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_and_enforce_neat_defaults(cls, data: Any) -> Any:
+        """Migrate legacy fields and enforce NEAT defaults."""
+        if isinstance(data, dict):
+            # Check for legacy use_neat or useNEAT fields
+            use_neat = data.pop('use_neat', None) or data.pop('useNEAT', None)
+            if use_neat:
+                data['neural_mode'] = 'neat'
+
+            # ENFORCE NEAT defaults - these are REQUIRED for NEAT to work properly
+            # Speciation protects structural innovations until weights adapt
+            if data.get('neural_mode') == 'neat':
+                data['use_speciation'] = True  # REQUIRED - without this, topology won't evolve
+                data['use_fitness_sharing'] = False  # Redundant with speciation
+                # Default to bias_node for NEAT (more faithful to original NEAT)
+                if 'bias_mode' not in data:
+                    data['bias_mode'] = 'bias_node'
+        return data
 
     @property
     def record_frames(self) -> bool:

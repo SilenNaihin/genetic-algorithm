@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useEvolutionStore, useConfig } from '../../stores/evolutionStore';
 import { ParamSlider } from './ParamSlider';
 import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
@@ -10,6 +11,23 @@ import { InfoTooltip, TOOLTIPS } from '../ui/InfoTooltip';
 export function NeuralPanel() {
   const config = useConfig();
   const setConfig = useEvolutionStore((s) => s.setConfig);
+
+  // ENFORCE NEAT defaults whenever neuralMode is 'neat'
+  // These settings are REQUIRED for NEAT topology evolution to work
+  useEffect(() => {
+    if (config.neuralMode === 'neat') {
+      const needsUpdate =
+        !config.useSpeciation ||  // Speciation is REQUIRED
+        config.useFitnessSharing;  // Should be off (redundant with speciation)
+
+      if (needsUpdate) {
+        setConfig({
+          useSpeciation: true,
+          useFitnessSharing: false,
+        });
+      }
+    }
+  }, [config.neuralMode, config.useSpeciation, config.useFitnessSharing, setConfig]);
 
   const selectStyle = {
     width: '100%',
@@ -85,19 +103,31 @@ export function NeuralPanel() {
             <select
               value={config.neuralMode}
               onChange={(e) => {
-                const newMode = e.target.value as 'hybrid' | 'pure';
-                // Auto-switch time encoding defaults when mode changes
-                const newTimeEncoding = newMode === 'hybrid' ? 'cyclic' : 'none';
-                setConfig({ neuralMode: newMode, timeEncoding: newTimeEncoding });
+                const newMode = e.target.value as 'hybrid' | 'pure' | 'neat';
+                // Auto-switch defaults when mode changes
+                if (newMode === 'neat') {
+                  // NEAT mode: enable speciation, disable fitness sharing, use bias node
+                  setConfig({
+                    neuralMode: newMode,
+                    useSpeciation: true,
+                    useFitnessSharing: false,
+                    biasMode: 'bias_node',  // Original NEAT style
+                  });
+                } else if (newMode === 'hybrid') {
+                  setConfig({ neuralMode: newMode, timeEncoding: 'cyclic', biasMode: 'node' });
+                } else {
+                  setConfig({ neuralMode: newMode, timeEncoding: 'none', biasMode: 'node' });
+                }
               }}
               style={selectStyle}
             >
               <option value="hybrid">Hybrid</option>
               <option value="pure">Pure</option>
+              <option value="neat">NEAT</option>
             </select>
           </div>
 
-          {/* Time Encoding - available for both modes */}
+          {/* Time Encoding - available for all modes */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <span style={labelStyle}>
@@ -118,8 +148,8 @@ export function NeuralPanel() {
             </select>
           </div>
 
-          {/* Hidden Size - hide when NEAT is enabled (topology is variable) */}
-          {!config.useNEAT && (
+          {/* Hidden Size - hide when NEAT mode is enabled (topology is variable) */}
+          {config.neuralMode !== 'neat' && (
             <div style={{ marginBottom: '16px' }}>
               <ParamSlider
                 name="Hidden Size"
@@ -151,6 +181,31 @@ export function NeuralPanel() {
               <option value="tanh">tanh</option>
               <option value="relu">ReLU</option>
               <option value="sigmoid">sigmoid</option>
+            </select>
+          </div>
+
+          {/* Bias Mode */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={labelStyle}>
+                Bias Mode
+                <InfoTooltip text={
+                  config.biasMode === 'none'
+                    ? "No biases - neurons have no bias terms"
+                    : config.biasMode === 'node'
+                    ? "Per-node biases - each neuron has its own bias value"
+                    : "Bias node - a special input always=1.0, connections from it act as biases (original NEAT style)"
+                } />
+              </span>
+            </div>
+            <select
+              value={config.biasMode}
+              onChange={(e) => setConfig({ biasMode: e.target.value as 'none' | 'node' | 'bias_node' })}
+              style={selectStyle}
+            >
+              <option value="node">Per-Node Biases</option>
+              <option value="bias_node">Bias Node (NEAT style)</option>
+              <option value="none">No Biases</option>
             </select>
           </div>
 
@@ -217,8 +272,8 @@ export function NeuralPanel() {
             />
           </div>
 
-          {/* Dead Zone - only shown in Pure mode */}
-          {config.neuralMode === 'pure' && (
+          {/* Dead Zone - shown in Pure and NEAT modes */}
+          {(config.neuralMode === 'pure' || config.neuralMode === 'neat') && (
             <div style={{ marginBottom: '16px' }}>
               <ParamSlider
                 name="Dead Zone"
@@ -359,65 +414,103 @@ export function NeuralPanel() {
             )}
           </div>
 
-          {/* NEAT Section (Variable Topology) */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={labelStyle}>
-                NEAT (Variable Topology)
-                <InfoTooltip text={TOOLTIPS.neat} />
-              </span>
-              <input
-                type="checkbox"
-                checked={config.useNEAT}
-                onChange={(e) => setConfig({ useNEAT: e.target.checked })}
-                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
-              />
-            </div>
+          {/* NEAT Settings (shown when mode is 'neat') */}
+          {config.neuralMode === 'neat' && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={labelStyle}>
+                  NEAT Topology
+                  <InfoTooltip text={TOOLTIPS.neat} />
+                </span>
+              </div>
 
-            {config.useNEAT && (
-              <>
-                <div style={{ marginBottom: '16px' }}>
-                  <ParamSlider
-                    name="Add Connection %"
-                    value={config.neatAddConnectionRate * 100}
-                    displayValue={`${Math.round(config.neatAddConnectionRate * 100)}%`}
-                    min={1}
-                    max={20}
-                    step={1}
-                    onChange={(v) => setConfig({ neatAddConnectionRate: v / 100 })}
-                    tooltip={TOOLTIPS.neatAddConnectionRate}
-                    width="100%"
-                  />
+              {/* Initial Connectivity */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={labelStyle}>
+                    Initial Connectivity
+                    <InfoTooltip text={TOOLTIPS.neatInitialConnectivity} />
+                  </span>
                 </div>
-                <div style={{ marginBottom: '16px' }}>
-                  <ParamSlider
-                    name="Add Node %"
-                    value={config.neatAddNodeRate * 100}
-                    displayValue={`${Math.round(config.neatAddNodeRate * 100)}%`}
-                    min={1}
-                    max={10}
-                    step={1}
-                    onChange={(v) => setConfig({ neatAddNodeRate: v / 100 })}
-                    tooltip={TOOLTIPS.neatAddNodeRate}
-                    width="100%"
-                  />
-                </div>
-                <div style={{ marginBottom: '16px' }}>
-                  <ParamSlider
-                    name="Max Hidden Nodes"
-                    value={config.neatMaxHiddenNodes}
-                    displayValue={String(config.neatMaxHiddenNodes)}
-                    min={4}
-                    max={64}
-                    step={4}
-                    onChange={(v) => setConfig({ neatMaxHiddenNodes: v })}
-                    tooltip={TOOLTIPS.neatMaxHiddenNodes}
-                    width="100%"
-                  />
-                </div>
-              </>
-            )}
-          </div>
+                <select
+                  value={config.neatInitialConnectivity}
+                  onChange={(e) => setConfig({ neatInitialConnectivity: e.target.value as 'full' | 'sparse_inputs' | 'sparse_outputs' | 'none' })}
+                  style={selectStyle}
+                >
+                  <option value="full">Full (all inputs → all outputs)</option>
+                  <option value="sparse_inputs">Sparse Inputs (1 output per input)</option>
+                  <option value="sparse_outputs">Sparse Outputs (1 input per output)</option>
+                  <option value="none">None (start empty)</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <ParamSlider
+                  name="Add Connection %"
+                  value={config.neatAddConnectionRate * 100}
+                  displayValue={`${Math.round(config.neatAddConnectionRate * 100)}%`}
+                  min={1}
+                  max={20}
+                  step={1}
+                  onChange={(v) => setConfig({ neatAddConnectionRate: v / 100 })}
+                  tooltip={TOOLTIPS.neatAddConnectionRate}
+                  width="100%"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <ParamSlider
+                  name="Add Node %"
+                  value={config.neatAddNodeRate * 100}
+                  displayValue={`${Math.round(config.neatAddNodeRate * 100)}%`}
+                  min={1}
+                  max={10}
+                  step={1}
+                  onChange={(v) => setConfig({ neatAddNodeRate: v / 100 })}
+                  tooltip={TOOLTIPS.neatAddNodeRate}
+                  width="100%"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <ParamSlider
+                  name="Max Hidden Nodes"
+                  value={config.neatMaxHiddenNodes}
+                  displayValue={String(config.neatMaxHiddenNodes)}
+                  min={4}
+                  max={64}
+                  step={4}
+                  onChange={(v) => setConfig({ neatMaxHiddenNodes: v })}
+                  tooltip={TOOLTIPS.neatMaxHiddenNodes}
+                  width="100%"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <ParamSlider
+                  name="Enable Conn %"
+                  value={config.neatEnableRate * 100}
+                  displayValue={`${Math.round(config.neatEnableRate * 100)}%`}
+                  min={0}
+                  max={10}
+                  step={1}
+                  onChange={(v) => setConfig({ neatEnableRate: v / 100 })}
+                  tooltip={TOOLTIPS.neatEnableRate}
+                  width="100%"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <ParamSlider
+                  name="Disable Conn %"
+                  value={config.neatDisableRate * 100}
+                  displayValue={`${Math.round(config.neatDisableRate * 100)}%`}
+                  min={0}
+                  max={10}
+                  step={1}
+                  onChange={(v) => setConfig({ neatDisableRate: v / 100 })}
+                  tooltip={TOOLTIPS.neatDisableRate}
+                  width="100%"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

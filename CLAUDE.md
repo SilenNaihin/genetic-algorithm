@@ -127,8 +127,8 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-130 frontend tests covering: genome, storage, neural networks, brain evolution, math utilities.
-441 backend tests covering: physics, neural, fitness, genetics, API, parity, integration.
+305 frontend tests covering: genome, storage, neural networks, brain evolution, math utilities, NEAT edge cases.
+474+ backend tests covering: physics, neural, fitness, genetics, API, parity, integration, NEAT connectivity modes.
 
 ## Global Commands
 
@@ -151,7 +151,15 @@ npm test -- --run  # Run once (no watch)
 - Neural networks: Optional neuroevolution mode where creature muscles are controlled by evolved neural nets
   - Pure mode: 7 inputs (no time phase), NN has full control
   - Hybrid mode: 8 inputs (with time phase), NN modulates base oscillation
+  - NEAT mode: Variable topology networks that evolve their own structure
   - GA-optimized: negative output biases (-0.5), uniform weights, dead zone threshold
   - Efficiency penalty: normalized by time AND muscle count (creatures with more muscles aren't penalized more)
   - NN update interval: outputs cached for 4 physics steps to reduce jitter (15 updates/sec)
   - BrainEvolutionPanel visualizes weight changes across generations
+- NEAT (NeuroEvolution of Augmenting Topologies):
+  - Third neural mode alongside pure/hybrid - evolves network topology
+  - Initial connectivity: `full` | `sparse_inputs` | `sparse_outputs` | `none`
+  - Speciation auto-enabled (required for NEAT), fitness sharing auto-disabled
+  - `bias_mode`: `node` (per-neuron attribute) or `bias_node` (original NEAT style with dedicated bias neuron)
+  - Topological sort excludes both input AND bias neurons from evaluation order
+  - Key files: `backend/app/neural/neat_network.py`, `backend/app/genetics/mutation.py` (NEAT mutations)

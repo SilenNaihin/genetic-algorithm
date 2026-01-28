@@ -5,6 +5,30 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Added
+- **NEAT Initial Connectivity Options**: Configurable starting topology for NEAT networks
+  - `full`: All inputs connected to all outputs (standard NEAT, most responsive)
+  - `sparse_inputs`: Each input connects to exactly one random output (all sensors used, total = input count)
+  - `sparse_outputs`: Each output gets exactly one random input (all muscles active, total = output count)
+  - `none`: No initial connections (topology emerges entirely from evolution)
+  - UI dropdown in NEAT Topology section when NEAT mode selected
+  - Backwards compatible: `sparse` alias maps to `sparse_outputs`
+- **NEAT Enable/Disable Connection Rates**: UI sliders for connection enable/disable probabilities
+  - `neatEnableRate`: Probability to re-enable a disabled connection (default 2%)
+  - `neatDisableRate`: Probability to disable an enabled connection (default 1%)
+- **NEAT Connectivity Mode Tests**: 33 comprehensive tests in `test_neat_connectivity_modes.py`
+  - Tests for all connectivity modes (full, sparse_inputs, sparse_outputs, none)
+  - Tests for bias_node interaction with each mode
+  - Tests for topological sort with all modes
+  - Tests for forward pass behavior with each mode
+  - Edge case tests (single input/output, many inputs/few outputs, etc.)
+
+### Fixed
+- **NEAT Topological Sort with Bias Neurons**: Fixed "Network contains a cycle!" error when using `none` connectivity with `bias_node` mode
+  - Bug: Bias neurons were included in topological sort queue but excluded from expected count
+  - Fix: Changed queue initialization to exclude bias neurons (same as input neurons)
+  - Affected line: `neat_network.py:235` - now checks `n.type not in ('input', 'bias')`
+
+### Added
 - **Muscle Velocity Cap**: Physics-level constraint on muscle speed (v2-prd Phase 1)
   - Limits how fast muscles can change length per timestep
   - Default 5.0 units/sec, configurable 0.1-20.0

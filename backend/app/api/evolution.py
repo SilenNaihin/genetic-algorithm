@@ -140,6 +140,8 @@ async def run_generation(
             proprioception_inputs=config.proprioception_inputs,
             use_neat=use_neat,
             innovation_counter=innovation_counter,
+            bias_mode=config.bias_mode,
+            neat_initial_connectivity=config.neat_initial_connectivity,
         )
     else:
         # Get previous generation performances (sorted by fitness)

@@ -55,6 +55,7 @@ export interface SimulationConfig {
   // Neural network settings (neuroevolution)
   useNeuralNet: boolean;              // Enable neural network control
   neuralMode: 'hybrid' | 'pure' | 'neat';  // How NN output is used (neat = variable topology)
+  biasMode: 'none' | 'node' | 'bias_node';  // Bias implementation: none, per-node attribute, or bias input node
   timeEncoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';  // Time encoding (default: none for pure, cyclic for hybrid)
   neuralHiddenSize: number;           // Neurons in hidden layer
   neuralActivation: ActivationType;   // Activation function
@@ -88,6 +89,7 @@ export interface SimulationConfig {
   minSpeciesSize: number;             // Minimum survivors per species (1-20)
 
   // NEAT (NeuroEvolution of Augmenting Topologies) - configured when neuralMode === 'neat'
+  neatInitialConnectivity: 'full' | 'sparse_inputs' | 'sparse_outputs' | 'none';  // Initial network connectivity
   neatAddConnectionRate: number;      // Probability to add a new connection (0.01-0.2)
   neatAddNodeRate: number;            // Probability to add a new hidden node (0.01-0.1)
   neatEnableRate: number;             // Probability to re-enable a disabled connection (0.01-0.1)
@@ -127,8 +129,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   mutationMagnitude: 0.3,
   crossoverRate: 0.5,
   eliteCount: 5,
-  useMutation: true,
-  useCrossover: false,
+  useMutation: false,
+  useCrossover: true,
 
   minNodes: 3,
   maxNodes: 8,
@@ -148,6 +150,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Neural network defaults (enabled by default)
   useNeuralNet: true,
   neuralMode: 'pure',
+  biasMode: 'node',      // Default: per-node biases (NEAT will auto-switch to 'bias_node')
   timeEncoding: 'none',  // Default 'none' for pure mode; 'cyclic' recommended for hybrid
   neuralHiddenSize: 8,
   neuralActivation: 'tanh',
@@ -181,6 +184,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   minSpeciesSize: 2,             // Minimum survivors per species
 
   // NEAT defaults (used when neuralMode === 'neat')
+  neatInitialConnectivity: 'full',  // Start with all inputs connected to all outputs
   neatAddConnectionRate: 0.05,   // 5% chance to add connection per genome
   neatAddNodeRate: 0.03,         // 3% chance to add node per genome
   neatEnableRate: 0.02,          // 2% chance to re-enable disabled connection
@@ -317,10 +321,10 @@ export interface FrameActivations {
  * NEAT neuron gene - represents a node in the neural network.
  */
 export interface NeuronGene {
-  id: number;                           // Unique neuron ID
-  type: 'input' | 'hidden' | 'output';  // Neuron type
-  bias: number;                         // Bias value (0 for input neurons)
-  innovation?: number;                  // Innovation number (only for hidden neurons)
+  id: number;                                    // Unique neuron ID
+  type: 'input' | 'hidden' | 'output' | 'bias';  // Neuron type (bias = always 1.0)
+  bias: number;                                  // Bias value (0 for input/bias neurons)
+  innovation?: number;                           // Innovation number (only for hidden neurons)
 }
 
 /**

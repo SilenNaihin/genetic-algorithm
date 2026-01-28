@@ -54,6 +54,14 @@ def generate_initial_population(request: GeneratePopulationRequest):
         max_amplitude=request.constraints.maxAmplitude,
     )
 
+    # Derive use_neat from neural_mode
+    use_neat = request.neural_mode == 'neat'
+
+    # Default bias_mode to 'bias_node' for NEAT if not explicitly set
+    bias_mode = request.bias_mode
+    if use_neat and bias_mode == 'node':
+        bias_mode = 'bias_node'  # NEAT prefers bias node approach
+
     genomes = generate_population(
         size=request.size,
         constraints=constraints,
@@ -64,6 +72,9 @@ def generate_initial_population(request: GeneratePopulationRequest):
         time_encoding=request.time_encoding,
         use_proprioception=request.use_proprioception,
         proprioception_inputs=request.proprioception_inputs,
+        use_neat=use_neat,
+        bias_mode=bias_mode,
+        neat_initial_connectivity=request.neat_initial_connectivity,
     )
 
     return GeneratePopulationResponse(

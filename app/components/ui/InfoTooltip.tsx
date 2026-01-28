@@ -160,9 +160,12 @@ export const TOOLTIPS = {
 
   // NEAT (NeuroEvolution of Augmenting Topologies)
   neat: 'NEAT allows neural networks to evolve their own topology. Starts with minimal structure (inputs directly connected to outputs) and gradually adds hidden neurons and connections. Based on Stanley & Miikkulainen (2002). Enables open-ended complexity growth but evolves slower than fixed topology.',
+  neatInitialConnectivity: 'How the initial NEAT network is connected. Full: all inputs to all outputs (most responsive). Sparse Inputs: each input connects to one random output (all sensors used, total = input count). Sparse Outputs: each output gets one random input (all muscles active, total = output count). None: no connections (topology emerges from evolution).',
   neatAddConnectionRate: 'Probability of adding a new connection between neurons per generation. New connections allow information to flow through different paths. Higher rates (10-20%) explore more topologies but may add unnecessary complexity. Default 5%.',
   neatAddNodeRate: 'Probability of adding a new hidden neuron per generation. New neurons increase network capacity but require evolution to learn their weights. Keep lower than connection rate (per NEAT paper). Default 3%.',
   neatMaxHiddenNodes: 'Maximum hidden neurons per network. Prevents complexity bloat. Networks stop growing structurally when they hit this limit but can still evolve weights. Default 16.',
+  neatEnableRate: 'Probability of re-enabling a disabled connection per generation. Disabled connections are kept in the genome but inactive. Re-enabling allows rediscovery of previously useful pathways. Default 2%.',
+  neatDisableRate: 'Probability of disabling an enabled connection per generation. Disabling (rather than removing) preserves the gene for potential re-enabling later. Allows network simplification without permanent loss. Default 1%.',
 
   // Proprioception (body-sensing)
   proprioception: 'Add body-sensing inputs to the neural network. Creatures can sense their own body state: muscle strain (stretch/compression), node velocities (how fast body parts move), and ground contact (which nodes touch ground). Experimental feature that increases network input size based on creature topology.',

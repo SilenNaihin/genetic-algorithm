@@ -85,7 +85,7 @@ class EvolutionConfig:
 
     # Reproduction
     crossover_rate: float = 0.5
-    use_mutation: bool = True
+    use_mutation: bool = False
     use_crossover: bool = True
 
     # Neural crossover method
@@ -132,6 +132,8 @@ class EvolutionConfig:
 
     # NEAT configuration
     use_neat: bool = False  # Use NEAT for variable-topology neural networks
+    bias_mode: str = 'node'  # 'none', 'node' (per-neuron), 'bias_node' (original NEAT style)
+    neat_initial_connectivity: str = 'full'  # 'full', 'sparse', 'none' - initial network connectivity
     neat_add_connection_rate: float = 0.05  # Per-genome probability to add a connection
     neat_add_node_rate: float = 0.03  # Per-genome probability to add a node
     neat_enable_rate: float = 0.02  # Per-genome probability to re-enable connection
@@ -208,6 +210,8 @@ def generate_random_genome(
     proprioception_inputs: str = 'all',
     use_neat: bool = False,
     innovation_counter: InnovationCounter | None = None,
+    bias_mode: str = 'node',
+    neat_initial_connectivity: str = 'full',
 ) -> dict:
     """
     Generate a random creature genome.
@@ -223,6 +227,8 @@ def generate_random_genome(
         proprioception_inputs: Which proprioception inputs to use ('strain', 'velocity', 'ground', 'all')
         use_neat: Whether to create NEAT genome instead of fixed-topology
         innovation_counter: Innovation counter for NEAT (optional, created if None and use_neat=True)
+        bias_mode: Bias implementation ('none', 'node', 'bias_node')
+        neat_initial_connectivity: Initial NEAT network connectivity ('full', 'sparse', 'none')
 
     Returns:
         Random genome dict
@@ -323,6 +329,8 @@ def generate_random_genome(
                 output_size=len(muscles),
                 output_bias=neural_output_bias,
                 innovation_counter=innovation_counter,
+                bias_mode=bias_mode,
+                connectivity=neat_initial_connectivity,
             )
             neat_genome = neat_genome_obj.model_dump()
         else:
@@ -408,6 +416,8 @@ def generate_population(
     proprioception_inputs: str = 'all',
     use_neat: bool = False,
     innovation_counter: InnovationCounter | None = None,
+    bias_mode: str = 'node',
+    neat_initial_connectivity: str = 'full',
 ) -> list[dict]:
     """
     Generate an initial population of random genomes.
@@ -424,6 +434,8 @@ def generate_population(
         proprioception_inputs: Which proprioception inputs to use ('strain', 'velocity', 'ground', 'all')
         use_neat: Whether to create NEAT genomes instead of fixed-topology
         innovation_counter: Innovation counter for NEAT (shared across population)
+        bias_mode: Bias implementation ('none', 'node', 'bias_node')
+        neat_initial_connectivity: Initial NEAT network connectivity ('full', 'sparse', 'none')
 
     Returns:
         List of genome dicts
@@ -444,6 +456,8 @@ def generate_population(
             proprioception_inputs=proprioception_inputs,
             use_neat=use_neat,
             innovation_counter=innovation_counter,
+            bias_mode=bias_mode,
+            neat_initial_connectivity=neat_initial_connectivity,
         )
         for _ in range(size)
     ]
@@ -525,6 +539,17 @@ def evolve_population(
         # Default population_size to input size if not specified
         if 'population_size' not in config:
             config['population_size'] = len(genomes)
+
+        # Derive use_neat first - needed to enforce NEAT defaults
+        use_neat = config.get('neural_mode') == 'neat' or config.get('use_neat', False)
+
+        # ENFORCE NEAT defaults - speciation is REQUIRED for topology to evolve
+        use_speciation = config.get('use_speciation', False)
+        use_fitness_sharing = config.get('use_fitness_sharing', False)
+        if use_neat:
+            use_speciation = True  # FORCE ON - without this, structural innovations get culled
+            use_fitness_sharing = False  # Redundant with speciation
+
         config = EvolutionConfig(
             population_size=config.get('population_size', 100),
             elite_count=config.get('elite_count', 5),
@@ -537,9 +562,9 @@ def evolve_population(
             use_crossover=config.get('use_crossover', True),
             neural_crossover_method=config.get('neural_crossover_method', 'sbx'),
             sbx_eta=config.get('sbx_eta', 2.0),
-            use_fitness_sharing=config.get('use_fitness_sharing', False),
+            use_fitness_sharing=use_fitness_sharing,
             sharing_radius=config.get('sharing_radius', 0.5),
-            use_speciation=config.get('use_speciation', False),
+            use_speciation=use_speciation,
             compatibility_threshold=config.get('compatibility_threshold', 1.0),
             min_species_size=config.get('min_species_size', 2),
             mutation_rate=config.get('mutation_rate', 0.1),
@@ -563,8 +588,9 @@ def evolve_population(
             min_frequency=config.get('min_frequency', 0.5),
             max_frequency=config.get('max_frequency', 2.0),
             max_amplitude=config.get('max_amplitude', 0.5),
-            # NEAT configuration
-            use_neat=config.get('use_neat', False),
+            # NEAT configuration (already derived above)
+            use_neat=use_neat,
+            bias_mode=config.get('bias_mode', 'bias_node' if use_neat else 'node'),
             neat_add_connection_rate=config.get('neat_add_connection_rate', 0.05),
             neat_add_node_rate=config.get('neat_add_node_rate', 0.03),
             neat_enable_rate=config.get('neat_enable_rate', 0.02),
@@ -744,6 +770,7 @@ def evolve_population(
             weight_perturb_rate=0.9,
             weight_perturb_magnitude=config.weight_mutation_magnitude,
             max_hidden_nodes=config.neat_max_hidden_nodes,
+            bias_mode=config.bias_mode,
         )
 
     # Start with survivors
@@ -798,9 +825,12 @@ def evolve_population(
             # Clone inherits parent's ancestry chain
             child['ancestryChain'] = list(parent.get('ancestryChain', []))
 
-        # Apply mutation to offspring (whether from crossover or clone)
-        # This is standard GA behavior - mutation happens AFTER crossover
-        if use_mutation:
+        # Apply mutation to offspring
+        # - Crossover offspring ALWAYS get mutated (standard GA: crossover + mutation)
+        # - Clone offspring only get mutated if use_mutation is True ("just mutation" mode)
+        should_mutate = do_crossover or use_mutation
+
+        if should_mutate:
             if config.use_neat:
                 # Use NEAT mutation for variable-topology networks
                 child = mutate_genome_neat(

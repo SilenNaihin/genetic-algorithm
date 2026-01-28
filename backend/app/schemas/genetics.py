@@ -56,7 +56,7 @@ class EvolutionConfig(BaseModel):
 
     # Reproduction
     crossover_rate: float = Field(default=0.5, ge=0.0, le=1.0)
-    use_mutation: bool = True
+    use_mutation: bool = False
     use_crossover: bool = True
 
     # Mutation
@@ -75,8 +75,7 @@ class EvolutionConfig(BaseModel):
     use_neural_net: bool = True
     neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
 
-    # NEAT (NeuroEvolution of Augmenting Topologies)
-    use_neat: bool = False  # Enable NEAT for variable-topology neural networks
+    # NEAT (NeuroEvolution of Augmenting Topologies) - configured when neural_mode == 'neat'
     neat_add_connection_rate: float = Field(default=0.05, ge=0.0, le=1.0)  # Probability to add connection
     neat_add_node_rate: float = Field(default=0.03, ge=0.0, le=1.0)  # Probability to add node
     neat_enable_rate: float = Field(default=0.02, ge=0.0, le=1.0)  # Probability to re-enable connection
@@ -122,7 +121,7 @@ class EvolveResponse(BaseModel):
     genomes: list[CreatureGenome]
     generation: int
     stats: PopulationStats
-    # NEAT innovation counter state (returned when use_neat=True)
+    # NEAT innovation counter state (returned when neural_mode='neat')
     innovation_counter: InnovationCounterState | None = None
 
 
@@ -134,12 +133,12 @@ class GeneratePopulationRequest(BaseModel):
     use_neural_net: bool = True
     neural_hidden_size: int = Field(default=8, ge=1, le=64)
     neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
-    neural_mode: Literal['pure', 'hybrid'] = 'hybrid'
+    neural_mode: Literal['pure', 'hybrid', 'neat'] = 'hybrid'
+    bias_mode: Literal['none', 'node', 'bias_node'] = 'node'
     time_encoding: Literal['none', 'sin', 'raw', 'cyclic', 'sin_raw'] = 'cyclic'
     use_proprioception: bool = False
     proprioception_inputs: Literal['strain', 'velocity', 'ground', 'all'] = 'all'
-    # NEAT
-    use_neat: bool = False  # Use NEAT for variable-topology neural networks
+    neat_initial_connectivity: Literal['full', 'sparse_inputs', 'sparse_outputs', 'none'] = 'full'
 
 
 class GeneratePopulationResponse(BaseModel):
@@ -147,5 +146,5 @@ class GeneratePopulationResponse(BaseModel):
 
     genomes: list[CreatureGenome]
     count: int
-    # NEAT innovation counter state (returned when use_neat=True)
+    # NEAT innovation counter state (returned when neural_mode='neat')
     innovation_counter: InnovationCounterState | None = None

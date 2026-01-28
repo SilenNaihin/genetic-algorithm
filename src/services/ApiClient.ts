@@ -42,6 +42,7 @@ export interface ApiSimulationConfig {
   fitness_regression_penalty: number;
   use_neural_net: boolean;
   neural_mode: 'hybrid' | 'pure' | 'neat';
+  bias_mode: 'none' | 'node' | 'bias_node';
   time_encoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
   neural_hidden_size: number;
   neural_activation: string;
@@ -57,6 +58,16 @@ export interface ApiSimulationConfig {
   sparse_bottom_count: number;
   use_proprioception: boolean;
   proprioception_inputs: 'strain' | 'velocity' | 'ground' | 'all';
+  // NEAT settings
+  neat_initial_connectivity: 'full' | 'sparse_inputs' | 'sparse_outputs' | 'none';
+  neat_add_connection_rate: number;
+  neat_add_node_rate: number;
+  neat_enable_rate: number;
+  neat_disable_rate: number;
+  neat_excess_coefficient: number;
+  neat_disjoint_coefficient: number;
+  neat_weight_coefficient: number;
+  neat_max_hidden_nodes: number;
 }
 
 
@@ -163,6 +174,7 @@ export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
     fitness_regression_penalty: config.fitnessRegressionPenalty,
     use_neural_net: config.useNeuralNet,
     neural_mode: config.neuralMode,
+    bias_mode: config.biasMode,
     time_encoding: config.timeEncoding,
     neural_hidden_size: config.neuralHiddenSize,
     neural_activation: config.neuralActivation,
@@ -178,6 +190,16 @@ export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
     sparse_bottom_count: config.sparseBottomCount,
     use_proprioception: config.useProprioception ?? false,
     proprioception_inputs: config.proprioceptionInputs ?? 'all',
+    // NEAT settings
+    neat_initial_connectivity: config.neatInitialConnectivity ?? 'full',
+    neat_add_connection_rate: config.neatAddConnectionRate,
+    neat_add_node_rate: config.neatAddNodeRate,
+    neat_enable_rate: config.neatEnableRate,
+    neat_disable_rate: config.neatDisableRate,
+    neat_excess_coefficient: config.neatExcessCoefficient,
+    neat_disjoint_coefficient: config.neatDisjointCoefficient,
+    neat_weight_coefficient: config.neatWeightCoefficient,
+    neat_max_hidden_nodes: config.neatMaxHiddenNodes,
   };
 }
 
@@ -209,6 +231,7 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
     fitnessRegressionPenalty: api.fitness_regression_penalty,
     useNeuralNet: api.use_neural_net,
     neuralMode: api.neural_mode,
+    biasMode: api.bias_mode ?? 'node',
     timeEncoding: api.time_encoding,
     neuralHiddenSize: api.neural_hidden_size,
     neuralActivation: api.neural_activation as SimulationConfig['neuralActivation'],
@@ -223,6 +246,16 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
     sparseBottomCount: api.sparse_bottom_count,
     useProprioception: api.use_proprioception ?? false,
     proprioceptionInputs: api.proprioception_inputs ?? 'all',
+    // NEAT settings
+    neatInitialConnectivity: api.neat_initial_connectivity ?? 'full',
+    neatAddConnectionRate: api.neat_add_connection_rate ?? 0.05,
+    neatAddNodeRate: api.neat_add_node_rate ?? 0.03,
+    neatEnableRate: api.neat_enable_rate ?? 0.02,
+    neatDisableRate: api.neat_disable_rate ?? 0.01,
+    neatExcessCoefficient: api.neat_excess_coefficient ?? 1.0,
+    neatDisjointCoefficient: api.neat_disjoint_coefficient ?? 1.0,
+    neatWeightCoefficient: api.neat_weight_coefficient ?? 0.4,
+    neatMaxHiddenNodes: api.neat_max_hidden_nodes ?? 16,
   };
 }
 
