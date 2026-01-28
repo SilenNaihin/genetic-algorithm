@@ -12,6 +12,7 @@ const showError = (message: string) => useEvolutionStore.getState().showError(me
 // Animation timing constants (matches vanilla app)
 const MARK_DEAD_DELAY = 600;
 const FADE_OUT_DELAY = 400;
+const REPOSITION_DELAY = 450; // Survivors moving to new positions
 const SPAWN_DELAY = 600;
 const SORT_DELAY = 700;
 
@@ -350,7 +351,18 @@ export function useSimulation() {
       y: Math.floor(index / GRID_COLS) * (CARD_SIZE + CARD_GAP),
     });
 
-    // Build map of survivor positions (creatures NOT culled)
+    // Build map of OLD positions for all creatures (needed for survivor repositioning)
+    // Current results are sorted by fitness, so index = grid position
+    const oldPositionMap = new Map<string, { x: number; y: number }>();
+    currentResults.forEach((result, index) => {
+      const pos = getGridPosition(index);
+      // Map by _apiCreatureId since that's consistent between old and new results
+      if (result.genome._apiCreatureId) {
+        oldPositionMap.set(result.genome._apiCreatureId, pos);
+      }
+    });
+
+    // Build map of survivor NEW positions (creatures NOT culled)
     const survivorCount = currentResults.length - deadCreatures.length;
     const survivorPositions: { x: number; y: number }[] = [];
     for (let i = 0; i < survivorCount; i++) {
@@ -369,6 +381,7 @@ export function useSimulation() {
           isSpawning: false,
           spawnFromX: null,
           spawnFromY: null,
+          isRepositioning: false,
         });
       }
       setCardAnimationStates(animStates);
@@ -387,6 +400,7 @@ export function useSimulation() {
           isSpawning: false,
           spawnFromX: null,
           spawnFromY: null,
+          isRepositioning: false,
         });
       }
       setCardAnimationStates(fadeStates);
@@ -405,11 +419,70 @@ export function useSimulation() {
     setGeneration(response.generation);
     setMaxGeneration(response.generation);
 
-    // === PHASE 3: Show real creatures with spawn animation ===
+    // === PHASE 3: Reposition survivors (show only survivors, animate to new positions) ===
+    // Check if any survivors actually need to move (old position != new position)
+    let survivorsNeedReposition = false;
     if (!fastMode) {
-      const newAnimStates = new Map<string, CardAnimationState>();
+      // First, show survivors at their OLD positions with isRepositioning
+      // Offspring are hidden (isSpawning=true, opacity 0)
+      const repositionStates = new Map<string, CardAnimationState>();
+      resultsWithHiddenFitness.forEach((result, newIndex) => {
+        const isSurvivor = !!(result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
+        const creatureId = result.genome._apiCreatureId;
+        const oldPos = creatureId ? oldPositionMap.get(creatureId) : null;
+        const newPos = getGridPosition(newIndex);
+
+        // Check if this survivor needs to move
+        if (isSurvivor && oldPos && (oldPos.x !== newPos.x || oldPos.y !== newPos.y)) {
+          survivorsNeedReposition = true;
+        }
+
+        repositionStates.set(result.genome.id, {
+          isDead: false,
+          isFadingOut: false,
+          isMutated: !isSurvivor,
+          isSpawning: !isSurvivor, // Offspring hidden (spawning = opacity 0)
+          // Survivors start at old position
+          spawnFromX: isSurvivor && oldPos ? oldPos.x : null,
+          spawnFromY: isSurvivor && oldPos ? oldPos.y : null,
+          isRepositioning: isSurvivor, // Enable position animation for survivors
+        });
+      });
+      setCardAnimationStates(repositionStates);
+      setSimulationResults(resultsWithHiddenFitness);
+
+      // Only do reposition animation if survivors actually need to move
+      if (survivorsNeedReposition) {
+        await delay(50); // Let React render at old positions
+
+        // Now clear spawnFrom to trigger animation to new positions
+        const animateToNewStates = new Map<string, CardAnimationState>();
+        for (const result of resultsWithHiddenFitness) {
+          const isSurvivor = !!(result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
+
+          animateToNewStates.set(result.genome.id, {
+            isDead: false,
+            isFadingOut: false,
+            isMutated: !isSurvivor,
+            isSpawning: !isSurvivor, // Keep offspring hidden
+            spawnFromX: null, // Clear to animate to grid position
+            spawnFromY: null,
+            isRepositioning: isSurvivor, // Keep transition enabled
+          });
+        }
+        setCardAnimationStates(animateToNewStates);
+        await delay(REPOSITION_DELAY);
+      }
+    } else {
+      setSimulationResults(resultsWithHiddenFitness);
+    }
+
+    // === PHASE 4: Spawn offspring animation ===
+    if (!fastMode) {
+      // Now set up spawn animation for offspring
+      const spawnStates = new Map<string, CardAnimationState>();
       for (const result of resultsWithHiddenFitness) {
-        const isSurvivor = (result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
+        const isSurvivor = !!(result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
 
         let spawnFromX: number | null = null;
         let spawnFromY: number | null = null;
@@ -419,27 +492,23 @@ export function useSimulation() {
           spawnFromY = randomParentPos.y;
         }
 
-        newAnimStates.set(result.genome.id, {
+        spawnStates.set(result.genome.id, {
           isDead: false,
           isFadingOut: false,
           isMutated: !isSurvivor,
           isSpawning: !isSurvivor,
           spawnFromX,
           spawnFromY,
+          isRepositioning: false, // Clear repositioning
         });
       }
-      setCardAnimationStates(newAnimStates);
-    }
-
-    setSimulationResults(resultsWithHiddenFitness);
-
-    if (!fastMode) {
+      setCardAnimationStates(spawnStates);
       await delay(50);
 
       // Clear spawning state to trigger animation
       const transitionAnimStates = new Map<string, CardAnimationState>();
       for (const result of resultsWithHiddenFitness) {
-        const isSurvivor = (result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
+        const isSurvivor = !!(result as CreatureSimulationResult & { _isSurvivor?: boolean })._isSurvivor;
         transitionAnimStates.set(result.genome.id, {
           isDead: false,
           isFadingOut: false,
@@ -447,6 +516,7 @@ export function useSimulation() {
           isSpawning: false,
           spawnFromX: null,
           spawnFromY: null,
+          isRepositioning: false,
         });
       }
       setCardAnimationStates(transitionAnimStates);

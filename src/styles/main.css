@@ -422,6 +422,11 @@ canvas {
   transition: opacity 0.3s ease, transform 0.3s ease, left 0.5s ease-out, top 0.5s ease-out;
 }
 
+/* Repositioning animation for survivors moving to new grid positions */
+.creature-card.repositioning {
+  transition: left 0.4s ease-out, top 0.4s ease-out, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
 .creature-card:hover {
   border-color: var(--accent);
   transform: scale(1.05);

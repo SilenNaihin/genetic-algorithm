@@ -285,9 +285,12 @@ export function CreatureGrid() {
           const isFadingOut = animState?.isFadingOut ?? false;
           const isMutated = animState?.isMutated ?? false;
           const isSpawning = animState?.isSpawning ?? false;
+          const isRepositioning = animState?.isRepositioning ?? false;
 
-          const displayX = isSpawning && animState?.spawnFromX != null ? animState.spawnFromX : pos.x;
-          const displayY = isSpawning && animState?.spawnFromY != null ? animState.spawnFromY : pos.y;
+          // Use spawn position if spawning OR repositioning (for survivors moving to new positions)
+          const useSpawnPos = (isSpawning || isRepositioning) && animState?.spawnFromX != null;
+          const displayX = useSpawnPos ? animState.spawnFromX! : pos.x;
+          const displayY = useSpawnPos && animState?.spawnFromY != null ? animState.spawnFromY : pos.y;
 
           return (
             <CreatureCard
@@ -299,6 +302,7 @@ export function CreatureGrid() {
               isSpawning={isSpawning}
               isFadingOut={isFadingOut}
               isAnimatingPosition={isAnimatingSort}
+              isRepositioning={isRepositioning}
               x={displayX}
               y={displayY}
               onClick={() => handleCardClick(cell.topCreature!)}
@@ -330,10 +334,12 @@ export function CreatureGrid() {
           const isFadingOut = animState?.isFadingOut ?? false;
           const isMutated = animState?.isMutated ?? false;
           const isSpawning = animState?.isSpawning ?? false;
+          const isRepositioning = animState?.isRepositioning ?? false;
 
-          // Use spawn position if spawning, otherwise use grid position
-          const displayX = isSpawning && animState?.spawnFromX != null ? animState.spawnFromX : pos.x;
-          const displayY = isSpawning && animState?.spawnFromY != null ? animState.spawnFromY : pos.y;
+          // Use spawn position if spawning OR repositioning (for survivors moving to new positions)
+          const useSpawnPos = (isSpawning || isRepositioning) && animState?.spawnFromX != null;
+          const displayX = useSpawnPos ? animState.spawnFromX! : pos.x;
+          const displayY = useSpawnPos && animState?.spawnFromY != null ? animState.spawnFromY : pos.y;
 
           return (
             <CreatureCard
@@ -345,6 +351,7 @@ export function CreatureGrid() {
               isSpawning={isSpawning}
               isFadingOut={isFadingOut}
               isAnimatingPosition={isAnimatingSort}
+              isRepositioning={isRepositioning}
               x={displayX}
               y={displayY}
               onClick={() => handleCardClick(result)}

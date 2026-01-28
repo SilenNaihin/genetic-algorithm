@@ -28,6 +28,7 @@ export interface CardAnimationState {
   isSpawning: boolean; // Card is spawning from parent position
   spawnFromX: number | null; // Start X position for spawn animation
   spawnFromY: number | null; // Start Y position for spawn animation
+  isRepositioning: boolean; // Survivor animating to new grid position
 }
 
 /**
@@ -211,7 +212,7 @@ export const useEvolutionStore = create<EvolutionStore>()(
       updateCardAnimationState: (id, state) => set(
         (s) => {
           const newStates = new Map(s.cardAnimationStates);
-          const existing = newStates.get(id) || { isDead: false, isFadingOut: false, isMutated: false, isSpawning: false, spawnFromX: null, spawnFromY: null };
+          const existing = newStates.get(id) || { isDead: false, isFadingOut: false, isMutated: false, isSpawning: false, spawnFromX: null, spawnFromY: null, isRepositioning: false };
           newStates.set(id, { ...existing, ...state });
           return { cardAnimationStates: newStates };
         },

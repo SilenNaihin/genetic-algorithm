@@ -15,6 +15,7 @@ export interface CreatureCardProps {
   isFadingOut?: boolean;
   isSpawning?: boolean;
   isAnimatingPosition?: boolean;
+  isRepositioning?: boolean;
   x: number;
   y: number;
   onClick?: () => void;
@@ -36,6 +37,7 @@ export function CreatureCard({
   isFadingOut = false,
   isSpawning = false,
   isAnimatingPosition = false,
+  isRepositioning = false,
   x,
   y,
   onClick,
@@ -61,6 +63,7 @@ export function CreatureCard({
   if (isMutated && !isDead && !isFadingOut) classNames.push('mutated');
   if (isSpawning) classNames.push('spawning');
   if (isAnimatingPosition) classNames.push('animating-position');
+  if (isRepositioning) classNames.push('repositioning');
 
   // Render creature to canvas on mount and when result changes
   useEffect(() => {
