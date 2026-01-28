@@ -148,7 +148,8 @@ class TestMutateGenomeNeat:
         """Mutated NEAT genome should still be valid for forward pass."""
         random.seed(42)
 
-        genome = create_test_genome_with_neat(input_size=5, output_size=2)
+        # Create genome with matching muscle count and NEAT output count
+        genome = create_test_genome_with_neat(input_size=5, output_size=3)  # 3 to match muscles
         counter = InnovationCounter()
 
         # Run many mutations
@@ -161,9 +162,10 @@ class TestMutateGenomeNeat:
         neat_dict = current['neatGenome']
         neat_genome = NEATGenome(**neat_dict)
 
-        # Should be able to run forward pass
+        # Output count should match creature's muscle count (NEAT adapts to body)
+        muscle_count = len(current['muscles'])
         outputs = neat_forward(neat_genome, [0.5] * 5)
-        assert len(outputs) == 2
+        assert len(outputs) == muscle_count
         assert all(-1 <= o <= 1 for o in outputs)
 
     def test_innovation_counter_updated(self):
@@ -347,7 +349,8 @@ class TestEdgeCases:
         """Genome should remain valid through many generations."""
         random.seed(12345)
 
-        genome = create_test_genome_with_neat(input_size=5, output_size=2)
+        # Create genome with matching muscle count and NEAT output count
+        genome = create_test_genome_with_neat(input_size=5, output_size=3)  # 3 to match muscles
         counter = InnovationCounter()
 
         current = genome
@@ -359,12 +362,13 @@ class TestEdgeCases:
             # Verify NEAT genome is still valid
             neat_genome = NEATGenome(**current['neatGenome'])
 
-            # Should be able to forward pass
+            # Output count should match creature's muscle count (NEAT adapts to body)
+            muscle_count = len(current['muscles'])
             outputs = neat_forward(neat_genome, [0.5] * 5)
-            assert len(outputs) == 2
+            assert len(outputs) == muscle_count
 
-            # Should still have input/output neurons
+            # Should still have input/output neurons matching creature structure
             inputs = neat_genome.get_input_neurons()
             outputs_neurons = neat_genome.get_output_neurons()
             assert len(inputs) == 5
-            assert len(outputs_neurons) == 2
+            assert len(outputs_neurons) == muscle_count

@@ -59,31 +59,33 @@ interface NEATActivations {
 
 /**
  * Calculate depth for each neuron in a NEAT network (for visualization layout).
- * Input neurons have depth 0, output neurons have max depth.
- * Hidden neurons are placed based on their longest path from inputs.
+ * Input/bias neurons have depth 0, output neurons have max depth.
+ * Hidden neurons are placed based on their longest path from inputs/bias.
  */
 function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, number>; maxDepth: number } {
-  const inputIds = new Set(genome.neurons.filter(n => n.type === 'input').map(n => n.id));
+  // Both input and bias neurons start at depth 0
+  const sourceIds = new Set(genome.neurons.filter(n => n.type === 'input' || n.type === 'bias').map(n => n.id));
   const outputIds = new Set(genome.neurons.filter(n => n.type === 'output').map(n => n.id));
 
-  // Build outgoing adjacency list
+  // Build outgoing adjacency list - include ALL connections (enabled or not) for layout
+  // This ensures hidden nodes are positioned correctly even if their connections are disabled
   const outgoing = new Map<number, Set<number>>();
   for (const n of genome.neurons) {
     outgoing.set(n.id, new Set());
   }
   for (const conn of genome.connections) {
-    if (conn.enabled) {
-      outgoing.get(conn.fromNode)?.add(conn.toNode);
-    }
+    // Include all connections for depth calculation (even disabled ones)
+    // This prevents hidden nodes from appearing at depth 0 when their connections are disabled
+    outgoing.get(conn.fromNode)?.add(conn.toNode);
   }
 
-  // BFS from inputs to calculate max depth
+  // BFS from inputs and bias to calculate max depth
   const depths = new Map<number, number>();
-  for (const inputId of inputIds) {
-    depths.set(inputId, 0);
+  for (const sourceId of sourceIds) {
+    depths.set(sourceId, 0);
   }
 
-  const queue = [...inputIds];
+  const queue = [...sourceIds];
   while (queue.length > 0) {
     const current = queue.shift()!;
     const currentDepth = depths.get(current) ?? 0;
@@ -103,10 +105,15 @@ function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, numb
     depths.set(outputId, maxDepth);
   }
 
-  // Any neuron not reached gets depth 0 (disconnected)
+  // Any hidden neuron not reached gets depth 1 (between input and output layers)
+  // This handles edge cases like isolated hidden nodes
   for (const neuron of genome.neurons) {
     if (!depths.has(neuron.id)) {
-      depths.set(neuron.id, 0);
+      if (neuron.type === 'hidden') {
+        depths.set(neuron.id, 1);  // Place hidden nodes in middle, not at input level
+      } else {
+        depths.set(neuron.id, 0);
+      }
     }
   }
 

@@ -30,7 +30,8 @@ Technical details for NEAT (NeuroEvolution of Augmenting Topologies) implementat
 | Backend Tests | **Complete** | Various test files | 143 NEAT-related tests pass |
 | Frontend Types | **Complete** | `src/types/simulation.ts` | NEAT config fields + NEATGenome, NeuronGene, ConnectionGene, InnovationCounterState |
 | Frontend UI | **Complete** | `app/components/menu/NeuralPanel.tsx` | NEAT toggle, Add Connection/Node rates, Max Hidden Nodes sliders |
-| Visualizer | Not started | `src/ui/NeuralVisualizer.ts` | Needs NEAT topology support + frame activations |
+| Visualizer | **Complete** | `src/ui/NeuralVisualizer.ts` | renderNEAT() with depth-based layout, disabled connections shown dashed |
+| Body-Neural Coupling | **Complete** | `backend/app/neural/neat_network.py` | adapt_neat_topology() syncs NEAT outputs to muscle count |
 | Storage Service | Not started | `src/services/StorageService.ts` | |
 
 *Update this table as implementation progresses.*
@@ -88,9 +89,13 @@ outputs = network.forward(inputs)  # [batch_size, max_muscles]
 
 ### 3. Topology Adaptation
 ```python
-# crossover.py already adapts output size when muscle count changes
+# Both fixed-topology and NEAT networks adapt when muscle count changes
 def adapt_neural_topology(neural_genome, new_muscle_count):
-    # Copy existing, random init new outputs
+    # For fixed: copy existing, random init new outputs
+
+def adapt_neat_topology(genome, target_output_count):
+    # For NEAT: add/remove output neurons to match muscle count
+    # See "NEAT Body-Neural Coupling" section below
 ```
 
 ### 4. Genome Lineage Tracking
@@ -752,6 +757,106 @@ class TestNEATEvolution:
 
 ---
 
+## NEAT Body-Neural Coupling
+
+Unlike fixed-topology networks, NEAT genomes have **structural complexity** (neurons, connections with innovation IDs). When the creature's body mutates (muscles added/removed), the NEAT genome must adapt.
+
+### The Problem
+
+Body mutations can change muscle count:
+- `mutate_add_node` can create new muscles (connecting new body nodes)
+- `mutate_remove_node` removes a body node and all its muscles
+- Crossover can produce children with different muscle counts than parents
+
+If NEAT outputs don't adapt:
+- Extra outputs waste evolution effort (optimizing non-existent muscles)
+- Missing outputs leave muscles uncontrolled
+- Visualization shows misleading connections (O8 for a 3-muscle creature)
+
+### The Solution: `adapt_neat_topology()`
+
+```python
+def adapt_neat_topology(genome: NEATGenome, target_output_count: int) -> NEATGenome:
+    """Adapt NEAT genome when muscle count changes."""
+
+    current_outputs = [n for n in genome.neurons if n.type == 'output']
+
+    if target_output_count > len(current_outputs):
+        # MUSCLES ADDED: Create new output neurons
+        for i in range(target_output_count - len(current_outputs)):
+            new_output = NeuronGene(id=next_id, type='output', bias=output_bias)
+            # Add sparse connections from random input/bias
+            # Add bias connection if using bias_node mode
+
+    elif target_output_count < len(current_outputs):
+        # MUSCLES REMOVED: Remove excess output neurons (highest IDs)
+        outputs_to_remove = sorted_output_ids[target_output_count:]
+        genome.neurons = [n for n in neurons if n.id not in outputs_to_remove]
+        genome.connections = [c for c in connections
+                            if c.from_node not in outputs_to_remove
+                            and c.to_node not in outputs_to_remove]
+```
+
+### Why This Doesn't Need Innovation Scores
+
+Innovation numbers enable **crossover alignment** - matching genes across parents to inherit correctly. But topology adaptation is different:
+
+| Operation | Innovation Needed? | Why |
+|-----------|-------------------|-----|
+| Crossover | Yes | Must align matching genes between parents |
+| Add Node mutation | Yes | Same split should get same innovation in population |
+| Add Connection mutation | Yes | Same connection should get same innovation |
+| **Topology Adaptation** | **No** | Single genome, no alignment needed |
+
+When adapting topology:
+- **Adding outputs**: We create NEW neurons that didn't exist before. They get fresh innovation IDs (or none - output neurons don't need innovation tracking for crossover since they're always present).
+- **Removing outputs**: We delete neurons entirely. No need to track what was removed.
+
+The key insight: **Innovation numbers are for crossover alignment, not for internal genome restructuring.**
+
+### When Adaptation Happens
+
+Adaptation is called in three places:
+
+1. **After crossover** (`crossover.py`): Child may have different muscle count than parents
+2. **After body mutation** (`mutation.py`): Structural mutation may add/remove muscles
+3. **After cloning** (`crossover.py`): Constraints may reduce muscle count
+
+```python
+# In single_point_crossover():
+neat_genome = crossover_neat_genomes(parent1, parent2, fitness1, fitness2)
+if output_count != len(child_muscles):
+    neat_genome = adapt_neat_topology(neat_genome, len(child_muscles))
+
+# In mutate_genome_neat():
+mutated_neat = mutate_neat_genome(neat_genome, counter, ...)
+if output_count != len(new_genome['muscles']):
+    mutated_neat = adapt_neat_topology(mutated_neat, len(new_genome['muscles']))
+```
+
+### Muscle Removal: What Happens to Evolved Connections?
+
+When a muscle is removed (say muscle 5 of 6):
+1. Output neuron O5 is removed
+2. ALL connections to/from O5 are removed (including evolved hidden→O5 connections)
+3. Remaining outputs (O0-O4) keep their evolved connections intact
+
+This is "safe" because:
+- The removed connections were specific to a muscle that no longer exists
+- Evolution will naturally rebuild connections to the remaining muscles if needed
+- It's simpler than trying to "remap" connections (which muscle should inherit O5's connections?)
+
+### Muscle Addition: What Connections Are Created?
+
+When a muscle is added:
+1. New output neuron created with standard output bias
+2. One sparse connection from a random input/bias neuron (weight random [-0.5, 0.5])
+3. If using `bias_node` mode, also adds bias→new_output connection
+
+The new output starts "underdeveloped" compared to existing ones, but NEAT mutations (add_connection, weight perturbation) will evolve it over generations.
+
+---
+
 ## Edge Cases
 
 1. **Fully connected genome**: `mutate_add_connection` returns False
@@ -761,6 +866,7 @@ class TestNEATEvolution:
 5. **Single species**: All creatures too similar, threshold too high
 6. **Innovation overflow**: Use UUID or reset per run
 7. **Recurrent connections**: Disallow for simplicity (feedforward only)
+8. **Zero muscles**: Don't adapt (preserve original outputs for genomes without bodies)
 
 ---
 
