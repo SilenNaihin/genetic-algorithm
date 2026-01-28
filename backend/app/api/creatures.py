@@ -300,12 +300,11 @@ async def get_longest_survivor(
     if not creature:
         raise HTTPException(status_code=404, detail="No creatures found")
 
-    # Get BEST performance for this creature (highest fitness, not latest generation)
-    # This ensures replay shows the generation where it performed best
+    # Get LATEST performance for this creature (final run before dying)
     perf_result = await db.execute(
         select(CreaturePerformance)
         .where(CreaturePerformance.creature_id == creature.id)
-        .order_by(CreaturePerformance.fitness.desc())
+        .order_by(CreaturePerformance.generation.desc())
         .limit(1)
         .options(selectinload(CreaturePerformance.frames))
     )
