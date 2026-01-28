@@ -420,6 +420,52 @@ def neat_crossover(parent_a: dict, parent_b: dict, fitness_a: float, fitness_b: 
     }
 ```
 
+### Cycle Prevention in Crossover
+
+Crossover can create cycles when combining disjoint/excess genes from both parents:
+
+```
+Parent A: H1 → H2 (innovation 5, disjoint)
+Parent B: H2 → H1 (innovation 7, disjoint)
+
+Equal fitness crossover inherits both → cycle: H1 → H2 → H1
+```
+
+**Solution**: Filter connections after gene alignment, processing by innovation order:
+
+```python
+def _filter_cycle_creating_connections(neurons, connections):
+    """Process connections in order, keeping only those that don't create cycles."""
+    filtered = []
+    for conn in connections:
+        if not would_create_cycle(neurons, filtered, conn.from_node, conn.to_node):
+            filtered.append(conn)
+    return filtered
+
+# Applied before returning child genome:
+child_connections = _filter_cycle_creating_connections(child_neurons, child_connections)
+```
+
+**Why lower innovation numbers win**: Connections are aligned and sorted by innovation number. When H1→H2 (inn 5) is processed first, it's accepted. Then H2→H1 (inn 7) is rejected because it would create a cycle. Lower innovation = older mutation = more established in the population, so it makes sense to prioritize these.
+
+**Where cycles are prevented**:
+
+| Location | Scenario |
+|----------|----------|
+| `mutate_add_connection` | New connection would close a loop |
+| `mutate_enable_connection` | Re-enabling disabled connection that now forms cycle |
+| `mutate_toggle_connection` | Same as above |
+| `neat_crossover` | Combining disjoint/excess from both parents |
+| `neat_crossover_equal_fitness` | More likely since both parents contribute |
+
+**Why cycles can form from re-enabling**:
+1. Add A→B (enabled)
+2. Disable A→B
+3. Add B→A (valid - A→B is disabled, no cycle)
+4. Re-enable A→B → cycle!
+
+The enable functions now check `would_create_cycle()` before re-enabling.
+
 ---
 
 ## Speciation
