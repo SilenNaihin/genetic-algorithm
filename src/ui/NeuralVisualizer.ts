@@ -602,9 +602,12 @@ export class NeuralVisualizer {
     const hiddenNeurons = neurons.filter(n => n.type === 'hidden').sort((a, b) => a.id - b.id);
     const outputNeurons = neurons.filter(n => n.type === 'output').sort((a, b) => a.id - b.id);
 
-    // Get non-padded inputs for display
-    const { labels: inputLabels } = this.getNonPaddedInputs();
+    // For NEAT, we need to position ALL input neurons for connection drawing,
+    // but only DISPLAY non-padded ones with labels
+    const { labels: inputLabels, indices: nonPaddedIndices } = this.getNonPaddedInputs();
     const displayInputSize = inputLabels.length;
+    // Create a set for O(1) lookup and a map for position lookup
+    const nonPaddedSet = new Set(nonPaddedIndices);
 
     // Vertical layout padding
     const topPadding = 35;
@@ -612,19 +615,32 @@ export class NeuralVisualizer {
     const sidePadding = 8;
     const availableHeight = height - topPadding - bottomPadding;
 
+    // Ensure outputs are at a distinct depth from inputs
+    // If maxDepth is 0 or 1 (no hidden nodes), force outputs to depth 2 for clear separation
+    const effectiveMaxDepth = Math.max(maxDepth, 2);
+
     // Calculate Y positions based on depth
     const getYForDepth = (depth: number) => {
-      if (maxDepth <= 1) return height / 2;
-      return topPadding + (depth / maxDepth) * availableHeight;
+      return topPadding + (depth / effectiveMaxDepth) * availableHeight;
     };
 
     // Calculate positions for all neurons
     const neuronPositions = new Map<number, { x: number; y: number }>();
 
-    // Input neurons (depth 0) - filter to non-padded
+    // Position ALL input neurons (needed for connection drawing)
+    // Non-padded inputs get visible X positions, padded inputs get off-screen positions
+    // NOTE: Padded inputs can be in the MIDDLE (e.g., unused muscle strain slots 18-23),
+    // not just at the end. Use nonPaddedSet to correctly identify visible inputs.
     const inputX = this.getNodeXPositions(displayInputSize, width, sidePadding);
-    inputNeurons.slice(0, displayInputSize).forEach((n, i) => {
-      neuronPositions.set(n.id, { x: inputX[i], y: getYForDepth(0) });
+    inputNeurons.forEach((n, i) => {
+      if (nonPaddedSet.has(i)) {
+        // Visible input neuron - find its position in the visible list
+        const visibleIndex = nonPaddedIndices.indexOf(i);
+        neuronPositions.set(n.id, { x: inputX[visibleIndex], y: getYForDepth(0) });
+      } else {
+        // Padded input neuron - position off-screen but still track for connections
+        neuronPositions.set(n.id, { x: -100, y: getYForDepth(0) });
+      }
     });
 
     // Hidden neurons - group by depth for horizontal positioning
@@ -642,10 +658,10 @@ export class NeuralVisualizer {
       });
     }
 
-    // Output neurons (max depth)
+    // Output neurons (max depth) - use effectiveMaxDepth for positioning
     const outputX = this.getNodeXPositions(outputNeurons.length, width, sidePadding);
     outputNeurons.forEach((n, i) => {
-      neuronPositions.set(n.id, { x: outputX[i], y: getYForDepth(maxDepth) });
+      neuronPositions.set(n.id, { x: outputX[i], y: getYForDepth(effectiveMaxDepth) });
     });
 
     // Get activations
@@ -662,10 +678,13 @@ export class NeuralVisualizer {
     const nodeRadius = this.calculateNodeRadius(maxLayerSize || 1, width, sidePadding);
 
     // Draw connections first (behind nodes)
+    // Skip connections from off-screen (padded) input neurons
     for (const conn of connections) {
       const fromPos = neuronPositions.get(conn.fromNode);
       const toPos = neuronPositions.get(conn.toNode);
       if (!fromPos || !toPos) continue;
+      // Skip connections from padded inputs (positioned off-screen at x=-100)
+      if (fromPos.x < 0 || toPos.x < 0) continue;
 
       const fromActivation = getActivation(conn.fromNode);
       const signal = fromActivation * conn.weight;
@@ -681,7 +700,8 @@ export class NeuralVisualizer {
     }
 
     // Draw input nodes with labels
-    const displayedInputNeurons = inputNeurons.slice(0, displayInputSize);
+    // Filter by nonPaddedSet since padding can be in the middle (not just at end)
+    const displayedInputNeurons = inputNeurons.filter((_, i) => nonPaddedSet.has(i));
     const inputActivations = displayedInputNeurons.map(n => getActivation(n.id));
     const inputPositions = displayedInputNeurons.map(n => neuronPositions.get(n.id)!);
     for (let i = 0; i < inputPositions.length; i++) {
@@ -717,7 +737,7 @@ export class NeuralVisualizer {
       this.drawOutputNode(ctx, pos.x, pos.y, rawVal, nodeRadius, wasZeroed);
     }
     // Draw output labels
-    this.drawNEATOutputLabels(ctx, outputPositions.map(p => p.x), getYForDepth(maxDepth), rawOutputs, nodeRadius, outputLabels);
+    this.drawNEATOutputLabels(ctx, outputPositions.map(p => p.x), getYForDepth(effectiveMaxDepth), rawOutputs, nodeRadius, outputLabels);
 
     // Draw layer labels
     ctx.fillStyle = '#666';
@@ -728,7 +748,7 @@ export class NeuralVisualizer {
     if (hiddenNeurons.length > 0) {
       ctx.fillText(`H (${hiddenNeurons.length})`, 5, height / 2);
     }
-    ctx.fillText(`Out (${outputNeurons.length})`, 5, getYForDepth(maxDepth));
+    ctx.fillText(`Out (${outputNeurons.length})`, 5, getYForDepth(effectiveMaxDepth));
 
     // Draw "NEAT" indicator
     ctx.fillStyle = 'var(--accent, #6366f1)';

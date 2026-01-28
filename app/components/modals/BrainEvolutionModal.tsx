@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useEvolutionStore } from '../../stores/evolutionStore';
+import { useEvolutionStore, useConfig, getNormalizedConfig } from '../../stores/evolutionStore';
 import { Modal } from '../common/Modal';
 import { BrainEvolutionPanel, type BrainEvolutionData } from '../../../src/ui/BrainEvolutionPanel';
 import * as StorageService from '../../../src/services/StorageService';
@@ -14,7 +14,7 @@ import type { NeuralGenomeData } from '../../../src/neural';
 export function BrainEvolutionModal() {
   const isOpen = useEvolutionStore((s) => s.brainEvolutionModalOpen);
   const setIsOpen = useEvolutionStore((s) => s.setBrainEvolutionModalOpen);
-  const config = useEvolutionStore((s) => s.config);
+  const config = useConfig();
   const generation = useEvolutionStore((s) => s.generation);
   const simulationResults = useEvolutionStore((s) => s.simulationResults);
 
@@ -54,7 +54,15 @@ export function BrainEvolutionModal() {
         return;
       }
 
-      // Get current generation's neural genomes
+      // Check if using NEAT mode (variable topology - can't compare weights directly)
+      const currentConfig = getNormalizedConfig();
+      if (currentConfig.neuralMode === 'neat') {
+        setError('Brain evolution comparison is not available for NEAT mode (variable topology networks)');
+        setLoading(false);
+        return;
+      }
+
+      // Get current generation's neural genomes (fixed-topology only)
       const currentNeuralGenomes: NeuralGenomeData[] = [];
       for (const result of simulationResults) {
         if (result.genome.neuralGenome && result.genome.controllerType === 'neural') {

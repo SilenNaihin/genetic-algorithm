@@ -612,6 +612,9 @@ class NEATMutationConfig:
     # Topology limits
     max_hidden_nodes: int = 16  # Maximum hidden neurons to prevent bloat
 
+    # Bias mode
+    bias_mode: str = 'node'  # 'none', 'node' (per-neuron), 'bias_node' (original NEAT style)
+
 
 def mutate_genome_neat(
     genome: dict,
@@ -674,6 +677,7 @@ def mutate_genome_neat(
             weight_perturb_rate=neat_config.weight_perturb_rate,
             weight_perturb_magnitude=neat_config.weight_perturb_magnitude,
             max_hidden_nodes=neat_config.max_hidden_nodes,
+            bias_mode=neat_config.bias_mode,
         )
 
         # Store as dict for JSON serialization

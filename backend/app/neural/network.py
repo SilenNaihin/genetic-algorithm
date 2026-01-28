@@ -41,7 +41,7 @@ ProprioceptionInputs = Literal['strain', 'velocity', 'ground', 'all']
 class NeuralConfig:
     """Configuration for neural network evolution."""
     use_neural_net: bool = True
-    neural_mode: Literal['hybrid', 'pure'] = 'hybrid'
+    neural_mode: Literal['hybrid', 'pure', 'neat'] = 'hybrid'
     hidden_size: int = 8
     activation: Literal['tanh', 'relu', 'sigmoid'] = 'tanh'
     weight_mutation_rate: float = 0.1
@@ -54,7 +54,7 @@ class NeuralConfig:
 
 
 def get_input_size(
-    mode: Literal['hybrid', 'pure'],
+    mode: Literal['hybrid', 'pure', 'neat'],
     time_encoding: TimeEncoding = 'cyclic',
     use_proprioception: bool = False,
     proprioception_inputs: ProprioceptionInputs = 'all',

@@ -241,7 +241,43 @@ export const useEvolutionStore = create<EvolutionStore>()(
  */
 export const useEvolutionStep = () => useEvolutionStore((s) => s.evolutionStep);
 export const useGeneration = () => useEvolutionStore((s) => s.generation);
-export const useConfig = () => useEvolutionStore((s) => s.config);
+
+/**
+ * Normalized config hook that handles both camelCase and snake_case keys.
+ * This is needed because configs loaded from the backend may have snake_case keys,
+ * while the frontend code expects camelCase.
+ */
+export const useConfig = () => {
+  const rawConfig = useEvolutionStore((s) => s.config);
+  // Normalize keys that might be in snake_case from backend
+  const rc = rawConfig as unknown as Record<string, unknown>;
+  return {
+    ...rawConfig,
+    timeEncoding: (rc.timeEncoding ?? rc.time_encoding ?? 'none') as typeof rawConfig.timeEncoding,
+    useProprioception: (rc.useProprioception ?? rc.use_proprioception ?? false) as boolean,
+    proprioceptionInputs: (rc.proprioceptionInputs ?? rc.proprioception_inputs ?? 'all') as typeof rawConfig.proprioceptionInputs,
+    neuralMode: (rc.neuralMode ?? rc.neural_mode ?? 'hybrid') as typeof rawConfig.neuralMode,
+    neuralDeadZone: (rc.neuralDeadZone ?? rc.neural_dead_zone ?? 0) as number,
+  };
+};
+
 export const useSimulationResults = () => useEvolutionStore((s) => s.simulationResults);
 export const useIsAutoRunning = () => useEvolutionStore((s) => s.isAutoRunning);
 export const useCardAnimationStates = () => useEvolutionStore((s) => s.cardAnimationStates);
+
+/**
+ * Non-hook function to get normalized config (handles both camelCase and snake_case keys).
+ * Use this when you need config outside of React hooks (e.g., in callbacks, event handlers).
+ */
+export function getNormalizedConfig(): SimulationConfig {
+  const rawConfig = useEvolutionStore.getState().config;
+  const rc = rawConfig as unknown as Record<string, unknown>;
+  return {
+    ...rawConfig,
+    timeEncoding: (rc.timeEncoding ?? rc.time_encoding ?? 'none') as typeof rawConfig.timeEncoding,
+    useProprioception: (rc.useProprioception ?? rc.use_proprioception ?? false) as boolean,
+    proprioceptionInputs: (rc.proprioceptionInputs ?? rc.proprioception_inputs ?? 'all') as typeof rawConfig.proprioceptionInputs,
+    neuralMode: (rc.neuralMode ?? rc.neural_mode ?? 'hybrid') as typeof rawConfig.neuralMode,
+    neuralDeadZone: (rc.neuralDeadZone ?? rc.neural_dead_zone ?? 0) as number,
+  };
+}

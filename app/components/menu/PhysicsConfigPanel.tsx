@@ -107,8 +107,8 @@ export function PhysicsConfigPanel() {
         />
       </div>
 
-      {/* Max Frequency - hide in pure mode since it's irrelevant */}
-      {config.neuralMode !== 'pure' && (
+      {/* Max Frequency - hide in pure/NEAT modes since they use direct neural control */}
+      {config.neuralMode === 'hybrid' && (
         <div style={{ marginBottom: '16px' }}>
           <ParamSlider
             name="Max Frequency"

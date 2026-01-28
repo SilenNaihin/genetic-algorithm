@@ -303,5 +303,5 @@ class TestConfigPassthrough:
         assert config.muscle_velocity_cap == 5.0
         assert config.muscle_damping_multiplier == 1.0
         assert config.max_extension_ratio == 2.0
-        assert config.neural_update_hz == 15
-        assert config.output_smoothing_alpha == 0.3
+        assert config.neural_update_hz == 10
+        assert config.output_smoothing_alpha == 0.15

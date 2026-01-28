@@ -99,8 +99,8 @@ class PyTorchSimulator:
             batch.spring_damping = batch.spring_damping * config.muscle_damping_multiplier
 
         # Check for frequency violations before simulation (only for hybrid mode)
-        # In pure mode, frequency is not used - neural net directly controls muscles
-        if config.neural_mode == 'pure':
+        # In pure/neat mode, frequency is not used - neural net directly controls muscles
+        if config.neural_mode in ('pure', 'neat'):
             freq_violations = torch.zeros(batch.batch_size, dtype=torch.bool, device=self.device)
         else:
             freq_violations = check_frequency_violations(batch, fitness_config)
@@ -125,7 +125,7 @@ class PyTorchSimulator:
 
         # Run simulation based on controller type
         use_neural = config.use_neural_net and self._has_neural_genomes(genomes)
-        use_neat = self._has_neat_genomes(genomes)
+        use_neat = config.neural_mode == 'neat'
 
         if use_neural:
             num_muscles = [len(g.get("muscles", [])) for g in genomes]
@@ -447,10 +447,3 @@ class PyTorchSimulator:
                     return True
         return False
 
-    def _has_neat_genomes(self, genomes: list[dict]) -> bool:
-        """Check if genomes use NEAT (variable topology)."""
-        for g in genomes:
-            neat = g.get("neatGenome") or g.get("neat_genome")
-            if neat is not None:
-                return True
-        return False

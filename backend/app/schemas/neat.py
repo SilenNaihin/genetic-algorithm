@@ -23,8 +23,8 @@ class NeuronGene(BaseModel):
     """
 
     id: int = Field(..., description="Unique neuron identifier within the genome")
-    type: Literal['input', 'hidden', 'output'] = Field(
-        ..., description="Neuron type determines position in network"
+    type: Literal['input', 'hidden', 'output', 'bias'] = Field(
+        ..., description="Neuron type: input, hidden, output, or bias (always=1.0)"
     )
     bias: float = Field(default=0.0, description="Bias term added before activation")
     # Innovation number for hidden neurons (None for input/output which are fixed)

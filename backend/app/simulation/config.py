@@ -49,7 +49,7 @@ class SimulationConfig:
 
     # Neural network settings
     use_neural_net: bool = True                # Enable neural network control
-    neural_mode: Literal['hybrid', 'pure'] = 'hybrid'  # How NN output is used
+    neural_mode: Literal['hybrid', 'pure', 'neat'] = 'hybrid'  # How NN output is used
     neural_hidden_size: int = 8                # Neurons in hidden layer
     neural_activation: str = 'tanh'            # Activation function
     weight_mutation_rate: float = 0.1          # Probability each weight mutates

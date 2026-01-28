@@ -32,6 +32,8 @@ def mutate_add_connection(
     - input -> output
     - hidden -> hidden (if no cycle created)
     - hidden -> output
+    - bias -> hidden (if bias_node mode)
+    - bias -> output (if bias_node mode)
 
     Args:
         genome: NEAT genome to mutate (modified in place)
@@ -41,8 +43,8 @@ def mutate_add_connection(
     Returns:
         True if a connection was added, False if no valid connection found
     """
-    # Find valid source neurons (input or hidden)
-    sources = [n for n in genome.neurons if n.type in ('input', 'hidden')]
+    # Find valid source neurons (input, hidden, or bias)
+    sources = [n for n in genome.neurons if n.type in ('input', 'hidden', 'bias')]
 
     # Find valid target neurons (hidden or output)
     targets = [n for n in genome.neurons if n.type in ('hidden', 'output')]
@@ -280,25 +282,32 @@ def mutate_neat_biases(
     mutation_rate: float = 0.8,
     perturb_rate: float = 0.9,
     perturb_magnitude: float = 0.2,
+    bias_mode: str = 'node',
 ) -> int:
     """
     Mutate neuron biases with Gaussian perturbation.
 
     Only hidden and output neurons have mutable biases.
+    Skipped entirely if bias_mode is 'none' or 'bias_node' (biases via connections).
 
     Args:
         genome: NEAT genome to mutate (modified in place)
         mutation_rate: Probability each bias mutates
         perturb_rate: Probability of perturbation vs reset
         perturb_magnitude: Standard deviation of perturbation
+        bias_mode: 'node' = per-node biases, 'bias_node' = bias via connections, 'none' = no biases
 
     Returns:
         Number of biases that were mutated
     """
+    # Skip bias mutation if not using per-node biases
+    if bias_mode in ('none', 'bias_node'):
+        return 0
+
     mutations = 0
     for neuron in genome.neurons:
         # Only mutate hidden and output biases
-        if neuron.type == 'input':
+        if neuron.type in ('input', 'bias'):
             continue
 
         if random.random() < mutation_rate:
@@ -323,6 +332,7 @@ def mutate_neat_genome(
     weight_perturb_magnitude: float = 0.2,
     bias_mutation_rate: float = 0.3,
     max_hidden_nodes: int = 16,
+    bias_mode: str = 'node',
 ) -> NEATGenome:
     """
     Apply all NEAT mutations to a genome.
@@ -341,6 +351,7 @@ def mutate_neat_genome(
         weight_perturb_magnitude: Standard deviation of weight perturbation
         bias_mutation_rate: Probability of bias mutations
         max_hidden_nodes: Maximum hidden nodes allowed
+        bias_mode: 'node' = per-node biases, 'bias_node' = bias via connections, 'none' = no biases
 
     Returns:
         New mutated genome
@@ -369,10 +380,11 @@ def mutate_neat_genome(
         perturb_magnitude=weight_perturb_magnitude,
     )
 
-    # Bias mutations
+    # Bias mutations (skipped for 'none' or 'bias_node' modes)
     mutate_neat_biases(
         mutated,
         mutation_rate=bias_mutation_rate,
+        bias_mode=bias_mode,
     )
 
     return mutated

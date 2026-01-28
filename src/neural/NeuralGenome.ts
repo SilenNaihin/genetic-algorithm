@@ -29,13 +29,13 @@ export interface NeuralGenomeData {
  * Configuration for neural network evolution.
  */
 export interface NeuralConfig {
-  useNeuralNet: boolean;           // Enable neural network control
-  neuralMode: 'hybrid' | 'pure';   // How NN output is used
-  hiddenSize: number;              // Neurons in hidden layer
-  activation: ActivationType;      // Activation function
-  weightMutationRate: number;      // Probability each weight mutates
-  weightMutationMagnitude: number; // Std dev of weight perturbation
-  outputBias: number;              // Initial output neuron bias (-2 to 0)
+  useNeuralNet: boolean;                     // Enable neural network control
+  neuralMode: 'hybrid' | 'pure' | 'neat';    // How NN output is used (neat = variable topology)
+  hiddenSize: number;                        // Neurons in hidden layer
+  activation: ActivationType;                // Activation function
+  weightMutationRate: number;                // Probability each weight mutates
+  weightMutationMagnitude: number;           // Std dev of weight perturbation
+  outputBias: number;                        // Initial output neuron bias (-2 to 0)
 }
 
 /**
@@ -70,9 +70,10 @@ export const NEURAL_INPUT_SIZE = 8;
 
 /**
  * Get input size based on neural mode.
+ * Note: NEAT mode uses same input size as pure mode (no time phase).
  */
-export function getInputSizeForMode(mode: 'pure' | 'hybrid'): number {
-  return mode === 'pure' ? NEURAL_INPUT_SIZE_PURE : NEURAL_INPUT_SIZE_HYBRID;
+export function getInputSizeForMode(mode: 'pure' | 'hybrid' | 'neat'): number {
+  return mode === 'hybrid' ? NEURAL_INPUT_SIZE_HYBRID : NEURAL_INPUT_SIZE_PURE;
 }
 
 /**

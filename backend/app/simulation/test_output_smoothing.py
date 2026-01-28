@@ -99,7 +99,7 @@ class TestOutputSmoothingConfig:
 
         config = SimulationConfig()
         assert hasattr(config, 'output_smoothing_alpha')
-        assert config.output_smoothing_alpha == 0.3  # Default
+        assert config.output_smoothing_alpha == 0.15  # Default
 
     def test_config_has_neural_update_hz(self):
         """SimulationConfig should have neural_update_hz field."""
@@ -107,7 +107,7 @@ class TestOutputSmoothingConfig:
 
         config = SimulationConfig()
         assert hasattr(config, 'neural_update_hz')
-        assert config.neural_update_hz == 15  # Default
+        assert config.neural_update_hz == 10  # Default
 
     def test_output_smoothing_validation(self):
         """output_smoothing_alpha should validate range."""

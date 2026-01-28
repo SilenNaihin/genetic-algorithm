@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from app.schemas.neat import NEATGenome
+
 
 class Vector3(BaseModel):
     """3D vector for positions and directions."""
@@ -176,6 +178,14 @@ class CreatureGenome(BaseModel):
         default=None,
         alias='neural_genome',
         validation_alias=AliasChoices('neuralGenome', 'neural_genome'),
+    )
+
+    # NEAT genome (optional, used when neural_mode='neat')
+    # Variable topology network that evolves structure
+    neatGenome: NEATGenome | None = Field(
+        default=None,
+        alias='neat_genome',
+        validation_alias=AliasChoices('neatGenome', 'neat_genome'),
     )
 
     # Color (for visualization, optional)

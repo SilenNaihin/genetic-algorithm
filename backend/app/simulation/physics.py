@@ -1464,13 +1464,13 @@ def simulate_with_fitness_neural(
     record_frames: bool = False,
     frame_interval: int = 1,
     arena_size: float = 50.0,
-    neural_update_hz: int = 15,
+    neural_update_hz: int = 10,
     time_encoding: str = 'cyclic',
     max_time: float = 20.0,
     use_proprioception: bool = False,
     proprioception_inputs: str = 'all',
     velocity_cap: float | None = None,
-    output_smoothing_alpha: float = 1.0,
+    output_smoothing_alpha: float = 0.15,
     max_extension_ratio: float | None = None,
 ) -> dict:
     """
@@ -1626,6 +1626,10 @@ def simulate_with_fitness_neural(
 
             # Use smoothed outputs for physics
             nn_outputs = smoothed_outputs
+
+            # Update activations with smoothed outputs for visualization
+            # (so stored activations match what physics actually uses)
+            current_full_activations['outputs'] = smoothed_outputs.clone()
 
         # 2. Physics step with neural control (uses cached/smoothed nn_outputs)
         current_com, step_activation = physics_step_neural(

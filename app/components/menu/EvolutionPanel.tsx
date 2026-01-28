@@ -101,50 +101,49 @@ export function EvolutionPanel() {
       {/* Mutation Section */}
       <div style={sectionStyle}>Mutation</div>
 
+      {/* Mutation rate/magnitude always visible - used by both crossover and clone paths */}
+      <div style={{ marginBottom: '16px' }}>
+        <ParamSlider
+          name="Mutation Rate"
+          value={config.mutationRate * 100}
+          displayValue={`${Math.round(config.mutationRate * 100)}%`}
+          min={5}
+          max={80}
+          tooltip={TOOLTIPS.mutationRate}
+          onChange={(v) => setConfig({ mutationRate: v / 100 })}
+          width="100%"
+        />
+      </div>
+      <div style={{ marginBottom: '16px' }}>
+        <ParamSlider
+          name="Mutation Magnitude"
+          value={config.mutationMagnitude}
+          displayValue={config.mutationMagnitude.toFixed(1)}
+          min={0.1}
+          max={1.0}
+          step={0.1}
+          tooltip={TOOLTIPS.mutationMagnitude}
+          onChange={(v) => setConfig({ mutationMagnitude: v })}
+          width="100%"
+        />
+      </div>
+
       <div style={{ marginBottom: '12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
           <input
             type="checkbox"
-            checked={config.useMutation}
+            checked={config.useMutation && !config.useCrossover}
             onChange={(e) => {
-              if (!e.target.checked && !config.useCrossover) return;
-              setConfig({ useMutation: e.target.checked });
+              if (e.target.checked) {
+                setConfig({ useMutation: true, useCrossover: false });
+              }
             }}
             style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
           />
-          Enable Mutation
+          Clone + Mutation
+          <InfoTooltip text="Clone a parent and apply mutations. Simpler than crossover." />
         </label>
       </div>
-
-      {config.useMutation && (
-        <>
-          <div style={{ marginBottom: '16px' }}>
-            <ParamSlider
-              name="Mutation Rate"
-              value={config.mutationRate * 100}
-              displayValue={`${Math.round(config.mutationRate * 100)}%`}
-              min={5}
-              max={80}
-              tooltip={TOOLTIPS.mutationRate}
-              onChange={(v) => setConfig({ mutationRate: v / 100 })}
-              width="100%"
-            />
-          </div>
-          <div style={{ marginBottom: '16px' }}>
-            <ParamSlider
-              name="Mutation Magnitude"
-              value={config.mutationMagnitude}
-              displayValue={config.mutationMagnitude.toFixed(1)}
-              min={0.1}
-              max={1.0}
-              step={0.1}
-              tooltip={TOOLTIPS.mutationMagnitude}
-              onChange={(v) => setConfig({ mutationMagnitude: v })}
-              width="100%"
-            />
-          </div>
-        </>
-      )}
 
       {/* Crossover Section */}
       <div style={sectionStyle}>Crossover</div>
@@ -155,35 +154,21 @@ export function EvolutionPanel() {
             type="checkbox"
             checked={config.useCrossover}
             onChange={(e) => {
-              if (!e.target.checked && !config.useMutation) return;
-              setConfig({ useCrossover: e.target.checked });
+              if (e.target.checked) {
+                setConfig({ useCrossover: true, useMutation: false });
+              }
             }}
             style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
           />
-          Enable Crossover
+          Crossover + Mutation
+          <InfoTooltip text="Combine two parents then mutate. More exploration than cloning." />
         </label>
       </div>
 
       {config.useCrossover && (
         <>
-          {/* Cross/Mut Ratio - only when both enabled */}
-          {config.useMutation && (
-            <div style={{ marginBottom: '16px' }}>
-              <ParamSlider
-                name="Cross/Mut Ratio"
-                value={config.crossoverRate * 100}
-                displayValue={`${Math.round(config.crossoverRate * 100)}/${Math.round(100 - config.crossoverRate * 100)}`}
-                min={0}
-                max={100}
-                tooltip={TOOLTIPS.crossoverRate}
-                onChange={(v) => setConfig({ crossoverRate: v / 100 })}
-                width="100%"
-              />
-            </div>
-          )}
-
-          {/* Crossover method - only for neural */}
-          {config.useNeuralNet && (
+          {/* Crossover method - only for fixed-topology neural networks (not NEAT) */}
+          {config.useNeuralNet && config.neuralMode !== 'neat' && (
             <>
               <div style={{ marginBottom: '16px' }}>
                 <div style={labelStyle}>
@@ -226,22 +211,42 @@ export function EvolutionPanel() {
       )}
 
       {/* Diversity Section */}
-      <div style={sectionStyle}>Diversity</div>
+      <div style={sectionStyle}>
+        Diversity
+        {config.neuralMode === 'neat' && (
+          <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--accent)', fontWeight: 'normal' }}>
+            (NEAT mode)
+          </span>
+        )}
+      </div>
 
       <div style={{ marginBottom: '12px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer',
+          color: config.neuralMode === 'neat' ? 'var(--text-muted)' : 'var(--text-primary)',
+          fontSize: '13px',
+        }}>
           <input
             type="checkbox"
             checked={config.useFitnessSharing}
+            disabled={config.neuralMode === 'neat'}
             onChange={(e) => setConfig({ useFitnessSharing: e.target.checked })}
-            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+            style={{ width: '16px', height: '16px', cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer', accentColor: 'var(--accent)' }}
           />
           Fitness Sharing
-          <InfoTooltip text={TOOLTIPS.fitnessSharing} width={280} />
+          <InfoTooltip
+            text={config.neuralMode === 'neat'
+              ? "Disabled in NEAT mode (redundant with speciation)"
+              : TOOLTIPS.fitnessSharing}
+            width={280}
+          />
         </label>
       </div>
 
-      {config.useFitnessSharing && (
+      {config.useFitnessSharing && config.neuralMode !== 'neat' && (
         <div style={{ marginBottom: '16px' }}>
           <ParamSlider
             name="Sharing Radius"
@@ -258,15 +263,31 @@ export function EvolutionPanel() {
       )}
 
       <div style={{ marginBottom: '12px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer',
+          color: config.neuralMode === 'neat' ? 'var(--text-muted)' : 'var(--text-primary)',
+          fontSize: '13px',
+        }}>
           <input
             type="checkbox"
             checked={config.useSpeciation}
+            disabled={config.neuralMode === 'neat'}
             onChange={(e) => setConfig({ useSpeciation: e.target.checked })}
-            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+            style={{ width: '16px', height: '16px', cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer', accentColor: 'var(--accent)' }}
           />
           Speciation
-          <InfoTooltip text={TOOLTIPS.speciation} width={280} />
+          {config.neuralMode === 'neat' && (
+            <span style={{ fontSize: '10px', color: 'var(--accent)' }}>(required)</span>
+          )}
+          <InfoTooltip
+            text={config.neuralMode === 'neat'
+              ? "Required in NEAT mode to protect structural innovations"
+              : TOOLTIPS.speciation}
+            width={280}
+          />
         </label>
       </div>
 

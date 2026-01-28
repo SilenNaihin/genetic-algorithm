@@ -442,3 +442,45 @@ class TestMultipleGenerations:
         # With high mutation rates, we expect some structural growth
         # (This may not always increase, but shouldn't crash)
         assert avg_connections >= 0  # Basic sanity check
+
+    def test_neural_mode_neat_enables_neat_mutations(self):
+        """neural_mode='neat' in config dict should enable NEAT mutations."""
+        random.seed(42)
+
+        counter = InnovationCounter()
+        population = generate_population(
+            size=20,
+            use_neural_net=True,
+            use_neat=True,
+            neural_mode='pure',
+            innovation_counter=counter,
+        )
+
+        # Use neural_mode='neat' instead of use_neat=True
+        config_dict = {
+            'population_size': 20,
+            'neural_mode': 'neat',  # New way to enable NEAT
+            'use_mutation': True,
+            'neat_add_connection_rate': 0.5,  # High rates for test
+            'neat_add_node_rate': 0.5,
+            'neat_max_hidden_nodes': 20,
+        }
+
+        # Run several generations
+        current = population
+        for gen in range(10):
+            fitness = [random.random() * 100 for _ in current]
+            current, stats = evolve_population(
+                current, fitness, config_dict,
+                generation=gen,
+                innovation_counter=counter,
+            )
+
+        # With 50% add_node_rate over 10 generations, we should see hidden neurons
+        # Hidden neurons are in the 'neurons' list with type='hidden'
+        def count_hidden(genome):
+            neurons = genome['neatGenome'].get('neurons', [])
+            return len([n for n in neurons if n.get('type') == 'hidden'])
+
+        has_hidden = any(count_hidden(g) > 0 for g in current)
+        assert has_hidden, "NEAT mutations should have added hidden neurons"
