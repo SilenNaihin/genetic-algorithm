@@ -203,7 +203,7 @@ def creature_genomes_to_batch(
             spring_node_b[b, num_muscles] = idx_b
             spring_rest_length[b, num_muscles] = muscle.get("restLength", muscle.get("rest_length", 1.0))
             spring_stiffness[b, num_muscles] = muscle.get("stiffness", 100.0)
-            spring_damping[b, num_muscles] = muscle.get("damping", 0.1)
+            spring_damping[b, num_muscles] = muscle.get("damping", 3.0)
             spring_frequency[b, num_muscles] = muscle.get("frequency", 1.0)
             spring_amplitude[b, num_muscles] = muscle.get("amplitude", 0.2)
             spring_phase[b, num_muscles] = muscle.get("phase", 0.0)

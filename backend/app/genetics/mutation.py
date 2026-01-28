@@ -158,11 +158,11 @@ def mutate_muscle(
             config.magnitude
         )
 
-    # Damping
+    # Damping (muscle-like range 1.0-6.0 for quick settling)
     if random.random() < config.rate:
         new_muscle['damping'] = mutate_value(
-            muscle.get('damping', 0.5),
-            0.05, 0.8,
+            muscle.get('damping', 3.0),
+            1.0, 6.0,
             config.magnitude
         )
 
@@ -288,7 +288,7 @@ def add_node(
         'nodeB': new_node['id'],
         'restLength': max(0.1, rest_length * (random.random() * 0.4 + 0.8)),
         'stiffness': random.random() * (constraints.max_stiffness - constraints.min_stiffness) + constraints.min_stiffness,
-        'damping': random.random() * 0.4 + 0.1,
+        'damping': random.random() * 2.0 + 2.0,  # Range 2.0-4.0 for muscle-like damping
         'frequency': random.random() * (constraints.max_frequency - constraints.min_frequency) + constraints.min_frequency,
         'amplitude': random.random() * constraints.max_amplitude,
         'phase': random.random() * math.pi * 2,
@@ -393,7 +393,7 @@ def add_muscle(
         'nodeB': node_b['id'],
         'restLength': max(0.1, rest_length * (random.random() * 0.4 + 0.8)),
         'stiffness': random.random() * (constraints.max_stiffness - constraints.min_stiffness) + constraints.min_stiffness,
-        'damping': random.random() * 0.4 + 0.1,
+        'damping': random.random() * 2.0 + 2.0,  # Range 2.0-4.0 for muscle-like damping
         'frequency': random.random() * (constraints.max_frequency - constraints.min_frequency) + constraints.min_frequency,
         'amplitude': random.random() * constraints.max_amplitude,
         'phase': random.random() * math.pi * 2,

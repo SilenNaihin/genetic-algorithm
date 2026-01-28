@@ -388,7 +388,7 @@ def create_muscle(
         'nodeB': node_b['id'],
         'restLength': max(0.1, dist * random_range(0.8, 1.2)),
         'stiffness': random_range(constraints.min_stiffness, constraints.max_stiffness),
-        'damping': random_range(0.05, 0.5),
+        'damping': random_range(2.0, 4.0),  # Muscle-like damping for quick settling
         'frequency': random_range(constraints.min_frequency, constraints.max_frequency),
         'amplitude': random_range(0.1, constraints.max_amplitude),
         'phase': random_range(0, math.pi * 2),

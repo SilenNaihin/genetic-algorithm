@@ -110,7 +110,7 @@ class GeneticsService:
             "node_b": node_b["id"],
             "rest_length": max(0.2, rest_length),
             "stiffness": random.uniform(50.0, 200.0),
-            "damping": random.uniform(0.3, 0.7),
+            "damping": random.uniform(2.0, 4.0),
             "frequency": random.uniform(0.5, 2.0),
             "amplitude": random.uniform(0.1, 0.5),
             "phase": random.uniform(0, 2 * math.pi),
@@ -315,7 +315,7 @@ class GeneticsService:
                 )
             if random.random() < mutation_rate:
                 muscle["damping"] = self._clamp(
-                    muscle.get("damping", 0.5) + random.gauss(0, 0.1), 0.1, 1.0
+                    muscle.get("damping", 3.0) + random.gauss(0, 0.5), 1.0, 6.0
                 )
             if random.random() < mutation_rate:
                 muscle["frequency"] = self._clamp(

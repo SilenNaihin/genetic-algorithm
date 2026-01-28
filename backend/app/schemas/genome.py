@@ -63,7 +63,7 @@ class MuscleGene(BaseModel):
         validation_alias=AliasChoices('restLength', 'rest_length'),
     )
     stiffness: float = Field(default=100.0, ge=1.0, le=1000.0)
-    damping: float = Field(default=0.5, ge=0.0, le=10.0)
+    damping: float = Field(default=3.0, ge=0.0, le=10.0)
 
     # Oscillation
     frequency: float = Field(default=1.0, ge=0.1, le=5.0)

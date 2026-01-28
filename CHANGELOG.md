@@ -32,6 +32,17 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - Symptom: Creatures moved even with `connectivity='none'` because bias output (-0.1) wasn't zeroed
   - Fix: Changed condition to `mode in ('pure', 'neat')` in three places in physics.py
   - Now NEAT mode respects `neural_dead_zone` setting like pure mode
+- **Muscle Damping Too Low (Spring-like Behavior)**: Increased default damping from 0.5 to 3.0
+  - Bug: Damping ratio ζ ≈ 0.08 caused 10+ second settle times after impacts
+  - Symptom: Creatures oscillated/tumbled for entire simulation after falling from spawn
+  - Fix: Changed default damping from 0.5 to 3.0 across all files:
+    - `genome.py`: Schema default 0.5 → 3.0
+    - `tensors.py`: Fallback 0.1 → 3.0
+    - `mutation.py`: Range [0.1, 0.5] → [2.0, 4.0], clamp [0.05, 0.8] → [1.0, 6.0]
+    - `population.py`: Range [0.05, 0.5] → [2.0, 4.0]
+    - `crossover.py`: Default 0.5 → 3.0
+    - `services/genetics.py`: Range [0.3, 0.7] → [2.0, 4.0], clamp [0.1, 1.0] → [1.0, 6.0]
+  - Result: ζ ≈ 0.5 → settles in ~1-2 seconds (muscle-like behavior)
 
 ### Added
 - **Muscle Velocity Cap**: Physics-level constraint on muscle speed (v2-prd Phase 1)
