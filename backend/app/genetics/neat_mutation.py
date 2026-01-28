@@ -359,11 +359,12 @@ def mutate_neat_genome(
     # Deep copy to avoid modifying original
     mutated = deepcopy(genome)
 
-    # Structural mutations (one per call maximum)
+    # Structural mutations - both can happen independently
+    # This is crucial for 'none' connectivity where add_node can only split bias connections
+    # and add_connection is the ONLY way to create input->output pathways
     if random.random() < add_node_rate:
         mutate_add_node(mutated, innovation_counter, max_hidden_nodes)
-    elif random.random() < add_connection_rate:
-        # Only try to add connection if we didn't add a node
+    if random.random() < add_connection_rate:
         mutate_add_connection(mutated, innovation_counter)
 
     # Connection enable/disable
