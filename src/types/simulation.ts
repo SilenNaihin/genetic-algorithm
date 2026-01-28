@@ -54,7 +54,7 @@ export interface SimulationConfig {
 
   // Neural network settings (neuroevolution)
   useNeuralNet: boolean;              // Enable neural network control
-  neuralMode: 'hybrid' | 'pure';      // How NN output is used
+  neuralMode: 'hybrid' | 'pure' | 'neat';  // How NN output is used (neat = variable topology)
   timeEncoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';  // Time encoding (default: none for pure, cyclic for hybrid)
   neuralHiddenSize: number;           // Neurons in hidden layer
   neuralActivation: ActivationType;   // Activation function
@@ -87,8 +87,7 @@ export interface SimulationConfig {
   compatibilityThreshold: number;     // Genome distance threshold for same species (0.1-3.0)
   minSpeciesSize: number;             // Minimum survivors per species (1-20)
 
-  // NEAT (NeuroEvolution of Augmenting Topologies)
-  useNEAT: boolean;                   // Enable NEAT for variable-topology neural networks
+  // NEAT (NeuroEvolution of Augmenting Topologies) - configured when neuralMode === 'neat'
   neatAddConnectionRate: number;      // Probability to add a new connection (0.01-0.2)
   neatAddNodeRate: number;            // Probability to add a new hidden node (0.01-0.1)
   neatEnableRate: number;             // Probability to re-enable a disabled connection (0.01-0.1)
@@ -158,8 +157,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   neuralOutputBias: -0.1,        // Slight negative bias so muscles must evolve to activate
   fitnessEfficiencyPenalty: 0.1, // Subtle penalty for excessive activation
   neuralDeadZone: 0.1,           // Outputs with absolute value < 0.1 become 0 in pure mode
-  neuralUpdateHz: 15,            // Update NN 15 times per second (physics_fps / 4 at 60 FPS)
-  outputSmoothingAlpha: 0.3,     // Moderate smoothing (0.3 = 30% new + 70% old)
+  neuralUpdateHz: 10,            // Update NN 10 times per second (smoother movement)
+  outputSmoothingAlpha: 0.15,    // Aggressive smoothing (0.15 = 15% new + 85% old)
 
   // Adaptive mutation defaults
   useAdaptiveMutation: false,    // Off by default - enable for long runs
@@ -181,8 +180,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   compatibilityThreshold: 1.0,   // Genome distance threshold for same species
   minSpeciesSize: 2,             // Minimum survivors per species
 
-  // NEAT defaults
-  useNEAT: false,                // Off by default - enable for variable topology
+  // NEAT defaults (used when neuralMode === 'neat')
   neatAddConnectionRate: 0.05,   // 5% chance to add connection per genome
   neatAddNodeRate: 0.03,         // 3% chance to add node per genome
   neatEnableRate: 0.02,          // 2% chance to re-enable disabled connection
@@ -286,6 +284,10 @@ export interface CreatureSimulationResult {
   // UI-specific properties (set by frontend from evolution step response)
   _isSurvivor?: boolean;   // For animation: creature survived from previous generation
   _hasFrames?: boolean;    // For replay button: frames are available in database
+
+  // Lifecycle tracking (from API)
+  birthGeneration?: number;  // Generation this creature was created
+  deathGeneration?: number;  // Generation this creature died (null = still alive)
 }
 
 export interface PelletData {
@@ -347,4 +349,21 @@ export interface NEATGenome {
 export interface InnovationCounterState {
   nextConnection: number;  // Next connection innovation number
   nextNode: number;        // Next node innovation number
+}
+
+// =============================================================================
+// Migration Utilities
+// =============================================================================
+
+/**
+ * Migrate old configs that used useNEAT boolean to neuralMode='neat'.
+ * Call this when loading configs from storage or API.
+ */
+export function migrateConfig(config: Partial<SimulationConfig> & { useNEAT?: boolean }): Partial<SimulationConfig> {
+  const migrated = { ...config };
+  if ('useNEAT' in migrated && migrated.useNEAT) {
+    migrated.neuralMode = 'neat';
+  }
+  delete (migrated as { useNEAT?: boolean }).useNEAT;
+  return migrated;
 }

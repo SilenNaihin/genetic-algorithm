@@ -112,7 +112,8 @@ async def run_generation(
 
     # Load or create innovation counter for NEAT
     innovation_counter = None
-    if config.use_neat:
+    use_neat = config.neural_mode == 'neat'
+    if use_neat:
         innovation_counter = InnovationCounter(
             next_connection=run.innovation_counter_connection,
             next_node=run.innovation_counter_node,
@@ -137,7 +138,7 @@ async def run_generation(
             time_encoding=config.time_encoding,
             use_proprioception=config.use_proprioception,
             proprioception_inputs=config.proprioception_inputs,
-            use_neat=config.use_neat,
+            use_neat=use_neat,
             innovation_counter=innovation_counter,
         )
     else:
@@ -204,7 +205,7 @@ async def run_generation(
             'compatibility_threshold': config.compatibility_threshold,
             'min_species_size': config.min_species_size,
             # NEAT config
-            'use_neat': config.use_neat,
+            'use_neat': use_neat,
             'neat_add_connection_rate': config.neat_add_connection_rate,
             'neat_add_node_rate': config.neat_add_node_rate,
             'neat_enable_rate': config.neat_enable_rate,
@@ -291,7 +292,6 @@ async def run_generation(
             "use_proprioception": config.use_proprioception,
             "proprioception_inputs": config.proprioception_inputs,
             # NEAT config
-            "use_neat": config.use_neat,
             "neat_max_hidden_nodes": config.neat_max_hidden_nodes,
         },
     )
@@ -358,6 +358,9 @@ async def run_generation(
     # else: frame_storage_mode == "none" -> keep_frames_ids stays empty
 
     # Create/update creature records and performance records
+    # Track creature objects for lifecycle info in response
+    creature_records: dict[str, Creature] = {}
+
     for genome, sim_result in zip(genomes, sim_results):
         creature_id = genome["id"]
         survival_streak = genome.get("survivalStreak", genome.get("survival_streak", 0))
@@ -399,6 +402,9 @@ async def run_generation(
                 parent_ids=genome.get("parentIds", genome.get("parent_ids", [])),
             )
             db.add(creature)
+
+        # Track for lifecycle info in response
+        creature_records[creature_id] = creature
 
         # Create performance record for this generation
         performance = CreaturePerformance(
@@ -481,6 +487,7 @@ async def run_generation(
     creatures_data = []
     for genome, sim_result in zip(genomes, sim_results):
         creature_id = genome["id"]
+        creature = creature_records.get(creature_id)
         creatures_data.append({
             "id": creature_id,
             "genome": genome,
@@ -492,6 +499,8 @@ async def run_generation(
             "parent_ids": genome.get("parentIds", genome.get("parent_ids", [])),
             "has_frames": creature_id in keep_frames_ids,
             "survival_streak": genome.get("survivalStreak", genome.get("survival_streak", 0)),
+            "birth_generation": creature.birth_generation if creature else None,
+            "death_generation": creature.death_generation if creature else None,
         })
 
     # Build response

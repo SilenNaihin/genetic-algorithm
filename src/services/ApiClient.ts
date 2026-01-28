@@ -41,7 +41,7 @@ export interface ApiSimulationConfig {
   fitness_distance_traveled_max: number;
   fitness_regression_penalty: number;
   use_neural_net: boolean;
-  neural_mode: 'hybrid' | 'pure';
+  neural_mode: 'hybrid' | 'pure' | 'neat';
   time_encoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
   neural_hidden_size: number;
   neural_activation: string;
@@ -114,6 +114,8 @@ export interface ApiEvolutionCreature {
   parent_ids: string[];
   has_frames: boolean;
   survival_streak: number;
+  birth_generation: number | null;
+  death_generation: number | null;
 }
 
 /** Evolution step response */
@@ -593,7 +595,8 @@ export async function getLongestSurvivorForRun(runId: string): Promise<ApiCreatu
 
 export async function getCreatureFrames(
   creatureId: string,
-  generation?: number
+  generation?: number,
+  best?: boolean
 ): Promise<{
   frames_data: number[][];
   frame_count: number;
@@ -613,8 +616,11 @@ export async function getCreatureFrames(
   }> | null;
   generation: number;
 }> {
-  const url = generation !== undefined
-    ? `/api/creatures/${creatureId}/frames?generation=${generation}`
+  const params: string[] = [];
+  if (generation !== undefined) params.push(`generation=${generation}`);
+  if (best) params.push('best=true');
+  const url = params.length > 0
+    ? `/api/creatures/${creatureId}/frames?${params.join('&')}`
     : `/api/creatures/${creatureId}/frames`;
   return fetchJson(url);
 }

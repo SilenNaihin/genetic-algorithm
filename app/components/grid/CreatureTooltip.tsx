@@ -3,15 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { TooltipManager, tooltipRow, tooltipTitle } from '../../../src/ui/TooltipManager';
 import { getCreatureName } from '../../../src/ui/CreatureCardRenderer';
-import { useEvolutionStore } from '../../stores/evolutionStore';
+import { getNormalizedConfig } from '../../stores/evolutionStore';
 import type { CreatureSimulationResult } from '../../../src/types';
 
 /**
  * Generates tooltip HTML for a creature card.
  */
 function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, stackDepth?: number): string {
-  const config = useEvolutionStore.getState().config;
-  const isPureMode = config.neuralMode === 'pure';
+  const config = getNormalizedConfig();
+  const isDirectNeural = config.neuralMode === 'pure' || config.neuralMode === 'neat';
   const genome = result.genome;
   const creatureName = getCreatureName(genome);
   const avgStiffness = genome.muscles.length > 0
@@ -46,6 +46,11 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, st
                       parentCount === 1 ? 'Mutant' :
                       `Crossover (${parentCount} parents)`;
 
+  // Lifecycle info
+  const birthGen = result.birthGeneration;
+  const deathGen = result.deathGeneration;
+  const isAlive = deathGen === undefined || deathGen === null;
+
   const rankStr = rank !== undefined ? `#${rank}` : '';
   const stackInfo = isStacked ? `<span style="color: #6b7280; font-size: 11px; margin-left: 6px;">(${stackDepth} stacked)</span>` : '';
 
@@ -69,6 +74,8 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, st
       <div style="font-size: 11px; color: var(--accent-light); margin-bottom: 4px;">Genetics</div>
       ${tooltipRow('Generation', genCount)}
       ${tooltipRow('Origin', lineageText, `color: ${parentCount === 0 ? '#7a8494' : parentCount === 1 ? '#f59e0b' : '#6366f1'}`)}
+      ${birthGen !== undefined ? tooltipRow('Born', `Gen ${birthGen}`) : ''}
+      ${!isAlive ? tooltipRow('Died', `Gen ${deathGen}`, 'color: #ef4444') : ''}
     </div>
 
     <div>
@@ -76,8 +83,8 @@ function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, st
       ${tooltipRow('Nodes', genome.nodes.length)}
       ${tooltipRow('Muscles', genome.muscles.length)}
       ${tooltipRow('Avg Stiffness', avgStiffness.toFixed(0))}
-      ${!isPureMode ? tooltipRow('Avg Frequency', `${avgFrequency.toFixed(1)} Hz`) : ''}
-      ${!isPureMode ? tooltipRow('Global Speed', `${genome.globalFrequencyMultiplier.toFixed(2)}x`) : ''}
+      ${!isDirectNeural ? tooltipRow('Avg Frequency', `${avgFrequency.toFixed(1)} Hz`) : ''}
+      ${!isDirectNeural ? tooltipRow('Global Speed', `${genome.globalFrequencyMultiplier.toFixed(2)}x`) : ''}
     </div>
 
     <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">${result.disqualified ? 'Replay unavailable' : 'Click to replay'}</div>

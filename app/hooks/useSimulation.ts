@@ -42,6 +42,9 @@ function apiCreatureToResult(creature: Api.ApiEvolutionCreature): CreatureSimula
     // Store additional data for UI
     _isSurvivor: creature.is_survivor,
     _hasFrames: creature.has_frames,
+    // Lifecycle tracking
+    birthGeneration: creature.birth_generation ?? undefined,
+    deathGeneration: creature.death_generation ?? undefined,
   };
 }
 
