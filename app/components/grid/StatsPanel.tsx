@@ -301,7 +301,7 @@ export function StatsPanel() {
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
             Longest Survivor{' '}
             <span style={{ color: 'var(--text-secondary)' }}>
-              ({longestSurvivingGenerations} gens, last ran Gen {longestSurvivingDiedAt})
+              ({longestSurvivingGenerations} gens, died Gen {longestSurvivingDiedAt})
             </span>
           </div>
           <div
