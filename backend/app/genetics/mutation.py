@@ -599,8 +599,8 @@ class NEATMutationConfig:
     """
 
     # Structural mutation rates
-    add_connection_rate: float = 0.05  # Per-genome probability to add a connection
-    add_node_rate: float = 0.03  # Per-genome probability to add a node
+    add_connection_rate: float = 0.5  # Per-genome probability to add a connection (NEAT standard)
+    add_node_rate: float = 0.2  # Per-genome probability to add a node (NEAT standard)
     enable_rate: float = 0.02  # Per-genome probability to re-enable a disabled connection
     disable_rate: float = 0.01  # Per-genome probability to disable a connection
 

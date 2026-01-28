@@ -323,8 +323,8 @@ def mutate_neat_biases(
 def mutate_neat_genome(
     genome: NEATGenome,
     innovation_counter: InnovationCounter,
-    add_connection_rate: float = 0.05,
-    add_node_rate: float = 0.03,
+    add_connection_rate: float = 0.5,
+    add_node_rate: float = 0.2,
     enable_rate: float = 0.02,
     disable_rate: float = 0.01,
     weight_mutation_rate: float = 0.8,

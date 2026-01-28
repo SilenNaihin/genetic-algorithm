@@ -279,8 +279,8 @@ export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfi
 
     // NEAT settings
     neat_initial_connectivity: api.neat_initial_connectivity ?? 'full',
-    neat_add_connection_rate: api.neat_add_connection_rate ?? 0.05,
-    neat_add_node_rate: api.neat_add_node_rate ?? 0.03,
+    neat_add_connection_rate: api.neat_add_connection_rate ?? 0.5,
+    neat_add_node_rate: api.neat_add_node_rate ?? 0.2,
     neat_enable_rate: api.neat_enable_rate ?? 0.02,
     neat_disable_rate: api.neat_disable_rate ?? 0.01,
     neat_excess_coefficient: api.neat_excess_coefficient ?? 1.0,

@@ -638,8 +638,8 @@ class TestMutateNeatGenome:
             genome = mutate_neat_genome(
                 genome,
                 counter,
-                add_connection_rate=0.05,  # Realistic rate
-                add_node_rate=0.03,  # Realistic rate
+                add_connection_rate=0.5,  # NEAT standard rate
+                add_node_rate=0.2,  # NEAT standard rate
             )
 
         # After 2500 mutation attempts, we expect ~125 successful add_connection

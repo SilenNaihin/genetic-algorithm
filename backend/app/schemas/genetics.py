@@ -74,8 +74,8 @@ class EvolutionConfig(BaseModel):
     neural_output_bias: float = Field(default=-0.1, ge=-2.0, le=2.0)
 
     # NEAT (NeuroEvolution of Augmenting Topologies) - configured when neural_mode == 'neat'
-    neat_add_connection_rate: float = Field(default=0.05, ge=0.0, le=1.0)  # Probability to add connection
-    neat_add_node_rate: float = Field(default=0.03, ge=0.0, le=1.0)  # Probability to add node
+    neat_add_connection_rate: float = Field(default=0.5, ge=0.0, le=1.0)  # Probability to add connection (NEAT standard: 0.5)
+    neat_add_node_rate: float = Field(default=0.2, ge=0.0, le=1.0)  # Probability to add node (NEAT standard: 0.2)
     neat_enable_rate: float = Field(default=0.02, ge=0.0, le=1.0)  # Probability to re-enable connection
     neat_disable_rate: float = Field(default=0.01, ge=0.0, le=1.0)  # Probability to disable connection
     neat_excess_coefficient: float = Field(default=1.0, ge=0.0, le=10.0)  # Weight for excess genes in distance

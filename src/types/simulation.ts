@@ -181,8 +181,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   // NEAT defaults (used when neural_mode === 'neat')
   neat_initial_connectivity: 'full',  // Start with all inputs connected to all outputs
-  neat_add_connection_rate: 0.05,   // 5% chance to add connection per genome
-  neat_add_node_rate: 0.03,         // 3% chance to add node per genome
+  neat_add_connection_rate: 0.5,    // 50% chance to add connection per genome (NEAT standard)
+  neat_add_node_rate: 0.2,          // 20% chance to add node per genome (NEAT standard)
   neat_enable_rate: 0.02,          // 2% chance to re-enable disabled connection
   neat_disable_rate: 0.01,         // 1% chance to disable enabled connection
   neat_excess_coefficient: 1.0,    // Standard weight for excess genes

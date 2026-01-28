@@ -148,8 +148,8 @@ describe('bias_mode Propagation', () => {
         bias_mode: 'bias_node',
         selection_method: 'speciation',
         use_fitness_sharing: false,
-        neat_add_connection_rate: 0.05,
-        neat_add_node_rate: 0.03,
+        neat_add_connection_rate: 0.5,
+        neat_add_node_rate: 0.2,
       };
 
       const apiConfig = toApiConfig(neatConfig);
@@ -227,8 +227,8 @@ describe('bias_mode Propagation', () => {
       const frontendConfig = fromApiConfig(apiConfig as any);
 
       // Should use default values
-      expect(frontendConfig.neat_add_connection_rate).toBe(0.05);
-      expect(frontendConfig.neat_add_node_rate).toBe(0.03);
+      expect(frontendConfig.neat_add_connection_rate).toBe(0.5);
+      expect(frontendConfig.neat_add_node_rate).toBe(0.2);
       expect(frontendConfig.neat_enable_rate).toBe(0.02);
       expect(frontendConfig.neat_disable_rate).toBe(0.01);
       expect(frontendConfig.neat_excess_coefficient).toBe(1.0);

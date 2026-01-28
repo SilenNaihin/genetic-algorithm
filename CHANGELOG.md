@@ -35,6 +35,12 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - Edge case tests (single input/output, many inputs/few outputs, etc.)
 
 ### Fixed
+- **NEAT Structural Mutations Too Slow**: Fixed topology evolution being 10x slower than standard NEAT
+  - Bug 1: `elif` made add_node and add_connection mutually exclusive (only one tried per generation)
+  - Bug 2: Default rates (5% connection, 3% node) were 10x lower than NEAT standard (50%, 20%)
+  - Symptom: After 24 generations with `none` connectivity, most creatures had 0 input connections
+  - Fix: Changed `elif` to independent `if` checks; updated defaults to match NEAT-python (50%/20%)
+  - Reference: NEAT-python uses `conn_add_prob=0.5`, `node_add_prob=0.2` with independent application
 - **NEAT Clones Not Getting Mutated**: Fixed NEAT topologies not evolving when `useMutation=false`
   - Bug: Clone offspring (50% of population with default crossover rate) never got NEAT structural mutations
   - Root cause: `should_mutate = do_crossover or use_mutation` excluded clones when `use_mutation=False`

@@ -23,8 +23,8 @@ class TestNEATConfigDefaults:
         """EvolutionConfig should have correct NEAT defaults."""
         config = EvolutionConfig()
 
-        assert config.neat_add_connection_rate == 0.05
-        assert config.neat_add_node_rate == 0.03
+        assert config.neat_add_connection_rate == 0.5
+        assert config.neat_add_node_rate == 0.2
         assert config.neat_enable_rate == 0.02
         assert config.neat_disable_rate == 0.01
         assert config.neat_excess_coefficient == 1.0
@@ -37,8 +37,8 @@ class TestNEATConfigDefaults:
         """SimulationConfig should have correct NEAT defaults."""
         config = SimulationConfig()
 
-        assert config.neat_add_connection_rate == 0.05
-        assert config.neat_add_node_rate == 0.03
+        assert config.neat_add_connection_rate == 0.5
+        assert config.neat_add_node_rate == 0.2
         assert config.neat_enable_rate == 0.02
         assert config.neat_disable_rate == 0.01
         assert config.neat_excess_coefficient == 1.0
@@ -51,8 +51,8 @@ class TestNEATConfigDefaults:
         """NEATMutationConfig should have correct defaults."""
         config = NEATMutationConfig()
 
-        assert config.add_connection_rate == 0.05
-        assert config.add_node_rate == 0.03
+        assert config.add_connection_rate == 0.5
+        assert config.add_node_rate == 0.2
         assert config.enable_rate == 0.02
         assert config.disable_rate == 0.01
         assert config.max_hidden_nodes == 16

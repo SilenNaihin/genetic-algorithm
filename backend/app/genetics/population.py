@@ -133,8 +133,8 @@ class EvolutionConfig:
     use_neat: bool = False  # Use NEAT for variable-topology neural networks
     bias_mode: str = 'node'  # 'none', 'node' (per-neuron), 'bias_node' (original NEAT style)
     neat_initial_connectivity: str = 'full'  # 'full', 'sparse', 'none' - initial network connectivity
-    neat_add_connection_rate: float = 0.05  # Per-genome probability to add a connection
-    neat_add_node_rate: float = 0.03  # Per-genome probability to add a node
+    neat_add_connection_rate: float = 0.5  # Per-genome probability to add a connection (NEAT standard)
+    neat_add_node_rate: float = 0.2  # Per-genome probability to add a node (NEAT standard)
     neat_enable_rate: float = 0.02  # Per-genome probability to re-enable connection
     neat_disable_rate: float = 0.01  # Per-genome probability to disable connection
     neat_excess_coefficient: float = 1.0  # Weight for excess genes in distance
@@ -597,8 +597,8 @@ def evolve_population(
             # NEAT configuration (already derived above)
             use_neat=use_neat,
             bias_mode=config.get('bias_mode', 'bias_node' if use_neat else 'node'),
-            neat_add_connection_rate=config.get('neat_add_connection_rate', 0.05),
-            neat_add_node_rate=config.get('neat_add_node_rate', 0.03),
+            neat_add_connection_rate=config.get('neat_add_connection_rate', 0.5),
+            neat_add_node_rate=config.get('neat_add_node_rate', 0.2),
             neat_enable_rate=config.get('neat_enable_rate', 0.02),
             neat_disable_rate=config.get('neat_disable_rate', 0.01),
             neat_excess_coefficient=config.get('neat_excess_coefficient', 1.0),
