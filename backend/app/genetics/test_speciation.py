@@ -127,8 +127,8 @@ class TestSelectWithinSpecies:
         result = select_within_species([], survival_rate=0.5, min_species_size=1)
         assert result == []
 
-    def test_single_member_species_survives(self):
-        """Single member species keeps its member with min_species_size=1."""
+    def test_single_member_species_respects_global_rate(self):
+        """Single member species respects global survival rate."""
         genome = make_genome([[0.5]])
         species = Species(
             id=0,
@@ -137,8 +137,12 @@ class TestSelectWithinSpecies:
             fitness_scores=[100.0],
         )
 
+        # With 50% rate and 1 creature: int(1 * 0.5) = 0
         result = select_within_species([species], survival_rate=0.5, min_species_size=1)
+        assert len(result) == 0
 
+        # With 100% rate, it survives
+        result = select_within_species([species], survival_rate=1.0, min_species_size=1)
         assert len(result) == 1
         assert result[0] == genome
 
@@ -159,8 +163,8 @@ class TestSelectWithinSpecies:
 
         assert len(result) == 5  # Half of 10
 
-    def test_min_species_size_respected(self):
-        """Minimum species size prevents extinction."""
+    def test_global_rate_takes_precedence_over_min_size(self):
+        """Global survival rate takes precedence over min_species_size."""
         genomes = [make_genome([[i * 0.1]]) for i in range(5)]
         fitness = list(range(100, 50, -10))  # 100, 90, 80, 70, 60
 
@@ -171,9 +175,13 @@ class TestSelectWithinSpecies:
             fitness_scores=fitness,
         )
 
-        # 10% survival = 0.5 → would be 0, but min_species_size=2
+        # 10% survival rate of 5 = 0 survivors
+        # Global rate takes precedence over min_species_size
         result = select_within_species([species], survival_rate=0.1, min_species_size=2)
+        assert len(result) == 0
 
+        # With 50% rate: int(5 * 0.5) = 2
+        result = select_within_species([species], survival_rate=0.5, min_species_size=2)
         assert len(result) == 2
 
     def test_best_fitness_survives(self):
@@ -189,7 +197,8 @@ class TestSelectWithinSpecies:
             fitness_scores=[50.0, 100.0, 75.0],  # g2 is best
         )
 
-        result = select_within_species([species], survival_rate=0.33, min_species_size=1)
+        # 50% rate of 3 = 1 survivor
+        result = select_within_species([species], survival_rate=0.5, min_species_size=1)
 
         assert len(result) == 1
         assert result[0]["id"] == "g2"  # Best fitness survives

@@ -127,7 +127,7 @@ class TestExtremeParameterValues:
         assert result[0].size == 20
 
     def test_min_species_size_larger_than_species(self):
-        """min_species_size larger than actual species size."""
+        """min_species_size larger than actual species size - global rate takes precedence."""
         g1 = make_neural_genome([0.0], "g1")
         g2 = make_neural_genome([10.0], "g2")  # Very different
         genomes = [g1, g2]
@@ -137,15 +137,17 @@ class TestExtremeParameterValues:
         species_list = assign_species(genomes, fitness, compatibility_threshold=0.1)
         assert len(species_list) == 2
 
-        # min_species_size=5 but each species has 1 member
-        # Should still keep all members (can't keep more than exist)
+        # With survival_rate=0.1 and 2 creatures: int(2 * 0.1) = 0
+        # Global rate takes precedence over min_species_size
         survivors = select_within_species(species_list, survival_rate=0.1, min_species_size=5)
+        assert len(survivors) == 0
 
-        # Each species should keep its member (1 each)
+        # With survival_rate=1.0, both species survive
+        survivors = select_within_species(species_list, survival_rate=1.0, min_species_size=5)
         assert len(survivors) == 2
 
     def test_survival_rate_zero(self):
-        """Survival rate of 0 should still keep min_species_size."""
+        """Survival rate of 0 returns no survivors - global rate takes precedence."""
         genome = make_neural_genome([0.5], "g")
         genomes = [{**genome, "id": f"g{i}"} for i in range(10)]
         fitness = list(range(100, 0, -10))
@@ -157,10 +159,10 @@ class TestExtremeParameterValues:
             fitness_scores=fitness,
         )
 
-        # 0% survival rate, but min_species_size=3
+        # 0% survival rate = 0 survivors, regardless of min_species_size
         survivors = select_within_species([species], survival_rate=0.0, min_species_size=3)
 
-        assert len(survivors) == 3
+        assert len(survivors) == 0
 
     def test_survival_rate_one(self):
         """Survival rate of 1.0 should keep all members."""
@@ -381,7 +383,7 @@ class TestEdgeCasesAndBugs:
             genomes,
             fitness,
             compatibility_threshold=1.0,
-            survival_rate=0.5,
+            survival_rate=1.0,  # 100% survival to keep the solo genome
             min_species_size=1,
         )
 
@@ -507,8 +509,8 @@ class TestSurvivorCountEdgeCases:
                         f"with survival_rate={survival_rate}, min_size={min_size}"
                     )
 
-    def test_survivor_count_at_least_one_per_species(self):
-        """Each species should have at least one survivor (if min_species_size >= 1)."""
+    def test_survivor_count_respects_global_budget(self):
+        """Global survival rate is respected as upper bound."""
         genomes = [make_neural_genome([i * 2.0], f"g{i}") for i in range(10)]
         fitness = [100.0 - i * 10 for i in range(10)]
 
@@ -516,15 +518,16 @@ class TestSurvivorCountEdgeCases:
         survivors, species_list = apply_speciation(
             genomes, fitness,
             compatibility_threshold=0.1,
-            survival_rate=0.1,  # Very low
+            survival_rate=0.1,  # Very low = 1 survivor
             min_species_size=1,
         )
 
-        # Each species should have at least 1 survivor
-        assert len(survivors) >= len(species_list)
+        # Global rate takes precedence: int(10 * 0.1) = 1
+        # The survivor should be from the best-fitness species
+        assert len(survivors) == 1
 
-    def test_min_species_size_can_increase_survivor_count(self):
-        """High min_species_size with many species can exceed naive survival rate."""
+    def test_high_survival_rate_with_many_species(self):
+        """High survival rate with many species protects diversity."""
         # Create 10 very different genomes (each in own species)
         genomes = [make_neural_genome([i * 10.0], f"g{i}") for i in range(10)]
         fitness = [100.0] * 10
@@ -533,12 +536,11 @@ class TestSurvivorCountEdgeCases:
         survivors, species_list = apply_speciation(
             genomes, fitness,
             compatibility_threshold=0.01,  # Very small
-            survival_rate=0.1,  # Would be 1 survivor normally
-            min_species_size=1,  # But each species keeps at least 1
+            survival_rate=1.0,  # 100% survival
+            min_species_size=1,
         )
 
-        # With 10 species and min_species_size=1, should have ~10 survivors
-        # (not just 1 as survival_rate would suggest)
+        # With 100% survival, all 10 survive
         assert len(survivors) == 10
 
     def test_population_size_preserved_after_evolution(self):

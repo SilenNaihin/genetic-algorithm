@@ -279,10 +279,13 @@ def assign_species(genomes, fitness_scores, compatibility_threshold):
 
 ### Within-Species Selection
 
-Each species uses truncation selection internally:
-- Sort members by fitness
-- Keep top N% (determined by survival_rate)
-- At least `min_species_size` members survive (prevents extinction)
+Speciation-based selection respects the global cull rate while protecting diversity:
+- Total survivor budget = population × survival_rate
+- If budget allows 1 per species, each species gets at least 1 survivor
+- If more species than budget, top species by max fitness get 1 survivor each
+- Remaining budget is allocated proportionally by species size
+
+**Important**: The global cull rate takes precedence over `min_species_size`. With 50% cull rate, roughly 50% of the population survives regardless of species count.
 
 ### Configuration
 
@@ -308,14 +311,15 @@ Speciation is now a selection method. Set `selectionMethod: 'speciation'` to ena
 ### Example
 
 ```
-Without speciation (truncation selection):
+Without speciation (truncation selection, 50% cull):
   Population: [A1, A2, A3, B1]  (A-type fitness: 100, B-type fitness: 60)
   Survivors: [A1, A2]          (B-type goes extinct!)
 
-With speciation:
-  Species A: [A1, A2, A3] → keeps [A1, A2] (top 66%)
-  Species B: [B1] → keeps [B1] (min_species_size=1)
-  Survivors: [A1, A2, B1]      (B-type survives!)
+With speciation (50% cull, 4 creatures, budget=2, 2 species):
+  Budget allows 1 per species (2 species ≤ 2 budget)
+  Species A: [A1, A2, A3] → gets guaranteed 1
+  Species B: [B1] → gets guaranteed 1
+  Survivors: [A1, B1]          (B-type protected!)
 ```
 
 ### Limitations (Not Implemented Yet)
