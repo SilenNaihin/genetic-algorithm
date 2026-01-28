@@ -203,7 +203,6 @@ async def run_generation(
             'max_frequency': config.max_allowed_frequency,
             'use_fitness_sharing': config.use_fitness_sharing,
             'sharing_radius': config.sharing_radius,
-            'use_speciation': config.use_speciation,
             'compatibility_threshold': config.compatibility_threshold,
             'min_species_size': config.min_species_size,
             # NEAT config

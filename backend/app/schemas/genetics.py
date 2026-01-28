@@ -38,7 +38,7 @@ class DecayConfig(BaseModel):
 class SelectionConfig(BaseModel):
     """Configuration for selection algorithm."""
 
-    method: Literal['truncation', 'tournament', 'rank'] = 'truncation'
+    method: Literal['truncation', 'tournament', 'rank', 'speciation'] = 'truncation'
     survival_rate: float = Field(default=0.5, ge=0.1, le=0.9)  # For truncation
     tournament_size: int = Field(default=3, ge=2, le=10)  # For tournament
 
@@ -66,8 +66,7 @@ class EvolutionConfig(BaseModel):
     # Constraints
     constraints: GenomeConstraints = Field(default_factory=GenomeConstraints)
 
-    # Speciation (diversity protection)
-    use_speciation: bool = False
+    # Speciation parameters (used when selection_method='speciation')
     compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
     min_species_size: int = Field(default=2, ge=1, le=20)
 

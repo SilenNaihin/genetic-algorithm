@@ -26,7 +26,7 @@ export interface SimulationConfig {
   // Evolution
   populationSize: number;       // 100
   cullPercentage: number;       // 0.5 (bottom 50%)
-  selectionMethod: 'truncation' | 'tournament' | 'rank';  // How survivors are selected
+  selectionMethod: 'truncation' | 'tournament' | 'rank' | 'speciation';  // How survivors are selected
   tournamentSize: number;       // For tournament selection: number of contestants per round
   mutationRate: number;         // Per-gene mutation rate (0.1-0.5)
   mutationMagnitude: number;    // How much values change
@@ -83,8 +83,7 @@ export interface SimulationConfig {
   useFitnessSharing: boolean;         // Enable fitness sharing to penalize similar creatures
   sharingRadius: number;              // Genome distance threshold for sharing (0.1-2.0)
 
-  // Speciation (diversity protection)
-  useSpeciation: boolean;             // Enable speciation to group creatures by similarity
+  // Speciation parameters (used when selectionMethod='speciation')
   compatibilityThreshold: number;     // Genome distance threshold for same species (0.1-3.0)
   minSpeciesSize: number;             // Minimum survivors per species (1-20)
 
@@ -178,8 +177,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   useFitnessSharing: false,      // Off by default - enable to maintain diversity
   sharingRadius: 0.5,            // Moderate sharing radius
 
-  // Speciation defaults
-  useSpeciation: false,          // Off by default - enable to protect diverse solutions
+  // Speciation parameters (used when selectionMethod='speciation')
   compatibilityThreshold: 1.0,   // Genome distance threshold for same species
   minSpeciesSize: 2,             // Minimum survivors per species
 

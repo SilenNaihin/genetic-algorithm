@@ -187,8 +187,8 @@ class InnovationCounter(BaseModel):
 #   neat_disjoint_coefficient: float   # Speciation distance tuning
 #   neat_weight_coefficient: float     # Speciation distance tuning
 #
-# When use_neat=True:
-#   - use_speciation is auto-enabled (NEAT requires it)
+# When neural_mode='neat':
+#   - selection_method is auto-set to 'speciation' (NEAT requires it)
 #   - use_fitness_sharing is auto-disabled (redundant)
 #   - neural_hidden_size is ignored (topology evolves)
 #   - Speciation uses neat_genome_distance() instead of neural_genome_distance()

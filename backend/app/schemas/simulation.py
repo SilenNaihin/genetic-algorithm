@@ -34,7 +34,7 @@ class SimulationConfig(BaseModel):
     # Evolution (not used in simulation, but included for parity)
     population_size: int = Field(default=100, ge=10, le=10000)
     cull_percentage: float = Field(default=0.5, ge=0.1, le=0.9)
-    selection_method: Literal['truncation', 'tournament', 'rank'] = 'rank'
+    selection_method: Literal['truncation', 'tournament', 'rank', 'speciation'] = 'rank'
     tournament_size: int = Field(default=3, ge=2, le=10)
     mutation_rate: float = Field(default=0.2, ge=0.0, le=1.0)
     mutation_magnitude: float = Field(default=0.3, ge=0.0, le=1.0)
@@ -91,8 +91,7 @@ class SimulationConfig(BaseModel):
     use_fitness_sharing: bool = False
     sharing_radius: float = Field(default=0.5, ge=0.1, le=2.0)
 
-    # Speciation (diversity protection)
-    use_speciation: bool = False
+    # Speciation parameters (used when selection_method='speciation')
     compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
     min_species_size: int = Field(default=2, ge=1, le=20)
 
@@ -136,10 +135,15 @@ class SimulationConfig(BaseModel):
             if use_neat:
                 data['neural_mode'] = 'neat'
 
+            # Migrate legacy use_speciation to selection_method
+            use_speciation = data.pop('use_speciation', None) or data.pop('useSpeciation', None)
+            if use_speciation:
+                data['selection_method'] = 'speciation'
+
             # ENFORCE NEAT defaults - these are REQUIRED for NEAT to work properly
             # Speciation protects structural innovations until weights adapt
             if data.get('neural_mode') == 'neat':
-                data['use_speciation'] = True  # REQUIRED - without this, topology won't evolve
+                data['selection_method'] = 'speciation'  # REQUIRED - without this, topology won't evolve
                 data['use_fitness_sharing'] = False  # Redundant with speciation
                 # Default to bias_node for NEAT (more faithful to original NEAT)
                 if 'bias_mode' not in data:

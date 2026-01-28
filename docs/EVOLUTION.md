@@ -286,9 +286,11 @@ Each species uses truncation selection internally:
 
 ### Configuration
 
+Speciation is now a selection method. Set `selectionMethod: 'speciation'` to enable.
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `useSpeciation` | `false` | Enable/disable speciation |
+| `selectionMethod` | `'rank'` | Set to `'speciation'` for speciation-based selection |
 | `compatibilityThreshold` | `1.0` | Genome distance threshold for same species |
 | `minSpeciesSize` | `2` | Minimum survivors per species |
 
@@ -341,9 +343,9 @@ With speciation:
 | `weightMutationDecay` | `'linear'` | Decay schedule for weight mutation |
 | `useFitnessSharing` | `false` | Enable fitness sharing for diversity |
 | `sharingRadius` | `0.5` | Genome distance threshold for sharing |
-| `useSpeciation` | `false` | Enable speciation for diversity protection |
-| `compatibilityThreshold` | `1.0` | Genome distance threshold for same species |
-| `minSpeciesSize` | `2` | Minimum survivors per species |
+| `selectionMethod` | `'rank'` | Selection method: 'truncation', 'tournament', 'rank', or 'speciation' |
+| `compatibilityThreshold` | `1.0` | Genome distance threshold for same species (when using speciation) |
+| `minSpeciesSize` | `2` | Minimum survivors per species (when using speciation) |
 
 ## Recommended Configurations
 

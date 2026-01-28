@@ -4,7 +4,19 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Changed
+- **Speciation is now a Selection Method**: Replaced `useSpeciation` toggle with `selectionMethod: 'speciation'`
+  - Selection dropdown now has 4 options: Rank, Tournament, Truncation, Speciation
+  - When NEAT mode enabled, selection is forced to 'speciation' (required for topology evolution)
+  - Migration: Old configs with `useSpeciation: true` automatically convert to `selectionMethod: 'speciation'`
+  - **Breaking**: Removed `useSpeciation` field from SimulationConfig - use `selectionMethod` instead
+
 ### Added
+- **Within-Species Breeding**: Speciation selection now breeds parents within the same species
+  - Offspring slots allocated proportionally to species average fitness
+  - Parents selected using rank-based probabilities within their species
+  - Protects structural innovations by keeping similar genomes together during reproduction
+  - Proper NEAT implementation: speciation groups → within-species survival → within-species breeding
 - **NEAT Initial Connectivity Options**: Configurable starting topology for NEAT networks
   - `full`: All inputs connected to all outputs (standard NEAT, most responsive)
   - `sparse_inputs`: Each input connects to exactly one random output (all sensors used, total = input count)

@@ -51,6 +51,7 @@ export function EvolutionPanel() {
             text={
               config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
               config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
+              config.selectionMethod === 'speciation' ? TOOLTIPS.selectionSpeciation :
               TOOLTIPS.selectionRank
             }
             width={280}
@@ -58,13 +59,20 @@ export function EvolutionPanel() {
         </div>
         <select
           value={config.selectionMethod}
-          onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' })}
+          onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' | 'speciation' })}
           style={selectStyle}
+          disabled={config.neuralMode === 'neat'}  // NEAT requires speciation
         >
           <option value="rank">Rank</option>
           <option value="tournament">Tournament</option>
           <option value="truncation">Truncation</option>
+          <option value="speciation">Speciation</option>
         </select>
+        {config.neuralMode === 'neat' && (
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            NEAT mode requires speciation selection
+          </div>
+        )}
       </div>
 
       {/* Tournament size - only shown when tournament selected */}
@@ -262,41 +270,13 @@ export function EvolutionPanel() {
         </div>
       )}
 
-      <div style={{ marginBottom: '12px' }}>
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer',
-          color: config.neuralMode === 'neat' ? 'var(--text-muted)' : 'var(--text-primary)',
-          fontSize: '13px',
-        }}>
-          <input
-            type="checkbox"
-            checked={config.useSpeciation}
-            disabled={config.neuralMode === 'neat'}
-            onChange={(e) => setConfig({ useSpeciation: e.target.checked })}
-            style={{ width: '16px', height: '16px', cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer', accentColor: 'var(--accent)' }}
-          />
-          Speciation
-          {config.neuralMode === 'neat' && (
-            <span style={{ fontSize: '10px', color: 'var(--accent)' }}>(required)</span>
-          )}
-          <InfoTooltip
-            text={config.neuralMode === 'neat'
-              ? "Required in NEAT mode to protect structural innovations"
-              : TOOLTIPS.speciation}
-            width={280}
-          />
-        </label>
-      </div>
-
-      {config.useSpeciation && (
+      {/* Compatibility threshold - only shown when speciation selected */}
+      {config.selectionMethod === 'speciation' && (
         <div style={{ marginBottom: '4px' }}>
           <ParamSlider
             name="Compatibility"
             value={config.compatibilityThreshold}
-            displayValue={`${config.compatibilityThreshold.toFixed(1)} ${config.compatibilityThreshold <= 0.5 ? '(many)' : config.compatibilityThreshold >= 2.0 ? '(few)' : ''}`}
+            displayValue={`${config.compatibilityThreshold.toFixed(1)} ${config.compatibilityThreshold <= 0.5 ? '(many species)' : config.compatibilityThreshold >= 2.0 ? '(few species)' : ''}`}
             min={0.1}
             max={3.0}
             step={0.1}

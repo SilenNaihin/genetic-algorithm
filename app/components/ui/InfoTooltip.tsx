@@ -134,6 +134,7 @@ export const TOOLTIPS = {
   selectionTruncation: 'Sort all creatures by fitness, keep the top N%. Simple and fast but harsh - creatures just below the cutoff are discarded even if nearly as good. Can lose diversity quickly.',
   selectionTournament: 'Randomly pick N creatures, the fittest wins and gets to breed. Repeat until enough parents selected. Gives weaker creatures a chance if they avoid strong competitors. Tournament size controls pressure.',
   selectionRank: 'Sort by fitness and assign breeding probability by rank (1st place gets most chances, last place fewest). Unlike truncation, even low-ranked creatures can reproduce. Maintains diversity while favoring the fit.',
+  selectionSpeciation: 'Groups creatures into species by genome similarity. Each species keeps its top performers, protecting diverse strategies from being outcompeted. Breeding happens within species. Required for NEAT topology evolution.',
   tournamentSize: 'How many creatures compete in each tournament. Size 2 = weak pressure (50% chance the best wins). Size 5+ = strong pressure (best almost always wins). Lower for exploration, higher for exploitation.',
 
   // Adaptive mutation

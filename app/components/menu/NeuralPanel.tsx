@@ -17,17 +17,17 @@ export function NeuralPanel() {
   useEffect(() => {
     if (config.neuralMode === 'neat') {
       const needsUpdate =
-        !config.useSpeciation ||  // Speciation is REQUIRED
+        config.selectionMethod !== 'speciation' ||  // Speciation is REQUIRED
         config.useFitnessSharing;  // Should be off (redundant with speciation)
 
       if (needsUpdate) {
         setConfig({
-          useSpeciation: true,
+          selectionMethod: 'speciation',
           useFitnessSharing: false,
         });
       }
     }
-  }, [config.neuralMode, config.useSpeciation, config.useFitnessSharing, setConfig]);
+  }, [config.neuralMode, config.selectionMethod, config.useFitnessSharing, setConfig]);
 
   const selectStyle = {
     width: '100%',
@@ -106,10 +106,10 @@ export function NeuralPanel() {
                 const newMode = e.target.value as 'hybrid' | 'pure' | 'neat';
                 // Auto-switch defaults when mode changes
                 if (newMode === 'neat') {
-                  // NEAT mode: enable speciation, disable fitness sharing, use bias node
+                  // NEAT mode: enable speciation selection, disable fitness sharing, use bias node
                   setConfig({
                     neuralMode: newMode,
-                    useSpeciation: true,
+                    selectionMethod: 'speciation',
                     useFitnessSharing: false,
                     biasMode: 'bias_node',  // Original NEAT style
                   });

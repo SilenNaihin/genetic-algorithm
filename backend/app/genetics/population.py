@@ -77,7 +77,7 @@ class EvolutionConfig:
 
     # Selection
     cull_percentage: float = 0.5
-    selection_method: str = 'rank'  # 'truncation', 'tournament', 'rank'
+    selection_method: str = 'rank'  # 'truncation', 'tournament', 'rank', 'speciation'
     tournament_size: int = 3  # For tournament selection
 
     # Adaptive mutation (boost level is computed externally and passed in)
@@ -96,8 +96,7 @@ class EvolutionConfig:
     use_fitness_sharing: bool = False
     sharing_radius: float = 0.5  # Genome distance threshold
 
-    # Speciation (diversity protection)
-    use_speciation: bool = False
+    # Speciation parameters (used when selection_method='speciation')
     compatibility_threshold: float = 1.0  # Genome distance for same species
     min_species_size: int = 2  # Minimum survivors per species
 
@@ -543,18 +542,23 @@ def evolve_population(
         # Derive use_neat first - needed to enforce NEAT defaults
         use_neat = config.get('neural_mode') == 'neat' or config.get('use_neat', False)
 
+        # Migrate legacy use_speciation to selection_method
+        use_speciation = config.get('use_speciation', False) or config.get('useSpeciation', False)
+        selection_method = config.get('selection_method', 'rank')
+        if use_speciation:
+            selection_method = 'speciation'
+
         # ENFORCE NEAT defaults - speciation is REQUIRED for topology to evolve
-        use_speciation = config.get('use_speciation', False)
         use_fitness_sharing = config.get('use_fitness_sharing', False)
         if use_neat:
-            use_speciation = True  # FORCE ON - without this, structural innovations get culled
+            selection_method = 'speciation'  # FORCE ON - without this, structural innovations get culled
             use_fitness_sharing = False  # Redundant with speciation
 
         config = EvolutionConfig(
             population_size=config.get('population_size', 100),
             elite_count=config.get('elite_count', 5),
             cull_percentage=config.get('cull_percentage', 0.5),
-            selection_method=config.get('selection_method', 'rank'),
+            selection_method=selection_method,
             tournament_size=config.get('tournament_size', 3),
             adaptive_boost_level=config.get('adaptive_boost_level', 1.0),
             crossover_rate=config.get('crossover_rate', 0.5),
@@ -564,7 +568,6 @@ def evolve_population(
             sbx_eta=config.get('sbx_eta', 2.0),
             use_fitness_sharing=use_fitness_sharing,
             sharing_radius=config.get('sharing_radius', 0.5),
-            use_speciation=use_speciation,
             compatibility_threshold=config.get('compatibility_threshold', 1.0),
             min_species_size=config.get('min_species_size', 2),
             mutation_rate=config.get('mutation_rate', 0.1),
@@ -633,8 +636,11 @@ def evolve_population(
     survival_rate = 1 - config.cull_percentage
     num_survivors = max(1, int(len(genomes) * survival_rate))
 
-    # Apply speciation if enabled (replaces normal selection with within-species selection)
-    if config.use_speciation:
+    # Species list for within-species breeding (only used when selection_method='speciation')
+    species_list = None
+
+    # Apply speciation if selection_method is 'speciation'
+    if config.selection_method == 'speciation':
         # Speciation groups creatures by genome similarity
         # Selection happens within each species, protecting diverse solutions
         # Use NEAT distance function if NEAT is enabled
@@ -645,7 +651,7 @@ def evolve_population(
                 disjoint_coefficient=config.neat_disjoint_coefficient,
                 weight_coefficient=config.neat_weight_coefficient,
             )
-        survivors, _species_list = apply_speciation(
+        survivors, species_list = apply_speciation(
             genomes,
             selection_fitness,
             config.compatibility_threshold,
@@ -778,25 +784,23 @@ def evolve_population(
     target_size = config.population_size
     new_creatures_needed = target_size - len(survivors)
 
-    # Create new creatures to fill culled slots
-    # Standard GA flow: selection → crossover (optional) → mutation (optional)
-    # Both operators can apply to the same offspring
-    for _ in range(new_creatures_needed):
+    def create_offspring(species_members: list[dict], species_probabilities: dict[str, float]) -> dict:
+        """Create a single offspring from within a species."""
         use_crossover = config.use_crossover
         use_mutation = config.use_mutation
 
         crossover_prob = config.crossover_rate if use_crossover else 0
-        do_crossover = random.random() < crossover_prob and len(survivors) >= 2
+        do_crossover = random.random() < crossover_prob and len(species_members) >= 2
 
         if do_crossover:
-            # Crossover of two survivors
-            parent1 = weighted_random_select(survivors, probabilities)
-            parent2 = weighted_random_select(survivors, probabilities)
+            # Crossover of two parents from same species
+            parent1 = weighted_random_select(species_members, species_probabilities)
+            parent2 = weighted_random_select(species_members, species_probabilities)
 
             # Ensure different parents
             attempts = 0
             while parent2['id'] == parent1['id'] and attempts < 10:
-                parent2 = weighted_random_select(survivors, probabilities)
+                parent2 = weighted_random_select(species_members, species_probabilities)
                 attempts += 1
 
             # Use NEAT crossover if enabled
@@ -819,7 +823,7 @@ def evolve_population(
             )
         else:
             # Clone from single parent
-            parent = weighted_random_select(survivors, probabilities)
+            parent = weighted_random_select(species_members, species_probabilities)
             child = clone_genome(parent, constraints)
             reproduction_type = 'clone'
             # Clone inherits parent's ancestry chain
@@ -848,7 +852,48 @@ def evolve_population(
         # New offspring start at next generation with 0 survival streak
         child['generation'] = next_gen
         child['survivalStreak'] = 0
-        new_genomes.append(child)
+        return child
+
+    # Create new creatures to fill culled slots
+    if species_list is not None and len(species_list) > 0:
+        # WITHIN-SPECIES BREEDING (speciation mode)
+        # Allocate offspring slots proportional to species average fitness
+        total_avg_fitness = sum(max(0.01, s.avg_fitness) for s in species_list)
+
+        # Calculate offspring allocation per species
+        offspring_per_species = []
+        allocated = 0
+        for i, species in enumerate(species_list):
+            if i == len(species_list) - 1:
+                # Last species gets remaining to avoid rounding errors
+                count = max(0, new_creatures_needed - allocated)
+            else:
+                # Proportional allocation based on average fitness
+                proportion = max(0.01, species.avg_fitness) / total_avg_fitness
+                count = round(new_creatures_needed * proportion)
+                # Cap to not exceed remaining slots
+                count = min(count, new_creatures_needed - allocated)
+            offspring_per_species.append(count)
+            allocated += count
+
+        # Breed within each species
+        for species, offspring_count in zip(species_list, offspring_per_species):
+            if species.size == 0 or offspring_count == 0:
+                continue
+
+            # Calculate probabilities within this species
+            species_probs = rank_based_probabilities(species.members, species.fitness_scores)
+
+            # Create offspring for this species
+            for _ in range(offspring_count):
+                child = create_offspring(species.members, species_probs)
+                new_genomes.append(child)
+    else:
+        # GLOBAL BREEDING (non-speciation selection methods)
+        # Standard GA flow: selection → crossover (optional) → mutation (optional)
+        for _ in range(new_creatures_needed):
+            child = create_offspring(survivors, probabilities)
+            new_genomes.append(child)
 
     # Clear innovation cache at end of generation (same structural mutation
     # in different creatures within a generation should get same innovation ID,

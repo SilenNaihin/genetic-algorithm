@@ -411,7 +411,22 @@
     ]
   },
   "maybe_add": {
-    "description": "Alternative mutation strategies to explore if Gaussian mutation proves insufficient",
+    "description": "Alternative strategies to explore for improved evolution",
+    "interspecies_mating": {
+      "name": "Interspecies Mating Rate",
+      "description": "Allow occasional breeding between different species for genetic diversity",
+      "rationale": "Standard NEAT breeds only within species to protect innovations. However, occasional cross-species mating can introduce beneficial diversity by combining successful traits from different niches.",
+      "parameters": {
+        "interspecies_mating_rate": "Probability of selecting second parent from different species (default 0.0, range 0.0-0.1)"
+      },
+      "implementation_notes": [
+        "When selecting parent2, with probability interspecies_mating_rate, pick from a different species",
+        "Choose the other species randomly weighted by species average fitness",
+        "Keep rate low (1-5%) to avoid creating incompatible offspring",
+        "NEAT crossover already handles mismatched topologies via innovation numbers"
+      ],
+      "risk": "Too high a rate defeats the purpose of speciation - innovations get mixed before optimizing"
+    },
     "mutation_variants": [
       {
         "name": "Cauchy Mutation",

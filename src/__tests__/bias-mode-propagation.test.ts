@@ -265,7 +265,7 @@ describe('bias_mode Propagation', () => {
         ...DEFAULT_CONFIG,
         neuralMode: 'neat',
         biasMode: 'bias_node',
-        useSpeciation: true,
+        selectionMethod: 'speciation',
         useFitnessSharing: false,
         neatAddConnectionRate: 0.05,
         neatAddNodeRate: 0.03,

@@ -588,7 +588,7 @@ class TestNEATConfigIntegrationWithSpeciation:
             'neural_mode': 'neat',
             'population_size': 20,
             'cull_percentage': 0.5,
-            'use_speciation': False,  # Try to turn off - should be overridden
+            'selection_method': 'rank',  # Try to use rank - should be overridden to 'speciation'
             'compatibility_threshold': 1.0,
             'bias_mode': 'bias_node',
         }

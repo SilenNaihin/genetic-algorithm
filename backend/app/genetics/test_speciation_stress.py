@@ -234,7 +234,7 @@ class TestIntegrationWithEvolution:
         # Evolve with speciation enabled
         config = {
             "population_size": 50,
-            "use_speciation": True,
+            "selection_method": "speciation",
             "compatibility_threshold": 1.0,
             "min_species_size": 2,
             "cull_percentage": 0.5,
@@ -287,7 +287,7 @@ class TestIntegrationWithEvolution:
         # Enable both speciation and fitness sharing
         config = {
             "population_size": 30,
-            "use_speciation": True,
+            "selection_method": "speciation",
             "compatibility_threshold": 1.0,
             "min_species_size": 2,
             "use_fitness_sharing": True,
@@ -311,7 +311,7 @@ class TestMultiGenerationScenarios:
 
         config = {
             "population_size": 50,
-            "use_speciation": True,
+            "selection_method": "speciation",
             "compatibility_threshold": 0.8,
             "min_species_size": 2,
             "cull_percentage": 0.5,
@@ -340,7 +340,7 @@ class TestMultiGenerationScenarios:
 
         config = {
             "population_size": 20,
-            "use_speciation": True,
+            "selection_method": "speciation",
             "compatibility_threshold": 1.0,
             "min_species_size": 1,
             "cull_percentage": 0.5,
@@ -549,7 +549,7 @@ class TestSurvivorCountEdgeCases:
 
             config = {
                 "population_size": pop_size,
-                "use_speciation": True,
+                "selection_method": "speciation",
                 "compatibility_threshold": 0.8,
                 "min_species_size": 2,
                 "cull_percentage": 0.5,
@@ -777,7 +777,7 @@ class TestRealWorldScenarios:
 
         config = {
             "population_size": 30,
-            "use_speciation": True,
+            "selection_method": "speciation",
             "compatibility_threshold": 0.8,
             "min_species_size": 2,
             "cull_percentage": 0.5,

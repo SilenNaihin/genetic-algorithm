@@ -209,7 +209,7 @@ class TestEvolvePopulationNeat:
         config = EvolutionConfig(
             population_size=30,
             use_neat=True,
-            use_speciation=True,
+            selection_method='speciation',
             compatibility_threshold=3.0,
             min_species_size=2,
         )

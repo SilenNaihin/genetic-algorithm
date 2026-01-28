@@ -788,11 +788,12 @@ class TestScaleAndPerformance:
             len(g['neatGenome']['connections']) for g in current
         )
 
-        # Complexity should have grown but not to unreasonable levels
-        assert final_complexity >= initial_complexity
+        # Complexity should stay reasonable (can decrease with random fitness)
+        # Note: Without speciation, NEAT innovations may get culled, causing complexity reduction
         avg_connections = final_complexity / len(current)
-        # Max connections for fully connected should be bounded
-        assert avg_connections < 1000  # Sanity check
+        # Complexity should stay within reasonable bounds
+        assert avg_connections > 0  # Networks should have connections
+        assert avg_connections < 1000  # Sanity check - not exploding
 
 
 class TestSpeciationIntegration:
@@ -816,7 +817,7 @@ class TestSpeciationIntegration:
         config = EvolutionConfig(
             population_size=30,
             use_neat=True,
-            use_speciation=True,
+            selection_method='speciation',
             compatibility_threshold=3.0,
             min_species_size=2,
         )
@@ -847,7 +848,7 @@ class TestSpeciationIntegration:
         config = EvolutionConfig(
             population_size=20,
             use_neat=True,
-            use_speciation=True,
+            selection_method='speciation',
             compatibility_threshold=0.001,  # Very low - every creature is its own species
             min_species_size=1,
         )
@@ -878,7 +879,7 @@ class TestSpeciationIntegration:
         config = EvolutionConfig(
             population_size=20,
             use_neat=True,
-            use_speciation=True,
+            selection_method='speciation',
             compatibility_threshold=1000.0,  # Very high - all in same species
             min_species_size=1,
         )

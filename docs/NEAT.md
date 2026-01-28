@@ -625,7 +625,7 @@ Neural Panel:
 
 ### Automatic Behavior When NEAT Enabled
 
-- `use_speciation` → **auto-enabled** (NEAT requires speciation)
+- `selection_method` → **auto-set to 'speciation'** (NEAT requires speciation)
 - `use_fitness_sharing` → **auto-disabled** (redundant with speciation)
 - `neural_hidden_size` → **ignored** (topology evolves)
 - Speciation distance function → **switches to `neat_genome_distance()`**
