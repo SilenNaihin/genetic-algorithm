@@ -35,6 +35,18 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - Edge case tests (single input/output, many inputs/few outputs, etc.)
 
 ### Fixed
+- **NEAT Clones Not Getting Mutated**: Fixed NEAT topologies not evolving when `useMutation=false`
+  - Bug: Clone offspring (50% of population with default crossover rate) never got NEAT structural mutations
+  - Root cause: `should_mutate = do_crossover or use_mutation` excluded clones when `use_mutation=False`
+  - Symptom: After 51 generations, creatures had 0 input connections - only bias-to-output connections
+  - Fix: Changed to `should_mutate = config.use_neat or do_crossover or use_mutation`
+  - NEAT mode now always applies mutations to enable topology evolution
+- **Velocity Sensor Oscillation**: Fixed velocity inputs oscillating ±1 for nearly stationary creatures
+  - Bug: Velocity was normalized to unit vector - tiny physics jitter normalized to ±1
+  - Root cause: `velocity / magnitude` with threshold 1e-6 still triggered on micro-movements
+  - Symptom: vel_x/vel_y inputs had 100+ sign changes per simulation for barely moving creatures
+  - Fix: Changed to magnitude-scaled velocity (`velocity / max_velocity`) clamped to [-1, 1]
+  - Now stationary creatures get ~0 velocity inputs, moving creatures get proportional signal
 - **NEAT Topological Sort with Bias Neurons**: Fixed "Network contains a cycle!" error when using `none` connectivity with `bias_node` mode
   - Bug: Bias neurons were included in topological sort queue but excluded from expected count
   - Fix: Changed queue initialization to exclude bias neurons (same as input neurons)

@@ -179,21 +179,23 @@ def gather_sensor_inputs(
     pellet_dist = torch.norm(to_pellet, dim=1, keepdim=True).clamp(min=1e-8)  # [B, 1]
     pellet_direction = to_pellet / pellet_dist  # [B, 3]
 
-    # Velocity direction: unit vector of movement
+    # Velocity: scaled by magnitude, not just direction
+    # This gives the NN meaningful speed information instead of just direction.
+    # Jittering creatures (tiny movements) get ~0 instead of random ±1.
     velocity = current_com - previous_com  # [B, 3]
-    velocity_mag = torch.norm(velocity, dim=1, keepdim=True).clamp(min=1e-8)  # [B, 1]
-    velocity_direction = velocity / velocity_mag  # [B, 3]
 
-    # Handle stationary creatures (velocity_mag ≈ 0)
-    stationary_mask = velocity_mag.squeeze(-1) < 1e-6
-    velocity_direction[stationary_mask] = 0
+    # Scale by a reasonable max velocity (units per frame at 60 FPS)
+    # At 60 FPS, max_velocity=0.1 means ~6 units/sec is "full speed"
+    max_velocity_per_frame = 0.1
+    velocity_scaled = velocity / max_velocity_per_frame  # [B, 3]
+    velocity_scaled = velocity_scaled.clamp(-1.0, 1.0)  # Cap to [-1, 1]
 
     # Normalized distance (0 = at pellet, 1 = far away)
     normalized_distance = (pellet_dist.squeeze(-1) / max_pellet_distance).clamp(0, 1)  # [B]
 
     # Use unified function for all modes - time_encoding determines input count
     return gather_sensor_inputs_with_time(
-        pellet_direction, velocity_direction, normalized_distance,
+        pellet_direction, velocity_scaled, normalized_distance,
         simulation_time, time_encoding, max_time
     )
 
