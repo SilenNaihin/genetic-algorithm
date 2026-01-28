@@ -538,6 +538,208 @@ class TestMutateNeatGenome:
             assert conn.from_node in neuron_ids
             assert conn.to_node in neuron_ids
 
+    def test_bias_only_genome_gets_input_connections(self):
+        """
+        A genome with only bias->output connections should gain input connections.
+
+        This tests the bug where genomes starting with initial_connectivity=none
+        would never evolve input connections because:
+        1. add_node can't split bias->output (creates no input path)
+        2. The elif structure meant add_connection was skipped when add_node was tried
+
+        After 100 mutations with high rates, the genome MUST have at least one
+        connection from an input neuron to prove topology is evolving.
+        """
+        random.seed(42)
+
+        # Create genome with only bias->output connections (like initial_connectivity=none)
+        genome = NEATGenome(
+            neurons=[
+                NeuronGene(id=0, type='bias'),
+                NeuronGene(id=1, type='input'),
+                NeuronGene(id=2, type='input'),
+                NeuronGene(id=3, type='input'),
+                NeuronGene(id=4, type='output'),
+                NeuronGene(id=5, type='output'),
+            ],
+            connections=[
+                # Only bias -> output connections
+                ConnectionGene(from_node=0, to_node=4, weight=0.5, enabled=True, innovation=0),
+                ConnectionGene(from_node=0, to_node=5, weight=-0.5, enabled=True, innovation=1),
+            ],
+        )
+        counter = InnovationCounter(next_connection=10)
+
+        # Run mutations with high structural rates
+        for _ in range(100):
+            genome = mutate_neat_genome(
+                genome,
+                counter,
+                add_connection_rate=0.3,  # High rate
+                add_node_rate=0.1,
+            )
+
+        # Check if ANY input neuron has an outgoing connection
+        input_ids = {1, 2, 3}
+        connections_from_inputs = [c for c in genome.connections if c.from_node in input_ids]
+
+        assert len(connections_from_inputs) > 0, (
+            f"After 100 mutations, genome still has no input connections! "
+            f"Connections: {[(c.from_node, c.to_node) for c in genome.connections]}"
+        )
+
+    def test_bias_only_genome_realistic_rates(self):
+        """
+        Test with realistic mutation rates (5% add_connection, 3% add_node).
+
+        This simulates 50 generations of evolution with realistic rates.
+        With 100 creatures per generation and 50% cull rate, roughly 50 new
+        creatures are created per generation, each getting a mutation attempt.
+
+        Total mutation opportunities: 50 gen × 50 creatures = 2500 attempts
+        Expected add_connection attempts: 2500 × 0.05 = ~125
+
+        CRITICAL: This test exposes a bug where the elif structure means
+        add_connection is only tried when add_node doesn't fire. The actual
+        probability of attempting add_connection is:
+        P(add_connection tried) = (1 - 0.03) × 0.05 = 0.0485 (4.85%, not 5%)
+
+        Worse: if add_node fires but fails (no connections to split on a
+        bias-only genome), we STILL skip add_connection due to elif.
+        """
+        random.seed(123)
+
+        # Create genome like initial_connectivity=none (only bias->output)
+        genome = NEATGenome(
+            neurons=[
+                NeuronGene(id=0, type='bias'),
+                NeuronGene(id=1, type='input'),
+                NeuronGene(id=2, type='input'),
+                NeuronGene(id=3, type='input'),
+                NeuronGene(id=4, type='input'),
+                NeuronGene(id=5, type='input'),
+                NeuronGene(id=6, type='input'),
+                NeuronGene(id=7, type='input'),
+                NeuronGene(id=8, type='output'),
+                NeuronGene(id=9, type='output'),
+                NeuronGene(id=10, type='output'),
+            ],
+            connections=[
+                # Only bias -> output connections
+                ConnectionGene(from_node=0, to_node=8, weight=0.3, enabled=True, innovation=0),
+                ConnectionGene(from_node=0, to_node=9, weight=-0.4, enabled=True, innovation=1),
+                ConnectionGene(from_node=0, to_node=10, weight=0.1, enabled=True, innovation=2),
+            ],
+        )
+        counter = InnovationCounter(next_connection=10)
+
+        # Simulate 2500 mutation attempts (50 generations × 50 new creatures)
+        for _ in range(2500):
+            genome = mutate_neat_genome(
+                genome,
+                counter,
+                add_connection_rate=0.05,  # Realistic rate
+                add_node_rate=0.03,  # Realistic rate
+            )
+
+        # After 2500 mutation attempts, we expect ~125 successful add_connection
+        # attempts. Even accounting for randomness, we should have MANY connections
+        # from inputs by now.
+        input_ids = {1, 2, 3, 4, 5, 6, 7}
+        connections_from_inputs = [c for c in genome.connections if c.from_node in input_ids]
+
+        # With 7 inputs × 3 outputs = 21 possible input->output connections,
+        # plus hidden nodes that may have been added, we should have quite a few
+        assert len(connections_from_inputs) >= 5, (
+            f"After 2500 mutations (50 generations), only {len(connections_from_inputs)} "
+            f"connections from inputs! This suggests topology isn't evolving. "
+            f"Total connections: {len(genome.connections)}, "
+            f"Hidden nodes: {len(genome.get_hidden_neurons())}"
+        )
+
+
+class TestNEATAlwaysMutates:
+    """Tests that NEAT mode always applies mutations, regardless of use_mutation setting."""
+
+    def test_neat_clones_get_mutated(self):
+        """
+        In NEAT mode, even clone offspring should get mutated.
+
+        This tests the fix for a bug where with use_mutation=False and
+        crossover_rate=0.5, 50% of offspring were clones that never got
+        mutated, preventing topology evolution.
+        """
+        random.seed(42)
+
+        from app.genetics.population import evolve_population
+        from app.schemas.neat import InnovationCounter
+
+        # Create 10 identical genomes (will be in same species)
+        genomes = []
+        for i in range(10):
+            genomes.append({
+                'id': f'creature_{i}',
+                'nodes': [{'id': 'n0', 'position': {'x': 0, 'y': 0, 'z': 0}, 'size': 0.3, 'friction': 0.5}],
+                'muscles': [
+                    {'id': 'm0', 'nodeA': 'n0', 'nodeB': 'n0', 'restLength': 1, 'stiffness': 100, 'damping': 2,
+                     'frequency': 1, 'amplitude': 0.3, 'phase': 0, 'directionBias': {'x': 0, 'y': 0, 'z': 0},
+                     'biasStrength': 0, 'velocityBias': {'x': 0, 'y': 0, 'z': 0}, 'velocityStrength': 0,
+                     'distanceBias': 0, 'distanceStrength': 0},
+                ],
+                'neatGenome': {
+                    'neurons': [
+                        {'id': 0, 'type': 'bias', 'bias': 0.0},
+                        {'id': 1, 'type': 'input', 'bias': 0.0},
+                        {'id': 2, 'type': 'output', 'bias': 0.0},
+                    ],
+                    'connections': [
+                        # Only bias->output (like initial_connectivity=none)
+                        {'from_node': 0, 'to_node': 2, 'weight': 0.5, 'enabled': True, 'innovation': 0},
+                    ],
+                    'activation': 'tanh',
+                },
+                'controllerType': 'neural',
+                'survivalStreak': 0,
+                'generation': 0,
+            })
+
+        config = {
+            'population_size': 10,
+            'cull_percentage': 0.5,
+            'selection_method': 'speciation',
+            'crossover_rate': 0.0,  # NO crossover - all offspring are clones
+            'use_mutation': False,  # Standard "no mutation" setting
+            'use_crossover': False,
+            'compatibility_threshold': 10.0,  # High threshold = all same species
+            'use_neat': True,
+            'neat_add_connection_rate': 1.0,  # 100% rate to guarantee mutation
+            'neat_add_node_rate': 0.0,
+        }
+
+        counter = InnovationCounter()
+        fitness = [100 - i for i in range(10)]
+
+        # Run evolution - without the fix, no mutations would happen
+        new_genomes, stats = evolve_population(genomes, fitness, config, generation=1, innovation_counter=counter)
+
+        # Get newborns (should all be clones since crossover_rate=0)
+        newborns = [g for g in new_genomes if g.get('survivalStreak', 0) == 0]
+
+        # Check that mutations were applied despite use_mutation=False
+        connections_added = 0
+        for g in newborns:
+            neat = g.get('neatGenome') or g.get('neat_genome', {})
+            if neat:
+                conns = len(neat.get('connections', []))
+                if conns > 1:  # Started with 1, should have more after mutation
+                    connections_added += 1
+
+        assert connections_added > 0, (
+            f"No mutations applied to clone offspring in NEAT mode! "
+            f"With neat_add_connection_rate=1.0, ALL newborns should have new connections. "
+            f"This suggests NEAT clones are not being mutated."
+        )
+
 
 class TestInnovationTracking:
     """Tests for innovation ID tracking across mutations."""

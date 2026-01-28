@@ -830,9 +830,9 @@ def evolve_population(
             child['ancestryChain'] = list(parent.get('ancestryChain', []))
 
         # Apply mutation to offspring
-        # - Crossover offspring ALWAYS get mutated (standard GA: crossover + mutation)
-        # - Clone offspring only get mutated if use_mutation is True ("just mutation" mode)
-        should_mutate = do_crossover or use_mutation
+        # - NEAT mode: ALWAYS mutate (structural mutations required for topology evolution)
+        # - Standard mode: Crossover offspring always mutated, clones only if use_mutation
+        should_mutate = config.use_neat or do_crossover or use_mutation
 
         if should_mutate:
             if config.use_neat:
