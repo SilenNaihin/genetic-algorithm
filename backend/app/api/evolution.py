@@ -166,16 +166,6 @@ async def run_generation(
         )
         prev_creatures_map = {c.id: c for c in creatures_result.scalars().all()}
 
-        # Calculate survivor count based on cull percentage
-        survivor_count = int(len(prev_performances) * (1 - config.cull_percentage))
-        survivor_creature_ids = {prev_performances[i].creature_id for i in range(survivor_count)}
-
-        # Mark culled creatures as dead
-        for perf in prev_performances[survivor_count:]:
-            creature = prev_creatures_map.get(perf.creature_id)
-            if creature and creature.death_generation is None:
-                creature.death_generation = current_gen - 1
-
         # Prepare genomes and fitness scores for evolution
         prev_genomes = [prev_creatures_map[p.creature_id].genome for p in prev_performances]
         prev_fitness = [p.fitness for p in prev_performances]
@@ -268,6 +258,12 @@ async def run_generation(
         # Calculate culled IDs (creatures from previous gen that didn't survive)
         all_prev_ids = {p.creature_id for p in prev_performances}
         culled_ids = all_prev_ids - survivor_ids
+
+        # Mark culled creatures as dead (based on actual selection method, not truncation)
+        for creature_id in culled_ids:
+            creature = prev_creatures_map.get(creature_id)
+            if creature and creature.death_generation is None:
+                creature.death_generation = current_gen - 1
 
     # Simulate all creatures
     start_time = time.time()
