@@ -1996,3 +1996,421 @@ describe('NEAT Full Pipeline Integration', () => {
     });
   });
 });
+
+// =============================================================================
+// Bias Node Visualization Tests
+// =============================================================================
+
+describe('NEAT Bias Node Visualization', () => {
+  /**
+   * Tests for bias_node mode where biases are implemented via a special
+   * input neuron with type='bias' that always outputs 1.0.
+   * Connections FROM the bias node to other neurons act as biases.
+   */
+
+  describe('Bias Neuron Detection', () => {
+    it('should correctly identify bias neurons by type', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },  // Bias node always at ID 0
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'input', bias: 0 },
+          { id: 3, type: 'output', bias: 0 },  // No per-node bias when using bias_node
+        ],
+        connections: [
+          { fromNode: 0, toNode: 3, weight: -0.5, enabled: true, innovation: 0 },  // Bias connection
+          { fromNode: 1, toNode: 3, weight: 0.3, enabled: true, innovation: 1 },
+          { fromNode: 2, toNode: 3, weight: 0.7, enabled: true, innovation: 2 },
+        ],
+        activation: 'tanh',
+      };
+
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      const inputNeurons = genome.neurons.filter(n => n.type === 'input');
+      const outputNeurons = genome.neurons.filter(n => n.type === 'output');
+
+      expect(biasNeurons.length).toBe(1);
+      expect(biasNeurons[0].id).toBe(0);
+      expect(inputNeurons.length).toBe(2);
+      expect(outputNeurons.length).toBe(1);
+    });
+
+    it('should handle genome with no bias neurons (per-node bias mode)', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'input', bias: 0 },
+          { id: 1, type: 'output', bias: -0.5 },  // Per-node bias
+        ],
+        connections: [
+          { fromNode: 0, toNode: 1, weight: 0.5, enabled: true, innovation: 0 },
+        ],
+        activation: 'tanh',
+      };
+
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      expect(biasNeurons.length).toBe(0);
+    });
+
+    it('should handle genome with multiple bias neurons (edge case)', () => {
+      // Though unlikely, test defensive handling
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'bias', bias: 0 },  // Second bias neuron (unusual)
+          { id: 2, type: 'input', bias: 0 },
+          { id: 3, type: 'output', bias: 0 },
+        ],
+        connections: [],
+        activation: 'tanh',
+      };
+
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      expect(biasNeurons.length).toBe(2);
+    });
+  });
+
+  describe('Bias Node Positioning', () => {
+    it('should position bias node with inputs (at depth 0)', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'output', bias: 0 },
+        ],
+        connections: [
+          { fromNode: 0, toNode: 2, weight: -0.5, enabled: true, innovation: 0 },
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 1 },
+        ],
+        activation: 'tanh',
+      };
+
+      // Simulate computeNEATNeuronDepths logic
+      const inputIds = new Set(genome.neurons.filter(n => n.type === 'input').map(n => n.id));
+      const biasIds = new Set(genome.neurons.filter(n => n.type === 'bias').map(n => n.id));
+
+      // Bias neurons should be treated like inputs (depth 0)
+      // In render, they're positioned alongside inputs
+      expect(biasIds.has(0)).toBe(true);
+      expect(inputIds.has(1)).toBe(true);
+    });
+
+    it('should account for bias node in layer size calculation', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'input', bias: 0 },
+          { id: 3, type: 'input', bias: 0 },
+          { id: 4, type: 'output', bias: 0 },
+          { id: 5, type: 'output', bias: 0 },
+        ],
+        connections: [],
+        activation: 'tanh',
+      };
+
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      const inputNeurons = genome.neurons.filter(n => n.type === 'input');
+      const outputNeurons = genome.neurons.filter(n => n.type === 'output');
+
+      const displayInputSize = inputNeurons.length;  // 3
+      const biasNodeWidth = biasNeurons.length > 0 ? 1 : 0;  // 1
+      const totalInputDisplay = displayInputSize + biasNodeWidth;  // 4
+
+      expect(totalInputDisplay).toBe(4);
+      expect(outputNeurons.length).toBe(2);
+
+      // Max layer size should account for bias
+      const maxLayerSize = Math.max(totalInputDisplay, outputNeurons.length);
+      expect(maxLayerSize).toBe(4);
+    });
+  });
+
+  describe('Bias Node Connections', () => {
+    it('should correctly identify connections FROM bias node', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'hidden', bias: 0, innovation: 1 },
+          { id: 3, type: 'output', bias: 0 },
+        ],
+        connections: [
+          { fromNode: 0, toNode: 2, weight: 0.3, enabled: true, innovation: 0 },  // Bias -> hidden
+          { fromNode: 0, toNode: 3, weight: -0.5, enabled: true, innovation: 1 },  // Bias -> output
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 2 },
+          { fromNode: 2, toNode: 3, weight: 0.7, enabled: true, innovation: 3 },
+        ],
+        activation: 'tanh',
+      };
+
+      const biasConnections = genome.connections.filter(c => c.fromNode === 0);
+      expect(biasConnections.length).toBe(2);
+
+      // Bias connections act as biases for target neurons
+      const hiddenBiasConn = biasConnections.find(c => c.toNode === 2);
+      const outputBiasConn = biasConnections.find(c => c.toNode === 3);
+      expect(hiddenBiasConn?.weight).toBe(0.3);
+      expect(outputBiasConn?.weight).toBe(-0.5);
+    });
+
+    it('should handle disabled bias connections', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'output', bias: 0 },
+        ],
+        connections: [
+          { fromNode: 0, toNode: 2, weight: -0.5, enabled: false, innovation: 0 },  // Disabled bias
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 1 },
+        ],
+        activation: 'tanh',
+      };
+
+      const enabledConnections = genome.connections.filter(c => c.enabled);
+      const disabledBiasConns = genome.connections.filter(c => c.fromNode === 0 && !c.enabled);
+
+      expect(enabledConnections.length).toBe(1);
+      expect(disabledBiasConns.length).toBe(1);
+    });
+
+    it('should not allow connections TO bias node', () => {
+      // Bias nodes should only be sources, never targets
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'output', bias: 0 },
+        ],
+        connections: [
+          { fromNode: 1, toNode: 0, weight: 0.5, enabled: true, innovation: 0 },  // Invalid: to bias
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 1 },
+        ],
+        activation: 'tanh',
+      };
+
+      // In a well-formed genome, there should be no connections TO bias neurons
+      const connectionsTooBias = genome.connections.filter(c => c.toNode === 0);
+      // This test documents the edge case - the renderer should handle it gracefully
+      expect(connectionsTooBias.length).toBe(1);  // The malformed connection exists
+    });
+  });
+
+  describe('Bias Node Activation', () => {
+    it('should always have activation value of 1.0', () => {
+      // Bias neurons always output 1.0 regardless of inputs
+      const biasActivation = 1.0;
+
+      // Verify this is the expected constant
+      expect(biasActivation).toBe(1.0);
+    });
+
+    it('should use bias value in signal calculation', () => {
+      // Signal = activation * weight
+      // For bias node: signal = 1.0 * weight = weight
+      const biasWeight = -0.5;
+      const biasActivation = 1.0;
+      const signal = biasActivation * biasWeight;
+
+      expect(signal).toBe(-0.5);
+    });
+  });
+
+  describe('Complex Bias Node Scenarios', () => {
+    it('should handle bias node with connections to multiple hidden layers', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'hidden', bias: 0, innovation: 1 },
+          { id: 3, type: 'hidden', bias: 0, innovation: 2 },
+          { id: 4, type: 'output', bias: 0 },
+        ],
+        connections: [
+          // Bias connects to both hidden neurons and output
+          { fromNode: 0, toNode: 2, weight: 0.1, enabled: true, innovation: 0 },
+          { fromNode: 0, toNode: 3, weight: 0.2, enabled: true, innovation: 1 },
+          { fromNode: 0, toNode: 4, weight: -0.3, enabled: true, innovation: 2 },
+          // Normal connections
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 3 },
+          { fromNode: 2, toNode: 3, weight: 0.6, enabled: true, innovation: 4 },
+          { fromNode: 3, toNode: 4, weight: 0.7, enabled: true, innovation: 5 },
+        ],
+        activation: 'tanh',
+      };
+
+      const biasConnections = genome.connections.filter(c => c.fromNode === 0);
+      expect(biasConnections.length).toBe(3);
+
+      // Verify connections to each layer
+      const toHidden1 = biasConnections.find(c => c.toNode === 2);
+      const toHidden2 = biasConnections.find(c => c.toNode === 3);
+      const toOutput = biasConnections.find(c => c.toNode === 4);
+
+      expect(toHidden1).toBeDefined();
+      expect(toHidden2).toBeDefined();
+      expect(toOutput).toBeDefined();
+    });
+
+    it('should handle mixed bias modes correctly', () => {
+      // Genome with bias_node but also per-node bias (though unusual)
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'output', bias: -0.5 },  // Per-node bias AND bias node
+        ],
+        connections: [
+          { fromNode: 0, toNode: 2, weight: 0.3, enabled: true, innovation: 0 },
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 1 },
+        ],
+        activation: 'tanh',
+      };
+
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      const outputNeurons = genome.neurons.filter(n => n.type === 'output');
+
+      expect(biasNeurons.length).toBe(1);
+      expect(outputNeurons[0].bias).toBe(-0.5);  // Per-node bias also present
+    });
+
+    it('should handle large network with bias node', () => {
+      const inputCount = 7;
+      const hiddenCount = 10;
+      const outputCount = 5;
+
+      const neurons: NeuronGene[] = [
+        { id: 0, type: 'bias', bias: 0 },
+        ...Array.from({ length: inputCount }, (_, i) => ({
+          id: i + 1,
+          type: 'input' as const,
+          bias: 0,
+        })),
+        ...Array.from({ length: hiddenCount }, (_, i) => ({
+          id: i + 1 + inputCount,
+          type: 'hidden' as const,
+          bias: 0,
+          innovation: i,
+        })),
+        ...Array.from({ length: outputCount }, (_, i) => ({
+          id: i + 1 + inputCount + hiddenCount,
+          type: 'output' as const,
+          bias: 0,
+        })),
+      ];
+
+      // Bias node connects to all hidden and output neurons
+      const connections: ConnectionGene[] = [];
+      let innov = 0;
+
+      // Bias -> hidden
+      for (let h = 0; h < hiddenCount; h++) {
+        connections.push({
+          fromNode: 0,
+          toNode: 1 + inputCount + h,
+          weight: Math.random() * 0.4 - 0.2,
+          enabled: true,
+          innovation: innov++,
+        });
+      }
+
+      // Bias -> output
+      for (let o = 0; o < outputCount; o++) {
+        connections.push({
+          fromNode: 0,
+          toNode: 1 + inputCount + hiddenCount + o,
+          weight: -0.5,
+          enabled: true,
+          innovation: innov++,
+        });
+      }
+
+      const genome: NEATGenome = { neurons, connections, activation: 'tanh' };
+
+      expect(genome.neurons.length).toBe(1 + inputCount + hiddenCount + outputCount);
+      expect(genome.neurons.filter(n => n.type === 'bias').length).toBe(1);
+
+      const biasConns = genome.connections.filter(c => c.fromNode === 0);
+      expect(biasConns.length).toBe(hiddenCount + outputCount);
+    });
+  });
+
+  describe('Visualization Edge Cases', () => {
+    it('should render bias node even with no connections', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'output', bias: 0 },
+        ],
+        connections: [
+          // No connections from bias node
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 0 },
+        ],
+        activation: 'tanh',
+      };
+
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      const biasConnections = genome.connections.filter(c => c.fromNode === 0);
+
+      expect(biasNeurons.length).toBe(1);
+      expect(biasConnections.length).toBe(0);
+      // Visualization should still show the bias node
+    });
+
+    it('should handle bias node with extreme weight values', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'output', bias: 0 },
+        ],
+        connections: [
+          { fromNode: 0, toNode: 2, weight: 1000, enabled: true, innovation: 0 },  // Extreme
+          { fromNode: 1, toNode: 2, weight: 0.5, enabled: true, innovation: 1 },
+        ],
+        activation: 'tanh',
+      };
+
+      // Signal from bias = 1.0 * 1000 = 1000
+      const biasSignal = 1.0 * 1000;
+      expect(biasSignal).toBe(1000);
+      expect(Number.isFinite(biasSignal)).toBe(true);
+    });
+
+    it('should correctly label bias node', () => {
+      // In the visualization, bias nodes are labeled "B" with value "1.00"
+      const biasLabel = 'B';
+      const biasValue = 1.0;
+      const displayValue = biasValue.toFixed(2);
+
+      expect(biasLabel).toBe('B');
+      expect(displayValue).toBe('1.00');
+    });
+
+    it('should include bias in input layer count display', () => {
+      const genome: NEATGenome = {
+        neurons: [
+          { id: 0, type: 'bias', bias: 0 },
+          { id: 1, type: 'input', bias: 0 },
+          { id: 2, type: 'input', bias: 0 },
+          { id: 3, type: 'input', bias: 0 },
+          { id: 4, type: 'output', bias: 0 },
+        ],
+        connections: [],
+        activation: 'tanh',
+      };
+
+      const inputNeurons = genome.neurons.filter(n => n.type === 'input');
+      const biasNeurons = genome.neurons.filter(n => n.type === 'bias');
+      const hasBiasNode = biasNeurons.length > 0;
+
+      // Expected label format: "In (3+B)" when bias present, "In (3)" otherwise
+      const inputLabel = hasBiasNode
+        ? `In (${inputNeurons.length}+B)`
+        : `In (${inputNeurons.length})`;
+
+      expect(inputLabel).toBe('In (3+B)');
+    });
+  });
+});

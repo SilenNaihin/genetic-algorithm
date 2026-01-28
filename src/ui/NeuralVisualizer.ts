@@ -599,6 +599,7 @@ export class NeuralVisualizer {
 
     // Separate neurons by type
     const inputNeurons = neurons.filter(n => n.type === 'input').sort((a, b) => a.id - b.id);
+    const biasNeurons = neurons.filter(n => n.type === 'bias').sort((a, b) => a.id - b.id);
     const hiddenNeurons = neurons.filter(n => n.type === 'hidden').sort((a, b) => a.id - b.id);
     const outputNeurons = neurons.filter(n => n.type === 'output').sort((a, b) => a.id - b.id);
 
@@ -627,11 +628,20 @@ export class NeuralVisualizer {
     // Calculate positions for all neurons
     const neuronPositions = new Map<number, { x: number; y: number }>();
 
+    // Position bias neurons (if any) at the far right of the input row
+    // Bias nodes are always value=1.0 and shown with a distinct "B" label
+    const hasBiasNode = biasNeurons.length > 0;
+    const biasNodeWidth = hasBiasNode ? 1 : 0;
+
     // Position ALL input neurons (needed for connection drawing)
     // Non-padded inputs get visible X positions, padded inputs get off-screen positions
     // NOTE: Padded inputs can be in the MIDDLE (e.g., unused muscle strain slots 18-23),
     // not just at the end. Use nonPaddedSet to correctly identify visible inputs.
-    const inputX = this.getNodeXPositions(displayInputSize, width, sidePadding);
+    // Account for bias node in positioning (bias node goes at the end)
+    const totalInputDisplay = displayInputSize + biasNodeWidth;
+    const inputX = this.getNodeXPositions(totalInputDisplay, width, sidePadding);
+
+    // Position regular input neurons first (indices 0 to displayInputSize-1)
     inputNeurons.forEach((n, i) => {
       if (nonPaddedSet.has(i)) {
         // Visible input neuron - find its position in the visible list
@@ -641,6 +651,11 @@ export class NeuralVisualizer {
         // Padded input neuron - position off-screen but still track for connections
         neuronPositions.set(n.id, { x: -100, y: getYForDepth(0) });
       }
+    });
+
+    // Position bias neuron(s) at the far right (after all inputs)
+    biasNeurons.forEach((n, i) => {
+      neuronPositions.set(n.id, { x: inputX[displayInputSize + i], y: getYForDepth(0) });
     });
 
     // Hidden neurons - group by depth for horizontal positioning
@@ -664,14 +679,16 @@ export class NeuralVisualizer {
       neuronPositions.set(n.id, { x: outputX[i], y: getYForDepth(effectiveMaxDepth) });
     });
 
-    // Get activations
+    // Get activations - bias neurons are always 1.0
+    const biasNeuronIds = new Set(biasNeurons.map(n => n.id));
     const getActivation = (neuronId: number): number => {
+      if (biasNeuronIds.has(neuronId)) return 1.0;
       return this.neatActivations?.byNodeId.get(neuronId) ?? 0;
     };
 
-    // Calculate node radius
+    // Calculate node radius (account for bias node in layer size)
     const maxLayerSize = Math.max(
-      displayInputSize,
+      totalInputDisplay,
       Math.max(...[...hiddenByDepth.values()].map(arr => arr.length), 0),
       outputNeurons.length
     );
@@ -699,6 +716,14 @@ export class NeuralVisualizer {
       );
     }
 
+    // Draw bias nodes first (if any) - shown with special styling
+    for (const biasNeuron of biasNeurons) {
+      const pos = neuronPositions.get(biasNeuron.id);
+      if (pos) {
+        this.drawBiasNode(ctx, pos.x, pos.y, nodeRadius);
+      }
+    }
+
     // Draw input nodes with labels
     // Filter by nonPaddedSet since padding can be in the middle (not just at end)
     const displayedInputNeurons = inputNeurons.filter((_, i) => nonPaddedSet.has(i));
@@ -708,8 +733,16 @@ export class NeuralVisualizer {
       const pos = inputPositions[i];
       this.drawSingleNode(ctx, pos.x, pos.y, inputActivations[i], nodeRadius);
     }
-    // Draw input labels
-    this.drawNEATNodeLabels(ctx, inputPositions.map(p => p.x), getYForDepth(0), inputActivations, nodeRadius, inputLabels, 'top');
+
+    // Build combined labels for input layer (regular inputs + bias at end)
+    const allInputLayerLabels = hasBiasNode ? [...inputLabels, 'B'] : inputLabels;
+    const allInputLayerActivations = hasBiasNode ? [...inputActivations, 1.0] : inputActivations;
+    const allInputLayerPositions = hasBiasNode
+      ? [...inputPositions, neuronPositions.get(biasNeurons[0].id)!]
+      : inputPositions;
+
+    // Draw input labels (including bias if present)
+    this.drawNEATNodeLabels(ctx, allInputLayerPositions.map(p => p.x), getYForDepth(0), allInputLayerActivations, nodeRadius, allInputLayerLabels, 'top');
 
     // Draw hidden nodes (no labels)
     for (const [_depth, neuronsAtDepth] of hiddenByDepth) {
@@ -744,7 +777,9 @@ export class NeuralVisualizer {
     ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`In (${displayInputSize})`, 5, getYForDepth(0));
+    // Show bias node in input count if present (e.g., "In (7+B)" or "In (7)")
+    const inputLabel = hasBiasNode ? `In (${displayInputSize}+B)` : `In (${displayInputSize})`;
+    ctx.fillText(inputLabel, 5, getYForDepth(0));
     if (hiddenNeurons.length > 0) {
       ctx.fillText(`H (${hiddenNeurons.length})`, 5, height / 2);
     }
@@ -1297,6 +1332,37 @@ export class NeuralVisualizer {
     ctx.fill();
     ctx.strokeStyle = '#444';
     ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  /**
+   * Draw a bias node (always value=1.0) with distinct styling.
+   * Uses a golden/yellow color to distinguish from regular inputs.
+   */
+  private drawBiasNode(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    nodeRadius: number
+  ): void {
+    // Bias nodes are always 1.0 - use distinctive golden color
+    const hue = 45;  // Golden yellow
+    const saturation = 70;
+    const lightness = 50;
+
+    // Draw glow (always active since bias=1.0)
+    ctx.beginPath();
+    ctx.arc(x, y, nodeRadius + 2, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
+    ctx.fill();
+
+    // Main node
+    ctx.beginPath();
+    ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    ctx.fill();
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 
