@@ -177,9 +177,10 @@ def creature_genomes_to_batch(
             positions[b, i, 2] = pos.get("z", 0)
 
             # Calculate mass from size (matches TypeScript formula)
+            # Minimum mass prevents extreme accelerations with small nodes
             size = node.get("size", 0.5)
             radius = size * 0.5
-            mass = (4 / 3) * 3.14159 * (radius ** 3) * 10  # Density factor
+            mass = max(0.5, (4 / 3) * 3.14159 * (radius ** 3) * 10)  # Density factor, min 0.5 kg
 
             sizes[b, i] = size
             masses[b, i] = mass

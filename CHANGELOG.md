@@ -43,6 +43,12 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
     - `crossover.py`: Default 0.5 → 3.0
     - `services/genetics.py`: Range [0.3, 0.7] → [2.0, 4.0], clamp [0.1, 1.0] → [1.0, 6.0]
   - Result: ζ ≈ 0.5 → settles in ~1-2 seconds (muscle-like behavior)
+- **Physics Explosion with Small Nodes**: Added minimum mass constraint of 0.5 kg
+  - Bug: Small nodes (size 0.26) had mass only 0.09 kg, creating 2000+ m/s² accelerations
+  - Symptom: Creatures would randomly explode/fly apart after settling on ground
+  - Root cause: F=ma with large spring forces (~200 N) and tiny masses → unstable Euler integration
+  - Fix: Added `max(0.5, ...)` to mass calculation in `tensors.py:183`
+  - Result: Max acceleration capped at ~400 m/s² (40× gravity) for typical spring forces
 
 ### Added
 - **Muscle Velocity Cap**: Physics-level constraint on muscle speed (v2-prd Phase 1)
