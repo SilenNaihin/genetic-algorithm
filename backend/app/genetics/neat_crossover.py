@@ -8,9 +8,72 @@ See docs/NEAT.md for technical details.
 """
 
 import random
+from collections import deque
 from copy import deepcopy
 
 from app.schemas.neat import ConnectionGene, NEATGenome, NeuronGene
+
+
+def _would_create_cycle_with_connections(
+    neurons: list[NeuronGene],
+    connections: list[ConnectionGene],
+    from_neuron: int,
+    to_neuron: int,
+) -> bool:
+    """
+    Check if adding a connection would create a cycle given existing connections.
+
+    Used during crossover to filter out cycle-creating genes.
+    """
+    if from_neuron == to_neuron:
+        return True
+
+    # Build adjacency from existing connections
+    # Use defaultdict-like behavior to handle neurons not in list
+    neuron_ids = {n.id for n in neurons}
+    outgoing: dict[int, set[int]] = {n.id: set() for n in neurons}
+    for conn in connections:
+        if conn.enabled:
+            # Handle connections from neurons not in our list (shouldn't happen but be safe)
+            if conn.from_node not in outgoing:
+                outgoing[conn.from_node] = set()
+            outgoing[conn.from_node].add(conn.to_node)
+
+    # BFS from to_neuron to see if we can reach from_neuron
+    visited: set[int] = set()
+    queue = deque([to_neuron])
+
+    while queue:
+        current = queue.popleft()
+        if current == from_neuron:
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+        for target in outgoing.get(current, set()):
+            if target not in visited:
+                queue.append(target)
+
+    return False
+
+
+def _filter_cycle_creating_connections(
+    neurons: list[NeuronGene],
+    connections: list[ConnectionGene],
+) -> list[ConnectionGene]:
+    """
+    Filter out connections that would create cycles.
+
+    Processes connections in order, keeping only those that don't create cycles
+    with the already-accepted connections.
+    """
+    filtered: list[ConnectionGene] = []
+
+    for conn in connections:
+        if not _would_create_cycle_with_connections(neurons, filtered, conn.from_node, conn.to_node):
+            filtered.append(conn)
+
+    return filtered
 
 
 def align_genes(
@@ -181,6 +244,10 @@ def neat_crossover(
                     innovation=neuron.innovation,
                 ))
 
+    # Filter out any connections that would create cycles
+    # (can happen when combining genes from different topologies)
+    child_connections = _filter_cycle_creating_connections(child_neurons, child_connections)
+
     return NEATGenome(
         neurons=child_neurons,
         connections=child_connections,
@@ -281,6 +348,10 @@ def neat_crossover_equal_fitness(
 
     # Choose activation from random parent
     activation = random.choice([parent_a.activation, parent_b.activation])
+
+    # Filter out any connections that would create cycles
+    # (more likely in equal fitness crossover since we inherit from both parents)
+    child_connections = _filter_cycle_creating_connections(child_neurons, child_connections)
 
     return NEATGenome(
         neurons=child_neurons,

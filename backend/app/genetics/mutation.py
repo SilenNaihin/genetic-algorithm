@@ -680,6 +680,14 @@ def mutate_genome_neat(
             bias_mode=neat_config.bias_mode,
         )
 
+        # Adapt NEAT topology if muscle count changed due to body mutations
+        # Only adapt if body has muscles - if muscles is empty, preserve original outputs
+        from app.neural.neat_network import adapt_neat_topology
+        new_muscle_count = len(new_genome['muscles'])
+        current_output_count = len([n for n in mutated_neat.neurons if n.type == 'output'])
+        if new_muscle_count > 0 and current_output_count != new_muscle_count:
+            mutated_neat = adapt_neat_topology(mutated_neat, new_muscle_count)
+
         # Store as dict for JSON serialization
         new_genome['neatGenome'] = mutated_neat.model_dump()
 

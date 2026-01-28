@@ -178,22 +178,28 @@ def mutate_toggle_connection(genome: NEATGenome, disable_rate: float = 0.5) -> b
     enabled = [c for c in genome.connections if c.enabled]
     disabled = [c for c in genome.connections if not c.enabled]
 
+    # Filter disabled to only those safe to re-enable (no cycle creation)
+    safe_to_enable = [
+        c for c in disabled
+        if not would_create_cycle(genome, c.from_node, c.to_node)
+    ]
+
     # Decide whether to enable or disable based on what's available
-    if enabled and disabled:
+    if enabled and safe_to_enable:
         # Both options available, use rate to decide
         if random.random() < disable_rate:
             conn = random.choice(enabled)
             conn.enabled = False
         else:
-            conn = random.choice(disabled)
+            conn = random.choice(safe_to_enable)
             conn.enabled = True
     elif enabled:
-        # Only enabled connections, disable one
+        # Only enabled connections (or no safe disabled), disable one
         conn = random.choice(enabled)
         conn.enabled = False
-    elif disabled:
-        # Only disabled connections, enable one
-        conn = random.choice(disabled)
+    elif safe_to_enable:
+        # Only disabled connections that are safe to enable
+        conn = random.choice(safe_to_enable)
         conn.enabled = True
     else:
         return False
@@ -203,19 +209,29 @@ def mutate_toggle_connection(genome: NEATGenome, disable_rate: float = 0.5) -> b
 
 def mutate_enable_connection(genome: NEATGenome) -> bool:
     """
-    Enable a random disabled connection.
+    Enable a random disabled connection (if it won't create a cycle).
 
     Args:
         genome: NEAT genome to mutate (modified in place)
 
     Returns:
-        True if a connection was enabled, False if none were disabled
+        True if a connection was enabled, False if none could be enabled
     """
     disabled = [c for c in genome.connections if not c.enabled]
     if not disabled:
         return False
 
-    conn = random.choice(disabled)
+    # Filter to only connections that won't create a cycle when re-enabled
+    # (a cycle could have formed since the connection was disabled)
+    safe_to_enable = [
+        c for c in disabled
+        if not would_create_cycle(genome, c.from_node, c.to_node)
+    ]
+
+    if not safe_to_enable:
+        return False
+
+    conn = random.choice(safe_to_enable)
     conn.enabled = True
     return True
 

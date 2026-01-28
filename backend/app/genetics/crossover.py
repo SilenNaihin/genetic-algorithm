@@ -20,6 +20,7 @@ from .neat_crossover import (
     crossover_biases,
 )
 from app.schemas.neat import NEATGenome
+from app.neural.neat_network import adapt_neat_topology
 
 DEFAULT_OUTPUT_BIAS = 0.0
 
@@ -297,6 +298,13 @@ def single_point_crossover(
             fitness2=fitness2,
             disabled_gene_inherit_rate=disabled_gene_inherit_rate,
         )
+        # Adapt NEAT topology if muscle count changed
+        if neat_genome is not None:
+            neat_obj = NEATGenome(**neat_genome) if isinstance(neat_genome, dict) else neat_genome
+            output_count = len([n for n in neat_obj.neurons if n.type == 'output'])
+            if output_count != len(child_muscles):
+                adapted = adapt_neat_topology(neat_obj, len(child_muscles))
+                neat_genome = adapted.model_dump()
     else:
         # Standard fixed-topology neural network crossover
         neural1 = parent1.get('neuralGenome') or parent1.get('neural_genome')
@@ -458,6 +466,13 @@ def uniform_crossover(
             fitness2=fitness2,
             disabled_gene_inherit_rate=disabled_gene_inherit_rate,
         )
+        # Adapt NEAT topology if muscle count changed
+        if neat_genome is not None:
+            neat_obj = NEATGenome(**neat_genome) if isinstance(neat_genome, dict) else neat_genome
+            output_count = len([n for n in neat_obj.neurons if n.type == 'output'])
+            if output_count != len(child_muscles):
+                adapted = adapt_neat_topology(neat_obj, len(child_muscles))
+                neat_genome = adapted.model_dump()
     else:
         # Standard fixed-topology neural network crossover
         neural1 = parent1.get('neuralGenome') or parent1.get('neural_genome')
@@ -575,6 +590,12 @@ def clone_genome(
     if neat_dict:
         # Deep clone the NEAT genome
         neat_genome = deepcopy(neat_dict) if isinstance(neat_dict, dict) else neat_dict.model_dump()
+        # Adapt NEAT topology if muscle count changed (due to constraints)
+        neat_obj = NEATGenome(**neat_genome) if isinstance(neat_genome, dict) else neat_genome
+        output_count = len([n for n in neat_obj.neurons if n.type == 'output'])
+        if output_count != len(new_muscles):
+            adapted = adapt_neat_topology(neat_obj, len(new_muscles))
+            neat_genome = adapted.model_dump()
     else:
         # Check for standard neural genome
         neural_dict = genome.get('neuralGenome') or genome.get('neural_genome')

@@ -219,6 +219,123 @@ def create_minimal_neat_genome(
     )
 
 
+def adapt_neat_topology(
+    genome: NEATGenome,
+    target_output_count: int,
+    output_bias: float = -0.5,
+    innovation_counter: InnovationCounter | None = None,
+) -> NEATGenome:
+    """
+    Adapt NEAT genome when muscle count changes.
+
+    - If muscles added: adds new output neurons with sparse initial connections
+    - If muscles removed: removes excess output neurons and their connections
+
+    This ensures the NEAT genome always matches the creature's actual muscle count,
+    preventing wasted evolution effort on non-existent outputs.
+
+    Args:
+        genome: NEAT genome to adapt
+        target_output_count: Desired number of output neurons (= muscle count)
+        output_bias: Initial bias for new output neurons
+        innovation_counter: Optional counter for new connection innovations
+
+    Returns:
+        Adapted genome (new instance, original not modified)
+    """
+    from copy import deepcopy
+
+    current_outputs = [n for n in genome.neurons if n.type == 'output']
+    current_count = len(current_outputs)
+
+    if current_count == target_output_count:
+        return genome  # No change needed
+
+    # Deep copy to avoid modifying original
+    adapted = deepcopy(genome)
+
+    if target_output_count > current_count:
+        # Need to add output neurons
+        # Find the max neuron ID to assign new IDs
+        max_id = max(n.id for n in adapted.neurons)
+
+        # Find input/bias neurons to connect new outputs to
+        sources = [n for n in adapted.neurons if n.type in ('input', 'bias')]
+        if not sources:
+            sources = [n for n in adapted.neurons if n.type == 'input']
+
+        # Determine bias_mode from existing genome
+        has_bias_node = any(n.type == 'bias' for n in adapted.neurons)
+        bias_node = next((n for n in adapted.neurons if n.type == 'bias'), None)
+
+        # Track next innovation ID
+        innovation = max((c.innovation for c in adapted.connections), default=0) + 1
+
+        for i in range(target_output_count - current_count):
+            new_id = max_id + 1 + i
+
+            # Create new output neuron
+            # Use node bias only if NOT using bias_node mode
+            new_neuron = NeuronGene(
+                id=new_id,
+                type='output',
+                bias=output_bias if not has_bias_node else 0.0,
+                innovation=None,
+            )
+            adapted.neurons.append(new_neuron)
+
+            # Add connection from random input to new output
+            if sources:
+                source = random.choice(sources)
+                if innovation_counter is not None:
+                    inn_id = innovation_counter.get_connection_innovation(source.id, new_id)
+                else:
+                    inn_id = innovation
+                    innovation += 1
+
+                adapted.connections.append(ConnectionGene(
+                    from_node=source.id,
+                    to_node=new_id,
+                    weight=random.uniform(-0.5, 0.5),
+                    enabled=True,
+                    innovation=inn_id,
+                ))
+
+            # Add bias connection if using bias_node mode
+            if bias_node is not None:
+                if innovation_counter is not None:
+                    inn_id = innovation_counter.get_connection_innovation(bias_node.id, new_id)
+                else:
+                    inn_id = innovation
+                    innovation += 1
+
+                adapted.connections.append(ConnectionGene(
+                    from_node=bias_node.id,
+                    to_node=new_id,
+                    weight=output_bias,
+                    enabled=True,
+                    innovation=inn_id,
+                ))
+
+    else:
+        # Need to remove output neurons
+        # Sort outputs by ID to remove the highest-numbered ones
+        # (preserves the original outputs that were evolved)
+        output_ids_sorted = sorted(n.id for n in current_outputs)
+        outputs_to_remove = set(output_ids_sorted[target_output_count:])
+
+        # Remove excess output neurons
+        adapted.neurons = [n for n in adapted.neurons if n.id not in outputs_to_remove]
+
+        # Remove connections to/from removed outputs
+        adapted.connections = [
+            c for c in adapted.connections
+            if c.from_node not in outputs_to_remove and c.to_node not in outputs_to_remove
+        ]
+
+    return adapted
+
+
 def topological_sort(genome: NEATGenome) -> list[int]:
     """
     Compute evaluation order for feedforward network.

@@ -4,6 +4,27 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 
 ## [Unreleased]
 
+### Fixed
+- **NEAT Cycle Prevention**: Fixed multiple sources of cycle creation in NEAT networks
+  - `mutate_enable_connection`: Now checks if re-enabling a disabled connection would create a cycle
+  - `mutate_toggle_connection`: Same cycle check when enabling
+  - `neat_crossover`: Filters out cycle-creating connections after gene alignment
+  - Scenario: A→B added, A→B disabled, B→A added (ok), A→B re-enabled = cycle (now prevented)
+- **NEAT Structural Mutations Now Independent**: Changed `elif` to `if` so add_node and add_connection can both happen
+- **NEAT Mutation Rates**: Updated defaults to match NEAT paper (50% add_connection, 20% add_node vs old 5%/3%)
+- **NEAT Hidden Nodes at Wrong Depth in Visualization**: Fixed hidden nodes appearing at same level as inputs
+  - Bug: `computeNEATNeuronDepths()` only started BFS from input neurons, not bias neurons
+  - Hidden nodes reachable only from bias (e.g., from splitting bias→output) got depth 0
+  - Fix: Include both input AND bias neurons in BFS starting set, use ALL connections (even disabled) for layout
+  - Now hidden nodes correctly appear in middle layers between inputs and outputs
+- **NEAT Genome Decoupled from Creature Body**: Fixed NEAT output count not adapting when muscle count changes
+  - Bug: Body mutations (add/remove muscle) didn't update NEAT genome output count
+  - Symptom: Visualization showed O8 for a creature with 3 muscles; evolution wasted effort on non-existent outputs
+  - Fix: Added `adapt_neat_topology()` function that adds/removes output neurons to match muscle count
+  - Called after crossover, body mutation, and cloning
+  - New outputs get sparse initial connections; removed outputs delete all their connections
+  - See `docs/NEAT.md` "NEAT Body-Neural Coupling" section for details
+
 ### Changed
 - **Speciation is now a Selection Method**: Replaced `useSpeciation` toggle with `selectionMethod: 'speciation'`
   - Selection dropdown now has 4 options: Rank, Tournament, Truncation, Speciation
