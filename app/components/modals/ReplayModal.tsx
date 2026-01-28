@@ -162,7 +162,22 @@ export function ReplayModal() {
   const replayResult = useEvolutionStore((s) => s.replayResult);
   const setReplayResult = useEvolutionStore((s) => s.setReplayResult);
   const simulationResults = useEvolutionStore((s) => s.simulationResults);
-  const config = useEvolutionStore((s) => s.config);
+  const rawConfig = useEvolutionStore((s) => s.config);
+
+  // Normalize config to handle both camelCase and snake_case keys
+  // This is needed because old configs may have been saved with snake_case keys from the backend
+  const config = React.useMemo(() => {
+    const rc = rawConfig as unknown as Record<string, unknown>;
+    return {
+      ...rawConfig,
+      // Handle fields that might be snake_case from backend
+      timeEncoding: (rc.timeEncoding ?? rc.time_encoding ?? 'none') as typeof rawConfig.timeEncoding,
+      useProprioception: (rc.useProprioception ?? rc.use_proprioception ?? false) as boolean,
+      proprioceptionInputs: (rc.proprioceptionInputs ?? rc.proprioception_inputs ?? 'all') as typeof rawConfig.proprioceptionInputs,
+      neuralMode: (rc.neuralMode ?? rc.neural_mode ?? 'hybrid') as typeof rawConfig.neuralMode,
+      neuralDeadZone: (rc.neuralDeadZone ?? rc.neural_dead_zone ?? 0) as number,
+    };
+  }, [rawConfig]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReplayRenderer | null>(null);
@@ -302,8 +317,8 @@ export function ReplayModal() {
       neuralVisualizerRef.current = null;
     }
 
-    // Only create visualizer if creature has neural genome
-    if (!genome.neuralGenome || genome.controllerType !== 'neural') {
+    // Only create visualizer if creature has neural genome (fixed-topology or NEAT)
+    if ((!genome.neuralGenome && !genome.neatGenome) || genome.controllerType !== 'neural') {
       return;
     }
 
@@ -363,8 +378,8 @@ export function ReplayModal() {
       numMuscles: genome.muscles.length,
       numNodes: genome.nodes.length,
     });
-    // Set dead zone for output node coloring (only in pure mode)
-    if (config.neuralMode === 'pure') {
+    // Set dead zone for output node coloring (in pure and neat modes)
+    if (config.neuralMode === 'pure' || config.neuralMode === 'neat') {
       visualizer.setDeadZone(config.neuralDeadZone || 0);
     }
 
@@ -473,7 +488,7 @@ export function ReplayModal() {
 
       // Update neural visualization if creature has neural genome and stored activations
       const genome = loadedResult.genome;
-      if (neuralVisualizerRef.current && genome.neuralGenome && genome.controllerType === 'neural') {
+      if (neuralVisualizerRef.current && (genome.neuralGenome || genome.neatGenome) && genome.controllerType === 'neural') {
         const frameActivations = loadedResult.activationsPerFrame?.[frameIndex];
         if (frameActivations) {
           neuralVisualizerRef.current.setStoredActivations(frameActivations);
@@ -806,18 +821,24 @@ export function ReplayModal() {
                       <span style={{ color: 'var(--text-primary)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={genome.id}>{genome.id.slice(0, 12)}...</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Generation</span>
-                      <span style={{ color: 'var(--text-primary)' }}>{genome.generation}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>Fitness</span>
+                      <span style={{ color: loadedResult.disqualified ? '#ef4444' : 'var(--success)' }}>{loadedResult.finalFitness.toFixed(1)}</span>
                     </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Born</span>
+                      <span style={{ color: 'var(--text-primary)' }}>Gen {loadedResult.birthGeneration ?? genome.generation}</span>
+                    </div>
+                    {loadedResult.deathGeneration !== undefined && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Died</span>
+                        <span style={{ color: '#ef4444' }}>Gen {loadedResult.deathGeneration}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Survival Streak</span>
                       <span style={{ color: 'var(--success)' }}>{genome.survivalStreak}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Parents</span>
-                      <span style={{ color: 'var(--text-primary)' }}>{genome.parentIds.length || 'Gen 0'}</span>
-                    </div>
-                    {config.neuralMode !== 'pure' && (
+                    {config.neuralMode === 'hybrid' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Freq Mult</span>
                         <span style={{ color: 'var(--text-primary)' }}>{genome.globalFrequencyMultiplier.toFixed(2)}×</span>
@@ -878,7 +899,7 @@ export function ReplayModal() {
                     {genome.muscles.map((muscle, i) => {
                       const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
                       const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
-                      const isPureNeural = hasNeuralGenome && config.neuralMode === 'pure';
+                      const isDirectNeural = hasNeuralGenome && (config.neuralMode === 'pure' || config.neuralMode === 'neat');
                       return (
                         <div key={muscle.id} style={{
                           background: 'var(--bg-secondary)',
@@ -900,8 +921,8 @@ export function ReplayModal() {
                             </div>
                           </div>
 
-                          {/* Oscillation - only for hybrid/oscillator mode */}
-                          {!isPureNeural && (
+                          {/* Oscillation - only for hybrid mode */}
+                          {!isDirectNeural && (
                             <div>
                               <div style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Oscillation</div>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', fontSize: '11px' }}>
@@ -912,8 +933,8 @@ export function ReplayModal() {
                             </div>
                           )}
 
-                          {/* Pure neural - NN output directly controls contraction, no amplitude */}
-                          {isPureNeural && (
+                          {/* Direct neural - NN output directly controls contraction, no amplitude */}
+                          {isDirectNeural && (
                             <div>
                               <div style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Neural Control</div>
                               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -973,12 +994,14 @@ export function ReplayModal() {
                         return actualInputs;
                       })()}
                       {isNEAT ? (
-                        <>
-                          {' → '}
-                          {genome.neatGenome!.neurons.filter(n => n.type === 'hidden').length}
-                          {' → '}
-                          {genome.neatGenome!.neurons.filter(n => n.type === 'output').length}
-                        </>
+                        (() => {
+                          const hiddenCount = genome.neatGenome!.neurons.filter(n => n.type === 'hidden').length;
+                          const outputCount = genome.neatGenome!.neurons.filter(n => n.type === 'output').length;
+                          // Only show hidden layer if there are hidden neurons
+                          return hiddenCount > 0
+                            ? <>{' → '}{hiddenCount}{' → '}{outputCount}</>
+                            : <>{' → '}{outputCount}</>;
+                        })()
                       ) : (
                         <>
                           {' → '}
