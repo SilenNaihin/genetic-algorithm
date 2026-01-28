@@ -175,12 +175,14 @@ async def get_creature_frames(
     creature_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     generation: int | None = Query(None, description="Specific generation to get frames for"),
+    best: bool = Query(False, description="If true, return frames from generation with best fitness"),
 ):
     """
     Get frame data for a creature (for replay).
 
-    If generation is provided, returns frames for that generation.
-    Otherwise, returns frames from the generation with the BEST fitness.
+    - If generation is provided, returns frames for that generation.
+    - If best=true, returns frames from the generation with the BEST fitness.
+    - Otherwise, returns frames from the latest generation.
     """
     # Build query for frames
     if generation is not None:
@@ -192,9 +194,9 @@ async def get_creature_frames(
             )
         )
         frame = frame_result.scalar_one_or_none()
-    else:
-        # Find frame from the generation with BEST fitness (not latest)
-        # This ensures clicking on longest survivor shows their best performance
+    elif best:
+        # Find frame from the generation with BEST fitness
+        # Used for best creature ever and longest survivor replays
         frame_result = await db.execute(
             select(CreatureFrame)
             .join(
@@ -204,6 +206,15 @@ async def get_creature_frames(
             )
             .where(CreatureFrame.creature_id == creature_id)
             .order_by(CreaturePerformance.fitness.desc())
+            .limit(1)
+        )
+        frame = frame_result.scalar_one_or_none()
+    else:
+        # Find latest frame record (default behavior for grid clicks)
+        frame_result = await db.execute(
+            select(CreatureFrame)
+            .where(CreatureFrame.creature_id == creature_id)
+            .order_by(CreatureFrame.generation.desc())
             .limit(1)
         )
         frame = frame_result.scalar_one_or_none()

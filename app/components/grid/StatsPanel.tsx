@@ -253,8 +253,8 @@ export function StatsPanel() {
         <span className="stat-value danger">{hasResults ? worst.toFixed(1) : '-'}</span>
       </div>
 
-      {/* NEAT topology stats - only show when NEAT is enabled */}
-      {config.useNEAT && hasResults && (() => {
+      {/* NEAT topology stats - only show when NEAT mode is enabled */}
+      {config.neuralMode === 'neat' && hasResults && (() => {
         const neatResults = validResults.filter(r => r.genome.neatGenome);
         if (neatResults.length === 0) return null;
 
@@ -308,7 +308,12 @@ export function StatsPanel() {
             onClick={() => {
               const hasFramesOrCanLoad = longestSurvivingCreature.frames.length > 0 || longestSurvivingCreature.genome._apiCreatureId;
               if (hasFramesOrCanLoad && !longestSurvivingCreature.disqualified) {
-                setReplayResult(longestSurvivingCreature);
+                // Mark to fetch best performance, not latest generation
+                const resultWithBestFlag = {
+                  ...longestSurvivingCreature,
+                  genome: { ...longestSurvivingCreature.genome, _fetchBestPerformance: true },
+                };
+                setReplayResult(resultWithBestFlag);
               }
             }}
             onMouseEnter={(e) => {
@@ -385,7 +390,12 @@ export function StatsPanel() {
             onClick={() => {
               const hasFramesOrCanLoad = bestCreatureEver.frames.length > 0 || bestCreatureEver.genome._apiCreatureId;
               if (hasFramesOrCanLoad && !bestCreatureEver.disqualified) {
-                setReplayResult(bestCreatureEver);
+                // Set the specific generation where this was the best
+                const resultWithGen = {
+                  ...bestCreatureEver,
+                  genome: { ...bestCreatureEver.genome, _bestPerformanceGeneration: bestCreatureGeneration },
+                };
+                setReplayResult(resultWithGen);
               }
             }}
             onMouseEnter={(e) => {

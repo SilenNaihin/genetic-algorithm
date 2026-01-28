@@ -180,6 +180,8 @@ export class RemoteStorage {
 
         // Store creature ID in genome for later frame loading
         genome._apiCreatureId = c.id;
+        // Store the generation so clicking on history creatures loads the right frames
+        genome._bestPerformanceGeneration = gen;
 
         // Create dummy pellet data
         const pellets: PelletData[] = Array.from({ length: c.pellets_collected }, (_, i) => ({
@@ -216,7 +218,7 @@ export class RemoteStorage {
    */
   async loadCreatureFrames(
     creatureId: string,
-    genome: { nodes: { id: string }[]; _bestPerformanceGeneration?: number },
+    genome: { nodes: { id: string }[]; _bestPerformanceGeneration?: number; _fetchBestPerformance?: boolean },
     pelletsCollected: number,
     _config: SimulationConfig,
     _disqualified: string | null,
@@ -224,10 +226,14 @@ export class RemoteStorage {
     realFitnessOverTime?: number[]
   ): Promise<{ frames: SimulationFrame[]; fitnessOverTime: number[]; pellets: PelletData[]; activationsPerFrame?: Array<{ inputs: number[]; hidden: number[]; outputs: number[]; outputs_raw?: number[] }> }> {
     try {
-      // Use best performance generation if available (for best/longest survivor replays)
-      const generation = genome._bestPerformanceGeneration;
-      console.log('[RemoteStorage] Fetching frames for creature:', creatureId, 'generation:', generation);
-      const framesData = await Api.getCreatureFrames(creatureId, generation);
+      // Determine how to fetch frames:
+      // 1. If _fetchBestPerformance is true, fetch frames from generation with best fitness
+      // 2. If _bestPerformanceGeneration is set, fetch frames from that specific generation
+      // 3. Otherwise, fetch latest (default for current gen grid clicks)
+      const generation = genome._fetchBestPerformance ? undefined : genome._bestPerformanceGeneration;
+      const fetchBest = genome._fetchBestPerformance ?? false;
+      console.log('[RemoteStorage] Fetching frames for creature:', creatureId, 'generation:', generation, 'best:', fetchBest);
+      const framesData = await Api.getCreatureFrames(creatureId, generation, fetchBest);
       console.log('[RemoteStorage] API response:', {
         hasFramesData: !!framesData.frames_data,
         framesDataLength: framesData.frames_data?.length,

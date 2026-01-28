@@ -91,8 +91,10 @@ export interface CreatureGenome {
 
   // Internal: API creature ID for lazy frame loading (not saved to storage)
   _apiCreatureId?: string;
-  // Internal: Generation of best performance (for loading correct frames)
+  // Internal: Generation to fetch frames from (for history view or specific replay)
   _bestPerformanceGeneration?: number;
+  // Internal: If true, fetch frames from best fitness generation (for best/longest survivor)
+  _fetchBestPerformance?: boolean;
 }
 
 // Creature constraints configuration
