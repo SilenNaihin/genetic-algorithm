@@ -449,9 +449,9 @@ export function NeuralPanel() {
                   name="Add Connection %"
                   value={config.neat_add_connection_rate * 100}
                   displayValue={`${Math.round(config.neat_add_connection_rate * 100)}%`}
-                  min={1}
-                  max={20}
-                  step={1}
+                  min={5}
+                  max={80}
+                  step={5}
                   onChange={(v) => setConfig({ neat_add_connection_rate: v / 100 })}
                   tooltip={TOOLTIPS.neatAddConnectionRate}
                   width="100%"
@@ -462,9 +462,9 @@ export function NeuralPanel() {
                   name="Add Node %"
                   value={config.neat_add_node_rate * 100}
                   displayValue={`${Math.round(config.neat_add_node_rate * 100)}%`}
-                  min={1}
-                  max={10}
-                  step={1}
+                  min={5}
+                  max={50}
+                  step={5}
                   onChange={(v) => setConfig({ neat_add_node_rate: v / 100 })}
                   tooltip={TOOLTIPS.neatAddNodeRate}
                   width="100%"
