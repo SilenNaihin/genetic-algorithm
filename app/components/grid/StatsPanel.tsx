@@ -308,12 +308,8 @@ export function StatsPanel() {
             onClick={() => {
               const hasFramesOrCanLoad = longestSurvivingCreature.frames.length > 0 || longestSurvivingCreature.genome._apiCreatureId;
               if (hasFramesOrCanLoad && !longestSurvivingCreature.disqualified) {
-                // Mark to fetch best performance, not latest generation
-                const resultWithBestFlag = {
-                  ...longestSurvivingCreature,
-                  genome: { ...longestSurvivingCreature.genome, _fetchBestPerformance: true },
-                };
-                setReplayResult(resultWithBestFlag);
+                // Use default (latest) - shows their final run before dying
+                setReplayResult(longestSurvivingCreature);
               }
             }}
             onMouseEnter={(e) => {
