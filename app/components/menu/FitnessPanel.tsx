@@ -14,11 +14,11 @@ export function FitnessPanelContent() {
 
   const handleReset = () => {
     setConfig({
-      fitnessPelletPoints: DEFAULT_CONFIG.fitnessPelletPoints,
-      fitnessProgressMax: DEFAULT_CONFIG.fitnessProgressMax,
-      fitnessDistancePerUnit: DEFAULT_CONFIG.fitnessDistancePerUnit,
-      fitnessDistanceTraveledMax: DEFAULT_CONFIG.fitnessDistanceTraveledMax,
-      fitnessRegressionPenalty: DEFAULT_CONFIG.fitnessRegressionPenalty,
+      fitness_pellet_points: DEFAULT_CONFIG.fitness_pellet_points,
+      fitness_progress_max: DEFAULT_CONFIG.fitness_progress_max,
+      fitness_distance_per_unit: DEFAULT_CONFIG.fitness_distance_per_unit,
+      fitness_distance_traveled_max: DEFAULT_CONFIG.fitness_distance_traveled_max,
+      fitness_regression_penalty: DEFAULT_CONFIG.fitness_regression_penalty,
     });
   };
 
@@ -27,60 +27,60 @@ export function FitnessPanelContent() {
         <div style={{ marginBottom: '12px' }}>
           <ParamSlider
             name="Pellet Points"
-            value={config.fitnessPelletPoints}
-            displayValue={String(config.fitnessPelletPoints)}
+            value={config.fitness_pellet_points}
+            displayValue={String(config.fitness_pellet_points)}
             min={10}
             max={200}
             hint="Points per pellet collected"
-            onChange={(v) => setConfig({ fitnessPelletPoints: v })}
+            onChange={(v) => setConfig({ fitness_pellet_points: v })}
             width="100%"
           />
         </div>
         <div style={{ marginBottom: '12px' }}>
           <ParamSlider
             name="Progress Max"
-            value={config.fitnessProgressMax}
-            displayValue={String(config.fitnessProgressMax)}
+            value={config.fitness_progress_max}
+            displayValue={String(config.fitness_progress_max)}
             min={0}
             max={150}
             hint="Max progress bonus toward pellet"
-            onChange={(v) => setConfig({ fitnessProgressMax: v })}
+            onChange={(v) => setConfig({ fitness_progress_max: v })}
             width="100%"
           />
         </div>
         <div style={{ marginBottom: '12px' }}>
           <ParamSlider
             name="Distance Per Unit"
-            value={config.fitnessDistancePerUnit}
-            displayValue={String(config.fitnessDistancePerUnit)}
+            value={config.fitness_distance_per_unit}
+            displayValue={String(config.fitness_distance_per_unit)}
             min={0}
             max={10}
             hint="Points per unit of distance traveled"
-            onChange={(v) => setConfig({ fitnessDistancePerUnit: v })}
+            onChange={(v) => setConfig({ fitness_distance_per_unit: v })}
             width="100%"
           />
         </div>
         <div style={{ marginBottom: '12px' }}>
           <ParamSlider
             name="Distance Traveled Max"
-            value={config.fitnessDistanceTraveledMax}
-            displayValue={String(config.fitnessDistanceTraveledMax)}
+            value={config.fitness_distance_traveled_max}
+            displayValue={String(config.fitness_distance_traveled_max)}
             min={0}
             max={50}
             hint="Max bonus for total distance traveled"
-            onChange={(v) => setConfig({ fitnessDistanceTraveledMax: v })}
+            onChange={(v) => setConfig({ fitness_distance_traveled_max: v })}
             width="100%"
           />
         </div>
         <div style={{ marginBottom: '12px' }}>
           <ParamSlider
             name="Regression Penalty"
-            value={config.fitnessRegressionPenalty}
-            displayValue={String(config.fitnessRegressionPenalty)}
+            value={config.fitness_regression_penalty}
+            displayValue={String(config.fitness_regression_penalty)}
             min={0}
             max={50}
             hint="Penalty for moving away after 1st pellet"
-            onChange={(v) => setConfig({ fitnessRegressionPenalty: v })}
+            onChange={(v) => setConfig({ fitness_regression_penalty: v })}
             width="100%"
           />
         </div>

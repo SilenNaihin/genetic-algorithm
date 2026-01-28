@@ -65,6 +65,7 @@ class PopulationStats:
     worst_fitness: float
     avg_nodes: float
     avg_muscles: float
+    survivor_ids: set[str] | None = None  # IDs of creatures that survived selection
 
 
 @dataclass
@@ -85,7 +86,6 @@ class EvolutionConfig:
 
     # Reproduction
     crossover_rate: float = 0.5
-    use_mutation: bool = False
     use_crossover: bool = True
 
     # Neural crossover method
@@ -101,19 +101,19 @@ class EvolutionConfig:
     min_species_size: int = 2  # Minimum survivors per species
 
     # Mutation
-    mutation_rate: float = 0.1
+    mutation_rate: float = 0.2
     mutation_magnitude: float = 0.3
     structural_rate: float = 0.1
 
     # Neural mutation
-    weight_mutation_rate: float = 0.1
-    weight_mutation_magnitude: float = 0.3
-    weight_mutation_decay: str = 'off'  # 'off', 'linear', 'exponential'
+    weight_mutation_rate: float = 0.2
+    weight_mutation_magnitude: float = 0.05
+    weight_mutation_decay: str = 'linear'  # 'off', 'linear', 'exponential'
 
     # Neural initialization
     use_neural_net: bool = True
     neural_hidden_size: int = 8
-    neural_output_bias: float = 0.0
+    neural_output_bias: float = -0.1
 
     # Constraints
     min_nodes: int = 3
@@ -466,6 +466,7 @@ def get_population_stats(
     genomes: list[dict],
     fitness_scores: list[float],
     generation: int,
+    survivor_ids: set[str] | None = None,
 ) -> PopulationStats:
     """
     Calculate population statistics.
@@ -474,6 +475,7 @@ def get_population_stats(
         genomes: List of genome dicts
         fitness_scores: Fitness values for each genome
         generation: Current generation number
+        survivor_ids: IDs of creatures that survived selection
 
     Returns:
         PopulationStats object
@@ -486,6 +488,7 @@ def get_population_stats(
             worst_fitness=0,
             avg_nodes=0,
             avg_muscles=0,
+            survivor_ids=survivor_ids,
         )
 
     sorted_fitness = sorted(fitness_scores, reverse=True)
@@ -500,6 +503,7 @@ def get_population_stats(
         worst_fitness=sorted_fitness[-1],
         avg_nodes=total_nodes / len(genomes) if genomes else 0,
         avg_muscles=total_muscles / len(genomes) if genomes else 0,
+        survivor_ids=survivor_ids,
     )
 
 
@@ -562,7 +566,6 @@ def evolve_population(
             tournament_size=config.get('tournament_size', 3),
             adaptive_boost_level=config.get('adaptive_boost_level', 1.0),
             crossover_rate=config.get('crossover_rate', 0.5),
-            use_mutation=config.get('use_mutation', True),
             use_crossover=config.get('use_crossover', True),
             neural_crossover_method=config.get('neural_crossover_method', 'sbx'),
             sbx_eta=config.get('sbx_eta', 2.0),
@@ -786,10 +789,7 @@ def evolve_population(
 
     def create_offspring(species_members: list[dict], species_probabilities: dict[str, float]) -> dict:
         """Create a single offspring from within a species."""
-        use_crossover = config.use_crossover
-        use_mutation = config.use_mutation
-
-        crossover_prob = config.crossover_rate if use_crossover else 0
+        crossover_prob = config.crossover_rate if config.use_crossover else 0
         do_crossover = random.random() < crossover_prob and len(species_members) >= 2
 
         if do_crossover:
@@ -829,25 +829,21 @@ def evolve_population(
             # Clone inherits parent's ancestry chain
             child['ancestryChain'] = list(parent.get('ancestryChain', []))
 
-        # Apply mutation to offspring
-        # - NEAT mode: ALWAYS mutate (structural mutations required for topology evolution)
-        # - Standard mode: Crossover offspring always mutated, clones only if use_mutation
-        should_mutate = config.use_neat or do_crossover or use_mutation
-
-        if should_mutate:
-            if config.use_neat:
-                # Use NEAT mutation for variable-topology networks
-                child = mutate_genome_neat(
-                    child, innovation_counter, mutation_config, constraints, neat_config
-                )
-            else:
-                # Use standard mutation for fixed-topology networks
-                child = mutate_genome(child, mutation_config, constraints)
-            # Update reproduction type if mutation was the only operator
-            if reproduction_type == 'clone':
-                reproduction_type = 'mutation'
-                build_ancestry_chain(child, parent, survivor_fitness_map.get(parent['id'], 0),
-                                     reproduction_type=reproduction_type)
+        # Always mutate offspring - survivors are already kept unchanged
+        # This ensures evolution always has variation (no duplicate genomes)
+        if config.use_neat:
+            # Use NEAT mutation for variable-topology networks
+            child = mutate_genome_neat(
+                child, innovation_counter, mutation_config, constraints, neat_config
+            )
+        else:
+            # Use standard mutation for fixed-topology networks
+            child = mutate_genome(child, mutation_config, constraints)
+        # Update reproduction type if mutation was the only operator
+        if reproduction_type == 'clone':
+            reproduction_type = 'mutation'
+            build_ancestry_chain(child, parent, survivor_fitness_map.get(parent['id'], 0),
+                                 reproduction_type=reproduction_type)
 
         # New offspring start at next generation with 0 survival streak
         child['generation'] = next_gen
@@ -901,7 +897,7 @@ def evolve_population(
     if config.use_neat and innovation_counter is not None:
         innovation_counter.clear_generation_cache()
 
-    # Calculate stats
-    stats = get_population_stats(genomes, fitness_scores, generation)
+    # Calculate stats (include survivor_ids for frontend to know which creatures died)
+    stats = get_population_stats(genomes, fitness_scores, generation, survivor_ids)
 
     return new_genomes, stats

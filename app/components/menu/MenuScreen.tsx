@@ -41,9 +41,9 @@ export function MenuScreen() {
 
       <PreviewCanvas
         config={{
-          maxNodes: config.maxNodes,
-          maxMuscles: config.maxMuscles,
-          maxAllowedFrequency: config.maxAllowedFrequency,
+          max_nodes: config.max_nodes,
+          max_muscles: config.max_muscles,
+          max_allowed_frequency: config.max_allowed_frequency,
           gravity: config.gravity,
         }}
         mountKey={menuMountKey}
@@ -59,31 +59,31 @@ export function MenuScreen() {
         }}>
           <ParamSlider
             name="Population"
-            value={config.populationSize}
-            displayValue={String(config.populationSize)}
+            value={config.population_size}
+            displayValue={String(config.population_size)}
             min={10}
             max={1000}
             step={10}
             tooltip={TOOLTIPS.populationSize}
-            onChange={(v) => setConfig({ populationSize: v })}
+            onChange={(v) => setConfig({ population_size: v })}
           />
           <ParamSlider
             name="Max Nodes"
-            value={config.maxNodes}
-            displayValue={String(config.maxNodes)}
+            value={config.max_nodes}
+            displayValue={String(config.max_nodes)}
             min={2}
             max={15}
             tooltip={TOOLTIPS.maxNodes}
-            onChange={(v) => setConfig({ maxNodes: v })}
+            onChange={(v) => setConfig({ max_nodes: v })}
           />
           <ParamSlider
             name="Max Muscles"
-            value={config.maxMuscles}
-            displayValue={String(config.maxMuscles)}
+            value={config.max_muscles}
+            displayValue={String(config.max_muscles)}
             min={1}
             max={30}
             tooltip={TOOLTIPS.maxMuscles}
-            onChange={(v) => setConfig({ maxMuscles: v })}
+            onChange={(v) => setConfig({ max_muscles: v })}
           />
         </div>
 
@@ -97,8 +97,8 @@ export function MenuScreen() {
         }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Replay Storage:</span>
           <select
-            value={config.frameStorageMode}
-            onChange={(e) => setConfig({ frameStorageMode: e.target.value as 'none' | 'sparse' | 'all' })}
+            value={config.frame_storage_mode}
+            onChange={(e) => setConfig({ frame_storage_mode: e.target.value as 'none' | 'sparse' | 'all' })}
             style={{
               background: 'var(--bg-secondary)',
               border: '1px solid var(--border)',

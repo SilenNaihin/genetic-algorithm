@@ -473,7 +473,6 @@ class TestEvolutionIntegration:
                 'elite_count': 2,
                 'cull_percentage': 0.5,
                 'crossover_rate': 0.5,
-                'use_mutation': True,
                 'use_crossover': True,
                 'mutation_rate': 0.3,
                 'mutation_magnitude': 0.5,

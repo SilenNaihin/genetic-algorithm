@@ -244,20 +244,19 @@ export const useGeneration = () => useEvolutionStore((s) => s.generation);
 
 /**
  * Normalized config hook that handles both camelCase and snake_case keys.
- * This is needed because configs loaded from the backend may have snake_case keys,
- * while the frontend code expects camelCase.
+ * Converts any legacy camelCase keys to snake_case for consistency.
  */
 export const useConfig = () => {
   const rawConfig = useEvolutionStore((s) => s.config);
-  // Normalize keys that might be in snake_case from backend
+  // Normalize keys that might be in camelCase from legacy storage
   const rc = rawConfig as unknown as Record<string, unknown>;
   return {
     ...rawConfig,
-    timeEncoding: (rc.timeEncoding ?? rc.time_encoding ?? 'none') as typeof rawConfig.timeEncoding,
-    useProprioception: (rc.useProprioception ?? rc.use_proprioception ?? false) as boolean,
-    proprioceptionInputs: (rc.proprioceptionInputs ?? rc.proprioception_inputs ?? 'all') as typeof rawConfig.proprioceptionInputs,
-    neuralMode: (rc.neuralMode ?? rc.neural_mode ?? 'hybrid') as typeof rawConfig.neuralMode,
-    neuralDeadZone: (rc.neuralDeadZone ?? rc.neural_dead_zone ?? 0) as number,
+    time_encoding: (rc.time_encoding ?? rc.timeEncoding ?? 'none') as typeof rawConfig.time_encoding,
+    use_proprioception: (rc.use_proprioception ?? rc.useProprioception ?? false) as boolean,
+    proprioception_inputs: (rc.proprioception_inputs ?? rc.proprioceptionInputs ?? 'all') as typeof rawConfig.proprioception_inputs,
+    neural_mode: (rc.neural_mode ?? rc.neuralMode ?? 'hybrid') as typeof rawConfig.neural_mode,
+    neural_dead_zone: (rc.neural_dead_zone ?? rc.neuralDeadZone ?? 0) as number,
   };
 };
 
@@ -268,16 +267,17 @@ export const useCardAnimationStates = () => useEvolutionStore((s) => s.cardAnima
 /**
  * Non-hook function to get normalized config (handles both camelCase and snake_case keys).
  * Use this when you need config outside of React hooks (e.g., in callbacks, event handlers).
+ * Converts any legacy camelCase keys to snake_case for consistency.
  */
 export function getNormalizedConfig(): SimulationConfig {
   const rawConfig = useEvolutionStore.getState().config;
   const rc = rawConfig as unknown as Record<string, unknown>;
   return {
     ...rawConfig,
-    timeEncoding: (rc.timeEncoding ?? rc.time_encoding ?? 'none') as typeof rawConfig.timeEncoding,
-    useProprioception: (rc.useProprioception ?? rc.use_proprioception ?? false) as boolean,
-    proprioceptionInputs: (rc.proprioceptionInputs ?? rc.proprioception_inputs ?? 'all') as typeof rawConfig.proprioceptionInputs,
-    neuralMode: (rc.neuralMode ?? rc.neural_mode ?? 'hybrid') as typeof rawConfig.neuralMode,
-    neuralDeadZone: (rc.neuralDeadZone ?? rc.neural_dead_zone ?? 0) as number,
+    time_encoding: (rc.time_encoding ?? rc.timeEncoding ?? 'none') as typeof rawConfig.time_encoding,
+    use_proprioception: (rc.use_proprioception ?? rc.useProprioception ?? false) as boolean,
+    proprioception_inputs: (rc.proprioception_inputs ?? rc.proprioceptionInputs ?? 'all') as typeof rawConfig.proprioception_inputs,
+    neural_mode: (rc.neural_mode ?? rc.neuralMode ?? 'hybrid') as typeof rawConfig.neural_mode,
+    neural_dead_zone: (rc.neural_dead_zone ?? rc.neuralDeadZone ?? 0) as number,
   };
 }

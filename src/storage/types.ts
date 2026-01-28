@@ -59,10 +59,10 @@ export function recalculateFitnessOverTime(
   const initialCOM = frames[0].centerOfMass;
 
   // Get fitness config (with defaults for legacy runs)
-  const pelletPoints = config.fitnessPelletPoints ?? DEFAULT_CONFIG.fitnessPelletPoints;
-  const progressMax = config.fitnessProgressMax ?? DEFAULT_CONFIG.fitnessProgressMax;
-  const distancePerUnit = config.fitnessDistancePerUnit ?? DEFAULT_CONFIG.fitnessDistancePerUnit;
-  const distanceTraveledMax = config.fitnessDistanceTraveledMax ?? DEFAULT_CONFIG.fitnessDistanceTraveledMax;
+  const pelletPoints = config.fitness_pellet_points ?? DEFAULT_CONFIG.fitness_pellet_points;
+  const progressMax = config.fitness_progress_max ?? DEFAULT_CONFIG.fitness_progress_max;
+  const distancePerUnit = config.fitness_distance_per_unit ?? DEFAULT_CONFIG.fitness_distance_per_unit;
+  const distanceTraveledMax = config.fitness_distance_traveled_max ?? DEFAULT_CONFIG.fitness_distance_traveled_max;
 
   // Track cumulative distance traveled (XZ only)
   let distanceTraveled = 0;

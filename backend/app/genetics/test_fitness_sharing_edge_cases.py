@@ -304,7 +304,6 @@ class TestEvolutionIntegration:
             use_fitness_sharing=True,
             sharing_radius=0.5,
             use_crossover=True,
-            use_mutation=True,
         )
 
         new_genomes, stats = evolve_population(genomes, fitness, config)
@@ -358,7 +357,6 @@ class TestEvolutionIntegration:
             use_fitness_sharing=True,
             sharing_radius=0.5,
             use_crossover=True,
-            use_mutation=True,
         )
 
         for gen in range(5):

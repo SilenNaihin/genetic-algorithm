@@ -125,7 +125,6 @@ class GeneticsService:
         population_size = config.get("population_size", 20)
         elite_count = config.get("elite_count", 2)
         use_crossover = config.get("use_crossover", True)
-        use_mutation = config.get("use_mutation", True)
         crossover_rate = config.get("crossover_rate", 0.3)
         mutation_rate = config.get("mutation_rate", 0.15)
         structural_rate = config.get("structural_mutation_rate", 0.1)
@@ -165,9 +164,8 @@ class GeneticsService:
                 parent = self._weighted_select(survivors, probs)
                 child = self._clone_genome(parent["genome"])
 
-            # Mutate
-            if use_mutation:
-                child = self._mutate(child, mutation_rate, structural_rate, constraints)
+            # Always mutate offspring - survivors are already kept unchanged
+            child = self._mutate(child, mutation_rate, structural_rate, constraints)
 
             # Update generation
             child["generation"] = sorted_creatures[0]["genome"].get("generation", 0) + 1

@@ -223,7 +223,7 @@ export function useSimulation() {
       const runId = await StorageService.createRun(currentConfig);
 
       // Show progress UI
-      setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
+      setSimulationProgress({ completed: 0, total: currentConfig.population_size });
       setEvolutionStep('simulate');
       setAppState('grid');
 
@@ -273,10 +273,10 @@ export function useSimulation() {
   ]);
 
   /**
-   * Run the mutate step with animation + backend call in parallel:
-   * 1. Start backend call immediately
-   * 2. Run culling animation (mark dead, fade out) while backend processes
-   * 3. When both complete, show real creatures with fitness hidden
+   * Run the mutate step:
+   * 1. Call backend to get evolution results and actual culled_ids
+   * 2. Run culling animation using actual culled creatures (from backend)
+   * 3. Show real creatures with fitness hidden
    * 4. Spawn animation for offspring
    * 5. Wait for user to click "Simulate" to reveal fitness
    */
@@ -291,15 +291,17 @@ export function useSimulation() {
       return;
     }
 
-    // Sort current results by fitness to find bottom cullPercentage%
-    const sortedResults = [...currentResults].sort((a, b) => {
-      const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
-      const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
-      return bFit - aFit;
-    });
+    // === CALL BACKEND FIRST to get actual culled_ids ===
+    if (!fastMode) {
+      setSimulationProgress({ completed: 0, total: currentConfig.population_size });
+    }
+    const response = await Api.evolutionStep(runId);
+    setSimulationProgress(null);
+    const newResults = response.creatures.map(apiCreatureToResult);
 
-    const survivorCount = Math.floor(sortedResults.length * (1 - currentConfig.cullPercentage));
-    const deadCreatures = sortedResults.slice(survivorCount);
+    // Get actual culled creatures from backend (based on selection method)
+    const culledIds = new Set(response.culled_ids || []);
+    const deadCreatures = currentResults.filter((r) => culledIds.has(r.genome._apiCreatureId || ''));
 
     // Check for dying creatures that might be longest survivors
     // Use same smart logic: keep best performance, set _bestPerformanceGeneration for replay
@@ -348,20 +350,18 @@ export function useSimulation() {
       y: Math.floor(index / GRID_COLS) * (CARD_SIZE + CARD_GAP),
     });
 
-    // Build map of survivor positions
+    // Build map of survivor positions (creatures NOT culled)
+    const survivorCount = currentResults.length - deadCreatures.length;
     const survivorPositions: { x: number; y: number }[] = [];
     for (let i = 0; i < survivorCount; i++) {
       survivorPositions.push(getGridPosition(i));
     }
 
-    // === START BACKEND CALL IMMEDIATELY (runs in parallel with animation) ===
-    const backendPromise = Api.evolutionStep(runId);
-
     // === PHASE 1: Mark dead creatures with red border (600ms) ===
     if (!fastMode) {
       const animStates = new Map<string, CardAnimationState>();
       for (const result of currentResults) {
-        const isDead = deadCreatures.some((d) => d.genome.id === result.genome.id);
+        const isDead = culledIds.has(result.genome._apiCreatureId || '');
         animStates.set(result.genome.id, {
           isDead,
           isFadingOut: false,
@@ -379,7 +379,7 @@ export function useSimulation() {
     if (!fastMode) {
       const fadeStates = new Map<string, CardAnimationState>();
       for (const result of currentResults) {
-        const isDead = deadCreatures.some((d) => d.genome.id === result.genome.id);
+        const isDead = culledIds.has(result.genome._apiCreatureId || '');
         fadeStates.set(result.genome.id, {
           isDead,
           isFadingOut: isDead,
@@ -392,15 +392,6 @@ export function useSimulation() {
       setCardAnimationStates(fadeStates);
       await delay(FADE_OUT_DELAY);
     }
-
-    // === WAIT FOR BACKEND TO COMPLETE ===
-    // Show progress if backend is still running after animation completes
-    if (!fastMode) {
-      setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
-    }
-    const response = await backendPromise;
-    setSimulationProgress(null);
-    const newResults = response.creatures.map(apiCreatureToResult);
 
     // Store the real fitness values but display with fitness hidden
     // We'll store actual fitness in a separate field and show NaN until "Simulate" is clicked
@@ -476,7 +467,7 @@ export function useSimulation() {
 
     // Show quick progress animation (data already loaded, this is just for UX)
     if (!fastMode) {
-      setSimulationProgress({ completed: 0, total: currentConfig.populationSize });
+      setSimulationProgress({ completed: 0, total: currentConfig.population_size });
       await delay(800); // Quick animation duration
       setSimulationProgress(null);
     }
@@ -573,19 +564,16 @@ export function useSimulation() {
         for (let i = 0; i < generations; i++) {
           if (!autoRunning) break;
 
-          // Check for dying creatures before evolution
           const previousResults = useEvolutionStore.getState().simulationResults;
-          const currentConfig = useEvolutionStore.getState().config;
           const currentGen = useEvolutionStore.getState().generation;
 
+          // Run evolution step first to get actual culled_ids
+          const response = await Api.evolutionStep(runId);
+
+          // Check for dying creatures using actual culled_ids from backend
           if (previousResults.length > 0) {
-            const sortedPrev = [...previousResults].sort((a, b) => {
-              const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
-              const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
-              return bFit - aFit;
-            });
-            const survivorCount = Math.floor(sortedPrev.length * (1 - currentConfig.cullPercentage));
-            const dyingCreatures = sortedPrev.slice(survivorCount);
+            const culledIds = new Set(response.culled_ids || []);
+            const dyingCreatures = previousResults.filter((r) => culledIds.has(r.genome._apiCreatureId || ''));
 
             // Use same smart logic: keep best performance, set _bestPerformanceGeneration for replay
             for (const dead of dyingCreatures) {
@@ -624,9 +612,6 @@ export function useSimulation() {
               }
             }
           }
-
-          // Run evolution step
-          const response = await Api.evolutionStep(runId);
           const results = response.creatures.map(apiCreatureToResult);
 
           // Update fitness history

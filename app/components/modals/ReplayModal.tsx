@@ -164,20 +164,8 @@ export function ReplayModal() {
   const simulationResults = useEvolutionStore((s) => s.simulationResults);
   const rawConfig = useEvolutionStore((s) => s.config);
 
-  // Normalize config to handle both camelCase and snake_case keys
-  // This is needed because old configs may have been saved with snake_case keys from the backend
-  const config = React.useMemo(() => {
-    const rc = rawConfig as unknown as Record<string, unknown>;
-    return {
-      ...rawConfig,
-      // Handle fields that might be snake_case from backend
-      timeEncoding: (rc.timeEncoding ?? rc.time_encoding ?? 'none') as typeof rawConfig.timeEncoding,
-      useProprioception: (rc.useProprioception ?? rc.use_proprioception ?? false) as boolean,
-      proprioceptionInputs: (rc.proprioceptionInputs ?? rc.proprioception_inputs ?? 'all') as typeof rawConfig.proprioceptionInputs,
-      neuralMode: (rc.neuralMode ?? rc.neural_mode ?? 'hybrid') as typeof rawConfig.neuralMode,
-      neuralDeadZone: (rc.neuralDeadZone ?? rc.neural_dead_zone ?? 0) as number,
-    };
-  }, [rawConfig]);
+  // Access config directly since it now uses snake_case
+  const config = rawConfig;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReplayRenderer | null>(null);
@@ -324,13 +312,13 @@ export function ReplayModal() {
 
     // Calculate NON-PADDED input count (padded inputs are not shown in visualization)
     let nonPaddedInputCount = 7; // base inputs always shown
-    if (config.timeEncoding === 'cyclic' || config.timeEncoding === 'sin_raw') nonPaddedInputCount += 2;
-    else if (config.timeEncoding === 'sin' || config.timeEncoding === 'raw') nonPaddedInputCount += 1;
+    if (config.time_encoding === 'cyclic' || config.time_encoding === 'sin_raw') nonPaddedInputCount += 2;
+    else if (config.time_encoding === 'sin' || config.time_encoding === 'raw') nonPaddedInputCount += 1;
 
-    if (config.useProprioception) {
+    if (config.use_proprioception) {
       const numMuscles = genome.muscles.length;
       const numNodes = genome.nodes.length;
-      const propType = config.proprioceptionInputs || 'all';
+      const propType = config.proprioception_inputs || 'all';
       // Only count actual inputs, not padded ones
       if (propType === 'strain') nonPaddedInputCount += numMuscles;
       else if (propType === 'velocity') nonPaddedInputCount += numNodes * 3;
@@ -370,17 +358,17 @@ export function ReplayModal() {
       visualizer.setGenome(genome.neuralGenome, muscleNames);
     }
     // Set time encoding for accurate input labels
-    visualizer.setTimeEncoding(config.timeEncoding || 'none');
+    visualizer.setTimeEncoding(config.time_encoding || 'none');
     // Set proprioception config for input labels
     visualizer.setProprioception({
-      enabled: config.useProprioception || false,
-      inputs: config.proprioceptionInputs || 'all',
+      enabled: config.use_proprioception || false,
+      inputs: config.proprioception_inputs || 'all',
       numMuscles: genome.muscles.length,
       numNodes: genome.nodes.length,
     });
     // Set dead zone for output node coloring (in pure and neat modes)
-    if (config.neuralMode === 'pure' || config.neuralMode === 'neat') {
-      visualizer.setDeadZone(config.neuralDeadZone || 0);
+    if (config.neural_mode === 'pure' || config.neural_mode === 'neat') {
+      visualizer.setDeadZone(config.neural_dead_zone || 0);
     }
 
     return () => {
@@ -389,7 +377,7 @@ export function ReplayModal() {
         neuralVisualizerRef.current = null;
       }
     };
-  }, [isOpen, loadedResult, config.timeEncoding, config.useProprioception, config.proprioceptionInputs, config.neuralMode, config.neuralDeadZone]);
+  }, [isOpen, loadedResult, config.time_encoding, config.use_proprioception, config.proprioception_inputs, config.neural_mode, config.neural_dead_zone]);
 
   // Build family tree from embedded ancestry chain (no DB lookups needed)
   const buildFamilyTree = useCallback((genome: CreatureGenome) => {
@@ -838,7 +826,7 @@ export function ReplayModal() {
                       <span style={{ color: 'var(--text-muted)' }}>Survival Streak</span>
                       <span style={{ color: 'var(--success)' }}>{genome.survivalStreak}</span>
                     </div>
-                    {config.neuralMode === 'hybrid' && (
+                    {config.neural_mode === 'hybrid' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Freq Mult</span>
                         <span style={{ color: 'var(--text-primary)' }}>{genome.globalFrequencyMultiplier.toFixed(2)}×</span>
@@ -899,7 +887,7 @@ export function ReplayModal() {
                     {genome.muscles.map((muscle, i) => {
                       const nodeAIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeA) + 1;
                       const nodeBIndex = genome.nodes.findIndex((n) => n.id === muscle.nodeB) + 1;
-                      const isDirectNeural = hasNeuralGenome && (config.neuralMode === 'pure' || config.neuralMode === 'neat');
+                      const isDirectNeural = hasNeuralGenome && (config.neural_mode === 'pure' || config.neural_mode === 'neat');
                       return (
                         <div key={muscle.id} style={{
                           background: 'var(--bg-secondary)',
@@ -975,17 +963,17 @@ export function ReplayModal() {
                   </div>
                   <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
                     <div style={{ marginBottom: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Mode:</span> {config.neuralMode || 'hybrid'}
+                      <span style={{ color: 'var(--text-muted)' }}>Mode:</span> {config.neural_mode || 'hybrid'}
                       {isNEAT && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>(NEAT)</span>}
                     </div>
                     <div style={{ marginBottom: '4px' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Topology:</span>{' '}
                       {(() => {
                         let actualInputs = 7;
-                        if (config.timeEncoding === 'cyclic' || config.timeEncoding === 'sin_raw') actualInputs += 2;
-                        else if (config.timeEncoding === 'sin' || config.timeEncoding === 'raw') actualInputs += 1;
-                        if (config.useProprioception) {
-                          const propType = config.proprioceptionInputs || 'all';
+                        if (config.time_encoding === 'cyclic' || config.time_encoding === 'sin_raw') actualInputs += 2;
+                        else if (config.time_encoding === 'sin' || config.time_encoding === 'raw') actualInputs += 1;
+                        if (config.use_proprioception) {
+                          const propType = config.proprioception_inputs || 'all';
                           if (propType === 'strain') actualInputs += 15;
                           else if (propType === 'velocity') actualInputs += 24;
                           else if (propType === 'ground') actualInputs += 8;
@@ -1036,7 +1024,7 @@ export function ReplayModal() {
                         <ColorKeyTooltip label="vel" color="var(--success)" description="Creature velocity - normalized xyz velocity of the creature's center of mass" />
                         <ColorKeyTooltip label="dst" color="var(--text-secondary)" description="Distance to pellet - normalized distance from creature edge to pellet (0=touching, 1=far)" />
                         <ColorKeyTooltip label="t" color="var(--warning)" description="Time phase - cyclic or linear time encoding for rhythm synchronization" />
-                        {(config.useProprioception) && (
+                        {(config.use_proprioception) && (
                           <>
                             <ColorKeyTooltip label="str" color="#e879f9" description="Muscle strain - how stretched/compressed each muscle is relative to rest length (-1 to 1)" />
                             <ColorKeyTooltip label="nv" color="#38bdf8" description="Node velocity - xyz velocity of each body node, showing how fast each part is moving" />
@@ -1054,9 +1042,9 @@ export function ReplayModal() {
                             const nodeBIndex = genome.nodes.findIndex((n) => n.id === m.nodeB) + 1;
                             return `${nodeAIndex}-${nodeBIndex}`;
                           });
-                          const allNames = getSensorNamesForEncoding(config.timeEncoding || 'none', {
-                            enabled: config.useProprioception || false,
-                            inputs: config.proprioceptionInputs || 'all',
+                          const allNames = getSensorNamesForEncoding(config.time_encoding || 'none', {
+                            enabled: config.use_proprioception || false,
+                            inputs: config.proprioception_inputs || 'all',
                             numMuscles: genome.muscles.length,
                             numNodes: genome.nodes.length,
                           }, muscleNames);

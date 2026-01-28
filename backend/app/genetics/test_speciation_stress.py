@@ -240,7 +240,6 @@ class TestIntegrationWithEvolution:
             "compatibility_threshold": 1.0,
             "min_species_size": 2,
             "cull_percentage": 0.5,
-            "use_mutation": True,
             "use_crossover": False,
         }
 
@@ -295,7 +294,6 @@ class TestIntegrationWithEvolution:
             "use_fitness_sharing": True,
             "sharing_radius": 0.5,
             "cull_percentage": 0.5,
-            "use_mutation": True,
         }
 
         new_genomes, stats = evolve_population(genomes, fitness, config, generation=0)
@@ -317,7 +315,6 @@ class TestMultiGenerationScenarios:
             "compatibility_threshold": 0.8,
             "min_species_size": 2,
             "cull_percentage": 0.5,
-            "use_mutation": True,
             "mutation_rate": 0.2,
         }
 
@@ -346,7 +343,6 @@ class TestMultiGenerationScenarios:
             "compatibility_threshold": 1.0,
             "min_species_size": 1,
             "cull_percentage": 0.5,
-            "use_mutation": True,
         }
 
         fitness = [100.0 - i for i in range(20)]  # Deterministic fitness
@@ -555,7 +551,6 @@ class TestSurvivorCountEdgeCases:
                 "compatibility_threshold": 0.8,
                 "min_species_size": 2,
                 "cull_percentage": 0.5,
-                "use_mutation": True,
             }
 
             new_genomes, _ = evolve_population(genomes, fitness, config, generation=0)
@@ -783,7 +778,6 @@ class TestRealWorldScenarios:
             "compatibility_threshold": 0.8,
             "min_species_size": 2,
             "cull_percentage": 0.5,
-            "use_mutation": True,
             "mutation_rate": 0.2,
         }
 

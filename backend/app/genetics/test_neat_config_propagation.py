@@ -321,7 +321,6 @@ class TestNEATConfigBoundaries:
             'weight_mutation_rate': 0.0,  # No weight changes either
             'bias_mode': 'bias_node',
             'use_crossover': False,  # Only mutation
-            'use_mutation': True,
         }
 
         fitness_scores = [float(i) for i in range(10)]
@@ -371,7 +370,6 @@ class TestNEATConfigBoundaries:
             'neat_max_hidden_nodes': 64,
             'bias_mode': 'bias_node',
             'use_crossover': False,
-            'use_mutation': True,
         }
 
         fitness_scores = [float(i) for i in range(20)]
@@ -419,7 +417,6 @@ class TestNEATConfigBoundaries:
             'neat_max_hidden_nodes': MAX_HIDDEN,
             'bias_mode': 'node',
             'use_crossover': False,
-            'use_mutation': True,
         }
 
         fitness_scores = [float(i) for i in range(10)]

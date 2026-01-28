@@ -56,7 +56,7 @@ export function BrainEvolutionModal() {
 
       // Check if using NEAT mode (variable topology - can't compare weights directly)
       const currentConfig = getNormalizedConfig();
-      if (currentConfig.neuralMode === 'neat') {
+      if (currentConfig.neural_mode === 'neat') {
         setError('Brain evolution comparison is not available for NEAT mode (variable topology networks)');
         setLoading(false);
         return;

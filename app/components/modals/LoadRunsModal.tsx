@@ -315,9 +315,9 @@ function RunCard({ run, onLoad, onDelete }: RunCardProps) {
 
       {/* Config summary - matches vanilla + duration */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-        <span>Gravity: {run.config.gravity} | Mut: {Math.round((run.config.mutationRate || 0.1) * 100)}%</span>
+        <span>Gravity: {run.config.gravity} | Mut: {Math.round((run.config.mutation_rate || 0.1) * 100)}%</span>
         <span>
-          {run.config.simulationDuration}s
+          {run.config.simulation_duration}s
           {run.bestCreature?.result?.fitness != null && (
             <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>
               {run.bestCreature.result.fitness.toFixed(0)}

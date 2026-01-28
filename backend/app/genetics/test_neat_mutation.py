@@ -659,15 +659,15 @@ class TestMutateNeatGenome:
 
 
 class TestNEATAlwaysMutates:
-    """Tests that NEAT mode always applies mutations, regardless of use_mutation setting."""
+    """Tests that all offspring (including clones) get mutated."""
 
-    def test_neat_clones_get_mutated(self):
+    def test_clone_offspring_get_mutated(self):
         """
-        In NEAT mode, even clone offspring should get mutated.
+        Clone offspring should always get mutated.
 
-        This tests the fix for a bug where with use_mutation=False and
-        crossover_rate=0.5, 50% of offspring were clones that never got
-        mutated, preventing topology evolution.
+        This tests that when crossover_rate=0 (all offspring are clones),
+        mutations are still applied to prevent duplicate genomes and
+        ensure evolution has variation.
         """
         random.seed(42)
 
@@ -708,7 +708,6 @@ class TestNEATAlwaysMutates:
             'cull_percentage': 0.5,
             'selection_method': 'speciation',
             'crossover_rate': 0.0,  # NO crossover - all offspring are clones
-            'use_mutation': False,  # Standard "no mutation" setting
             'use_crossover': False,
             'compatibility_threshold': 10.0,  # High threshold = all same species
             'use_neat': True,
@@ -719,13 +718,13 @@ class TestNEATAlwaysMutates:
         counter = InnovationCounter()
         fitness = [100 - i for i in range(10)]
 
-        # Run evolution - without the fix, no mutations would happen
+        # Run evolution
         new_genomes, stats = evolve_population(genomes, fitness, config, generation=1, innovation_counter=counter)
 
         # Get newborns (should all be clones since crossover_rate=0)
         newborns = [g for g in new_genomes if g.get('survivalStreak', 0) == 0]
 
-        # Check that mutations were applied despite use_mutation=False
+        # Check that mutations were applied to clone offspring
         connections_added = 0
         for g in newborns:
             neat = g.get('neatGenome') or g.get('neat_genome', {})
@@ -735,9 +734,9 @@ class TestNEATAlwaysMutates:
                     connections_added += 1
 
         assert connections_added > 0, (
-            f"No mutations applied to clone offspring in NEAT mode! "
+            f"No mutations applied to clone offspring! "
             f"With neat_add_connection_rate=1.0, ALL newborns should have new connections. "
-            f"This suggests NEAT clones are not being mutated."
+            f"This suggests clone offspring are not being mutated."
         )
 
 

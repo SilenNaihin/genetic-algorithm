@@ -40,7 +40,6 @@ class SimulationConfig(BaseModel):
     mutation_magnitude: float = Field(default=0.3, ge=0.0, le=1.0)
     crossover_rate: float = Field(default=0.5, ge=0.0, le=1.0)
     elite_count: int = Field(default=5, ge=0, le=100)
-    use_mutation: bool = False
     use_crossover: bool = True
 
     # Creature constraints

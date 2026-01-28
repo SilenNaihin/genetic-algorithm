@@ -28,7 +28,7 @@ export function PreviewCanvas({ config, isActive = true, mountKey = 0 }: Preview
     configRef.current = config;
     // Regenerate creature when complexity settings change
     rendererRef.current?.regenerateCreature();
-  }, [config.maxNodes, config.maxMuscles, config.maxAllowedFrequency, config.gravity]);
+  }, [config.max_nodes, config.max_muscles, config.max_allowed_frequency, config.gravity]); // Note: these are passed from parent, not from store
 
   // Create renderer with a small delay to handle StrictMode double-mount
   useEffect(() => {

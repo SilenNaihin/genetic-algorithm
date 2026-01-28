@@ -2,7 +2,8 @@
  * API Client for Python Backend
  *
  * Typed fetch wrapper for all backend endpoints.
- * Handles JSON serialization, error handling, and type conversion.
+ * Handles JSON serialization and error handling.
+ * Both frontend and backend use snake_case field names.
  */
 
 import type { SimulationConfig, NEATGenome } from '../types/simulation';
@@ -15,103 +16,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 // API Types (matching backend Pydantic schemas)
 // -------------------------------------------------------------------
 
-/** Backend uses snake_case, we convert to camelCase */
-export interface ApiSimulationConfig {
-  // Physics
-  gravity: number;
-  ground_friction: number;
-  time_step: number;
-  simulation_duration: number;
-
-  // Muscle constraints (optional for backwards compatibility)
-  muscle_velocity_cap?: number;
-  muscle_damping_multiplier?: number;
-  max_extension_ratio?: number;
-
-  // Evolution
-  population_size: number;
-  cull_percentage: number;
-  selection_method?: 'truncation' | 'tournament' | 'rank' | 'speciation';
-  tournament_size?: number;
-  mutation_rate: number;
-  mutation_magnitude: number;
-  crossover_rate: number;
-  elite_count: number;
-  use_mutation: boolean;
-  use_crossover: boolean;
-
-  // Creature constraints
-  min_nodes: number;
-  max_nodes: number;
-  max_muscles: number;
-  max_allowed_frequency: number;
-
-  // Environment
-  pellet_count: number;
-  arena_size: number;
-
-  // Fitness
-  fitness_pellet_points: number;
-  fitness_progress_max: number;
-  fitness_distance_per_unit: number;
-  fitness_distance_traveled_max: number;
-  fitness_regression_penalty: number;
-
-  // Neural network
-  use_neural_net: boolean;
-  neural_mode: 'hybrid' | 'pure' | 'neat';
-  bias_mode?: 'none' | 'node' | 'bias_node';
-  time_encoding: 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw';
-  neural_hidden_size: number;
-  neural_activation: string;
-  weight_mutation_rate: number;
-  weight_mutation_magnitude: number;
-  weight_mutation_decay: 'off' | 'linear' | 'exponential';
-  neural_output_bias: number;
-  fitness_efficiency_penalty: number;
-  neural_dead_zone: number;
-  neural_update_hz?: number;
-  output_smoothing_alpha?: number;
-
-  // Adaptive mutation (optional for backwards compatibility)
-  use_adaptive_mutation?: boolean;
-  stagnation_threshold?: number;
-  adaptive_mutation_boost?: number;
-  max_adaptive_boost?: number;
-  improvement_threshold?: number;
-
-  // Crossover method (optional for backwards compatibility)
-  neural_crossover_method?: 'interpolation' | 'uniform' | 'sbx';
-  sbx_eta?: number;
-
-  // Fitness sharing (optional for backwards compatibility)
-  use_fitness_sharing?: boolean;
-  sharing_radius?: number;
-
-  // Speciation (used when selection_method='speciation')
-  compatibility_threshold?: number;
-  min_species_size?: number;
-
-  // NEAT settings (optional - backend has defaults)
-  neat_initial_connectivity?: 'full' | 'sparse_inputs' | 'sparse_outputs' | 'none';
-  neat_add_connection_rate?: number;
-  neat_add_node_rate?: number;
-  neat_enable_rate?: number;
-  neat_disable_rate?: number;
-  neat_excess_coefficient?: number;
-  neat_disjoint_coefficient?: number;
-  neat_weight_coefficient?: number;
-  neat_max_hidden_nodes?: number;
-
-  // Proprioception
-  use_proprioception?: boolean;
-  proprioception_inputs?: 'strain' | 'velocity' | 'ground' | 'all';
-
-  // Frame storage
-  frame_storage_mode: 'none' | 'all' | 'sparse';
-  frame_rate: number;
-  sparse_top_count: number;
-  sparse_bottom_count: number;
+/** API config - extends SimulationConfig with backend-specific fields */
+export interface ApiSimulationConfig extends SimulationConfig {
+  frame_rate?: number;  // Backend-only: frame capture rate for replays
 }
 
 
@@ -183,6 +90,7 @@ export interface ApiEvolutionStepResponse {
   simulation_time_ms: number;
   creature_count: number;
   creatures: ApiEvolutionCreature[];
+  culled_ids: string[];  // IDs of creatures from previous gen that died
 }
 
 
@@ -190,204 +98,204 @@ export interface ApiEvolutionStepResponse {
 // Conversion helpers
 // -------------------------------------------------------------------
 
-/** Convert frontend SimulationConfig (camelCase) to API format (snake_case) */
+/** Convert frontend SimulationConfig to API format (identity - both use snake_case) */
 export function toApiConfig(config: SimulationConfig): ApiSimulationConfig {
   return {
     // Physics
     gravity: config.gravity,
-    ground_friction: config.groundFriction,
-    time_step: config.timeStep,
-    simulation_duration: config.simulationDuration,
+    ground_friction: config.ground_friction,
+    time_step: config.time_step,
+    physics_fps: config.physics_fps,
+    simulation_duration: config.simulation_duration,
 
     // Muscle constraints
-    muscle_velocity_cap: config.muscleVelocityCap ?? 5.0,
-    muscle_damping_multiplier: config.muscleDampingMultiplier ?? 1.0,
-    max_extension_ratio: config.maxExtensionRatio ?? 2.0,
+    muscle_velocity_cap: config.muscle_velocity_cap ?? 5.0,
+    muscle_damping_multiplier: config.muscle_damping_multiplier ?? 1.0,
+    max_extension_ratio: config.max_extension_ratio ?? 2.0,
 
     // Evolution
-    population_size: config.populationSize,
-    cull_percentage: config.cullPercentage,
-    selection_method: config.selectionMethod,
-    tournament_size: config.tournamentSize ?? 3,
-    mutation_rate: config.mutationRate,
-    mutation_magnitude: config.mutationMagnitude,
-    crossover_rate: config.crossoverRate,
-    elite_count: config.eliteCount,
-    use_mutation: config.useMutation,
-    use_crossover: config.useCrossover,
+    population_size: config.population_size,
+    cull_percentage: config.cull_percentage,
+    selection_method: config.selection_method,
+    tournament_size: config.tournament_size ?? 3,
+    mutation_rate: config.mutation_rate,
+    mutation_magnitude: config.mutation_magnitude,
+    crossover_rate: config.crossover_rate,
+    elite_count: config.elite_count,
+    use_crossover: config.use_crossover,
 
     // Creature constraints
-    min_nodes: config.minNodes,
-    max_nodes: config.maxNodes,
-    max_muscles: config.maxMuscles,
-    max_allowed_frequency: config.maxAllowedFrequency,
+    min_nodes: config.min_nodes,
+    max_nodes: config.max_nodes,
+    max_muscles: config.max_muscles,
+    max_allowed_frequency: config.max_allowed_frequency,
 
     // Environment
-    pellet_count: config.pelletCount,
-    arena_size: config.arenaSize,
+    pellet_count: config.pellet_count,
+    arena_size: config.arena_size,
 
     // Fitness
-    fitness_pellet_points: config.fitnessPelletPoints,
-    fitness_progress_max: config.fitnessProgressMax,
-    fitness_distance_per_unit: config.fitnessDistancePerUnit,
-    fitness_distance_traveled_max: config.fitnessDistanceTraveledMax,
-    fitness_regression_penalty: config.fitnessRegressionPenalty,
+    fitness_pellet_points: config.fitness_pellet_points,
+    fitness_progress_max: config.fitness_progress_max,
+    fitness_distance_per_unit: config.fitness_distance_per_unit,
+    fitness_distance_traveled_max: config.fitness_distance_traveled_max,
+    fitness_regression_penalty: config.fitness_regression_penalty,
 
     // Neural network
-    use_neural_net: config.useNeuralNet,
-    neural_mode: config.neuralMode,
-    bias_mode: config.biasMode,
-    time_encoding: config.timeEncoding,
-    neural_hidden_size: config.neuralHiddenSize,
-    neural_activation: config.neuralActivation,
-    weight_mutation_rate: config.weightMutationRate,
-    weight_mutation_magnitude: config.weightMutationMagnitude,
-    weight_mutation_decay: config.weightMutationDecay,
-    neural_output_bias: config.neuralOutputBias,
-    fitness_efficiency_penalty: config.fitnessEfficiencyPenalty,
-    neural_dead_zone: config.neuralDeadZone,
-    neural_update_hz: config.neuralUpdateHz ?? 10,
-    output_smoothing_alpha: config.outputSmoothingAlpha ?? 0.15,
+    use_neural_net: config.use_neural_net,
+    neural_mode: config.neural_mode,
+    bias_mode: config.bias_mode,
+    time_encoding: config.time_encoding,
+    neural_hidden_size: config.neural_hidden_size,
+    neural_activation: config.neural_activation,
+    weight_mutation_rate: config.weight_mutation_rate,
+    weight_mutation_magnitude: config.weight_mutation_magnitude,
+    weight_mutation_decay: config.weight_mutation_decay,
+    neural_output_bias: config.neural_output_bias,
+    fitness_efficiency_penalty: config.fitness_efficiency_penalty,
+    neural_dead_zone: config.neural_dead_zone,
+    neural_update_hz: config.neural_update_hz ?? 10,
+    output_smoothing_alpha: config.output_smoothing_alpha ?? 0.15,
 
     // Adaptive mutation
-    use_adaptive_mutation: config.useAdaptiveMutation ?? false,
-    stagnation_threshold: config.stagnationThreshold ?? 20,
-    adaptive_mutation_boost: config.adaptiveMutationBoost ?? 2.0,
-    max_adaptive_boost: config.maxAdaptiveBoost ?? 8.0,
-    improvement_threshold: config.improvementThreshold ?? 5.0,
+    use_adaptive_mutation: config.use_adaptive_mutation ?? false,
+    stagnation_threshold: config.stagnation_threshold ?? 20,
+    adaptive_mutation_boost: config.adaptive_mutation_boost ?? 2.0,
+    max_adaptive_boost: config.max_adaptive_boost ?? 8.0,
+    improvement_threshold: config.improvement_threshold ?? 5.0,
 
     // Crossover method
-    neural_crossover_method: config.neuralCrossoverMethod ?? 'sbx',
-    sbx_eta: config.sbxEta ?? 2.0,
+    neural_crossover_method: config.neural_crossover_method ?? 'sbx',
+    sbx_eta: config.sbx_eta ?? 2.0,
 
     // Fitness sharing
-    use_fitness_sharing: config.useFitnessSharing ?? false,
-    sharing_radius: config.sharingRadius ?? 0.5,
+    use_fitness_sharing: config.use_fitness_sharing ?? false,
+    sharing_radius: config.sharing_radius ?? 0.5,
 
     // Speciation
-    compatibility_threshold: config.compatibilityThreshold ?? 1.0,
-    min_species_size: config.minSpeciesSize ?? 2,
+    compatibility_threshold: config.compatibility_threshold ?? 1.0,
+    min_species_size: config.min_species_size ?? 2,
 
     // NEAT settings
-    neat_initial_connectivity: config.neatInitialConnectivity ?? 'full',
-    neat_add_connection_rate: config.neatAddConnectionRate,
-    neat_add_node_rate: config.neatAddNodeRate,
-    neat_enable_rate: config.neatEnableRate,
-    neat_disable_rate: config.neatDisableRate,
-    neat_excess_coefficient: config.neatExcessCoefficient,
-    neat_disjoint_coefficient: config.neatDisjointCoefficient,
-    neat_weight_coefficient: config.neatWeightCoefficient,
-    neat_max_hidden_nodes: config.neatMaxHiddenNodes,
+    neat_initial_connectivity: config.neat_initial_connectivity ?? 'full',
+    neat_add_connection_rate: config.neat_add_connection_rate,
+    neat_add_node_rate: config.neat_add_node_rate,
+    neat_enable_rate: config.neat_enable_rate,
+    neat_disable_rate: config.neat_disable_rate,
+    neat_excess_coefficient: config.neat_excess_coefficient,
+    neat_disjoint_coefficient: config.neat_disjoint_coefficient,
+    neat_weight_coefficient: config.neat_weight_coefficient,
+    neat_max_hidden_nodes: config.neat_max_hidden_nodes,
 
     // Proprioception
-    use_proprioception: config.useProprioception ?? false,
-    proprioception_inputs: config.proprioceptionInputs ?? 'all',
+    use_proprioception: config.use_proprioception ?? false,
+    proprioception_inputs: config.proprioception_inputs ?? 'all',
 
     // Frame storage
-    frame_storage_mode: config.frameStorageMode,
+    frame_storage_mode: config.frame_storage_mode,
     frame_rate: 15,
-    sparse_top_count: config.sparseTopCount,
-    sparse_bottom_count: config.sparseBottomCount,
+    sparse_top_count: config.sparse_top_count,
+    sparse_bottom_count: config.sparse_bottom_count,
   };
 }
 
-/** Convert API SimulationConfig (snake_case) to frontend format (camelCase) */
+/** Convert API SimulationConfig to frontend format (identity - both use snake_case) */
 export function fromApiConfig(api: ApiSimulationConfig): Partial<SimulationConfig> {
   return {
     // Physics
     gravity: api.gravity,
-    groundFriction: api.ground_friction,
-    timeStep: api.time_step,
-    simulationDuration: api.simulation_duration,
+    ground_friction: api.ground_friction,
+    time_step: api.time_step,
+    physics_fps: api.physics_fps,
+    simulation_duration: api.simulation_duration,
 
     // Muscle constraints
-    muscleVelocityCap: api.muscle_velocity_cap ?? 5.0,
-    muscleDampingMultiplier: api.muscle_damping_multiplier ?? 1.0,
-    maxExtensionRatio: api.max_extension_ratio ?? 2.0,
+    muscle_velocity_cap: api.muscle_velocity_cap ?? 5.0,
+    muscle_damping_multiplier: api.muscle_damping_multiplier ?? 1.0,
+    max_extension_ratio: api.max_extension_ratio ?? 2.0,
 
     // Evolution
-    populationSize: api.population_size,
-    cullPercentage: api.cull_percentage,
-    selectionMethod: api.selection_method ?? 'rank',
-    tournamentSize: api.tournament_size ?? 3,
-    mutationRate: api.mutation_rate,
-    mutationMagnitude: api.mutation_magnitude,
-    crossoverRate: api.crossover_rate,
-    eliteCount: api.elite_count,
-    useMutation: api.use_mutation,
-    useCrossover: api.use_crossover,
+    population_size: api.population_size,
+    cull_percentage: api.cull_percentage,
+    selection_method: api.selection_method ?? 'rank',
+    tournament_size: api.tournament_size ?? 3,
+    mutation_rate: api.mutation_rate,
+    mutation_magnitude: api.mutation_magnitude,
+    crossover_rate: api.crossover_rate,
+    elite_count: api.elite_count,
+    use_crossover: api.use_crossover,
 
     // Creature constraints
-    minNodes: api.min_nodes,
-    maxNodes: api.max_nodes,
-    maxMuscles: api.max_muscles,
-    maxAllowedFrequency: api.max_allowed_frequency,
+    min_nodes: api.min_nodes,
+    max_nodes: api.max_nodes,
+    max_muscles: api.max_muscles,
+    max_allowed_frequency: api.max_allowed_frequency,
 
     // Environment
-    pelletCount: api.pellet_count,
-    arenaSize: api.arena_size,
+    pellet_count: api.pellet_count,
+    arena_size: api.arena_size,
 
     // Fitness
-    fitnessPelletPoints: api.fitness_pellet_points,
-    fitnessProgressMax: api.fitness_progress_max,
-    fitnessDistancePerUnit: api.fitness_distance_per_unit,
-    fitnessDistanceTraveledMax: api.fitness_distance_traveled_max,
-    fitnessRegressionPenalty: api.fitness_regression_penalty,
+    fitness_pellet_points: api.fitness_pellet_points,
+    fitness_progress_max: api.fitness_progress_max,
+    fitness_distance_per_unit: api.fitness_distance_per_unit,
+    fitness_distance_traveled_max: api.fitness_distance_traveled_max,
+    fitness_regression_penalty: api.fitness_regression_penalty,
 
     // Neural network
-    useNeuralNet: api.use_neural_net,
-    neuralMode: api.neural_mode,
-    biasMode: api.bias_mode ?? 'node',
-    timeEncoding: api.time_encoding,
-    neuralHiddenSize: api.neural_hidden_size,
-    neuralActivation: api.neural_activation as SimulationConfig['neuralActivation'],
-    weightMutationRate: api.weight_mutation_rate,
-    weightMutationMagnitude: api.weight_mutation_magnitude,
-    weightMutationDecay: api.weight_mutation_decay,
-    neuralOutputBias: api.neural_output_bias,
-    fitnessEfficiencyPenalty: api.fitness_efficiency_penalty,
-    neuralDeadZone: api.neural_dead_zone,
-    neuralUpdateHz: api.neural_update_hz ?? 10,
-    outputSmoothingAlpha: api.output_smoothing_alpha ?? 0.15,
+    use_neural_net: api.use_neural_net,
+    neural_mode: api.neural_mode,
+    bias_mode: api.bias_mode ?? 'node',
+    time_encoding: api.time_encoding,
+    neural_hidden_size: api.neural_hidden_size,
+    neural_activation: api.neural_activation as SimulationConfig['neural_activation'],
+    weight_mutation_rate: api.weight_mutation_rate,
+    weight_mutation_magnitude: api.weight_mutation_magnitude,
+    weight_mutation_decay: api.weight_mutation_decay,
+    neural_output_bias: api.neural_output_bias,
+    fitness_efficiency_penalty: api.fitness_efficiency_penalty,
+    neural_dead_zone: api.neural_dead_zone,
+    neural_update_hz: api.neural_update_hz ?? 10,
+    output_smoothing_alpha: api.output_smoothing_alpha ?? 0.15,
 
     // Adaptive mutation
-    useAdaptiveMutation: api.use_adaptive_mutation ?? false,
-    stagnationThreshold: api.stagnation_threshold ?? 20,
-    adaptiveMutationBoost: api.adaptive_mutation_boost ?? 2.0,
-    maxAdaptiveBoost: api.max_adaptive_boost ?? 8.0,
-    improvementThreshold: api.improvement_threshold ?? 5.0,
+    use_adaptive_mutation: api.use_adaptive_mutation ?? false,
+    stagnation_threshold: api.stagnation_threshold ?? 20,
+    adaptive_mutation_boost: api.adaptive_mutation_boost ?? 2.0,
+    max_adaptive_boost: api.max_adaptive_boost ?? 8.0,
+    improvement_threshold: api.improvement_threshold ?? 5.0,
 
     // Crossover method
-    neuralCrossoverMethod: api.neural_crossover_method ?? 'sbx',
-    sbxEta: api.sbx_eta ?? 2.0,
+    neural_crossover_method: api.neural_crossover_method ?? 'sbx',
+    sbx_eta: api.sbx_eta ?? 2.0,
 
     // Fitness sharing
-    useFitnessSharing: api.use_fitness_sharing ?? false,
-    sharingRadius: api.sharing_radius ?? 0.5,
+    use_fitness_sharing: api.use_fitness_sharing ?? false,
+    sharing_radius: api.sharing_radius ?? 0.5,
 
     // Speciation
-    compatibilityThreshold: api.compatibility_threshold ?? 1.0,
-    minSpeciesSize: api.min_species_size ?? 2,
+    compatibility_threshold: api.compatibility_threshold ?? 1.0,
+    min_species_size: api.min_species_size ?? 2,
 
     // NEAT settings
-    neatInitialConnectivity: api.neat_initial_connectivity ?? 'full',
-    neatAddConnectionRate: api.neat_add_connection_rate ?? 0.05,
-    neatAddNodeRate: api.neat_add_node_rate ?? 0.03,
-    neatEnableRate: api.neat_enable_rate ?? 0.02,
-    neatDisableRate: api.neat_disable_rate ?? 0.01,
-    neatExcessCoefficient: api.neat_excess_coefficient ?? 1.0,
-    neatDisjointCoefficient: api.neat_disjoint_coefficient ?? 1.0,
-    neatWeightCoefficient: api.neat_weight_coefficient ?? 0.4,
-    neatMaxHiddenNodes: api.neat_max_hidden_nodes ?? 16,
+    neat_initial_connectivity: api.neat_initial_connectivity ?? 'full',
+    neat_add_connection_rate: api.neat_add_connection_rate ?? 0.05,
+    neat_add_node_rate: api.neat_add_node_rate ?? 0.03,
+    neat_enable_rate: api.neat_enable_rate ?? 0.02,
+    neat_disable_rate: api.neat_disable_rate ?? 0.01,
+    neat_excess_coefficient: api.neat_excess_coefficient ?? 1.0,
+    neat_disjoint_coefficient: api.neat_disjoint_coefficient ?? 1.0,
+    neat_weight_coefficient: api.neat_weight_coefficient ?? 0.4,
+    neat_max_hidden_nodes: api.neat_max_hidden_nodes ?? 16,
 
     // Proprioception
-    useProprioception: api.use_proprioception ?? false,
-    proprioceptionInputs: api.proprioception_inputs ?? 'all',
+    use_proprioception: api.use_proprioception ?? false,
+    proprioception_inputs: api.proprioception_inputs ?? 'all',
 
     // Frame storage
-    frameStorageMode: api.frame_storage_mode,
-    sparseTopCount: api.sparse_top_count,
-    sparseBottomCount: api.sparse_bottom_count,
+    frame_storage_mode: api.frame_storage_mode,
+    sparse_top_count: api.sparse_top_count,
+    sparse_bottom_count: api.sparse_bottom_count,
   };
 }
 

@@ -49,7 +49,7 @@ export function generateRandomGenome(
   constraintsOrOptions: GenomeConstraints | RandomGenomeOptions = DEFAULT_GENOME_CONSTRAINTS
 ): CreatureGenome {
   // Handle both old signature (just constraints) and new signature (options object)
-  const constraints: GenomeConstraints = 'minNodes' in constraintsOrOptions
+  const constraints: GenomeConstraints = 'min_nodes' in constraintsOrOptions
     ? constraintsOrOptions
     : (constraintsOrOptions.constraints || DEFAULT_GENOME_CONSTRAINTS);
 
@@ -60,9 +60,9 @@ export function generateRandomGenome(
   const id = generateId('creature');
 
   // To connect N nodes, we need at least N-1 muscles (spanning tree)
-  // So maxNodes is limited by maxMuscles + 1
-  const effectiveMaxNodes = Math.min(constraints.maxNodes, constraints.maxMuscles + 1);
-  const effectiveMinNodes = Math.min(constraints.minNodes, effectiveMaxNodes);
+  // So max_nodes is limited by max_muscles + 1
+  const effectiveMaxNodes = Math.min(constraints.max_nodes, constraints.max_muscles + 1);
+  const effectiveMinNodes = Math.min(constraints.min_nodes, effectiveMaxNodes);
 
   // Generate nodes
   const nodeCount = randomInt(effectiveMinNodes, effectiveMaxNodes);
@@ -71,16 +71,16 @@ export function generateRandomGenome(
   for (let i = 0; i < nodeCount; i++) {
     nodes.push({
       id: generateId('node'),
-      size: randomRange(constraints.minSize, constraints.maxSize),
+      size: randomRange(constraints.min_size, constraints.max_size),
       friction: randomRange(0.3, 0.9),
-      position: randomVector3(constraints.spawnRadius)
+      position: randomVector3(constraints.spawn_radius)
     });
   }
 
   // Generate muscles (connect nodes)
   const muscles: MuscleGene[] = [];
   const maxMuscles = Math.min(
-    constraints.maxMuscles,
+    constraints.max_muscles,
     (nodeCount * (nodeCount - 1)) / 2  // Max possible connections
   );
 
@@ -106,10 +106,10 @@ export function generateRandomGenome(
       nodeA: fromId,
       nodeB: toId,
       restLength: restLength * randomRange(0.8, 1.2),
-      stiffness: randomRange(constraints.minStiffness, constraints.maxStiffness),
+      stiffness: randomRange(constraints.min_stiffness, constraints.max_stiffness),
       damping: randomRange(0.1, 0.5),
-      frequency: randomRange(constraints.minFrequency, constraints.maxFrequency),
-      amplitude: randomRange(0.1, constraints.maxAmplitude),
+      frequency: randomRange(constraints.min_frequency, constraints.max_frequency),
+      amplitude: randomRange(0.1, constraints.max_amplitude),
       phase: randomRange(0, Math.PI * 2),
       // v1: Direction sensing
       directionBias: randomUnitVector(),
@@ -150,10 +150,10 @@ export function generateRandomGenome(
       nodeA: nodeA.id,
       nodeB: nodeB.id,
       restLength: restLength * randomRange(0.8, 1.2),
-      stiffness: randomRange(constraints.minStiffness, constraints.maxStiffness),
+      stiffness: randomRange(constraints.min_stiffness, constraints.max_stiffness),
       damping: randomRange(0.1, 0.5),
-      frequency: randomRange(constraints.minFrequency, constraints.maxFrequency),
-      amplitude: randomRange(0.1, constraints.maxAmplitude),
+      frequency: randomRange(constraints.min_frequency, constraints.max_frequency),
+      amplitude: randomRange(0.1, constraints.max_amplitude),
       phase: randomRange(0, Math.PI * 2),
       // v1: Direction sensing
       directionBias: randomUnitVector(),
@@ -168,16 +168,16 @@ export function generateRandomGenome(
   }
 
   // Initialize neural genome if enabled
-  const useNeural = simulationConfig?.useNeuralNet ?? false;
+  const useNeural = simulationConfig?.use_neural_net ?? false;
   const neuralGenome = useNeural
     ? initializeNeuralGenome(muscles.length, {
         useNeuralNet: true,
-        neuralMode: simulationConfig?.neuralMode || 'hybrid',
-        hiddenSize: simulationConfig?.neuralHiddenSize || 8,
-        activation: simulationConfig?.neuralActivation || 'tanh',
-        weightMutationRate: simulationConfig?.weightMutationRate || 0.1,
-        weightMutationMagnitude: simulationConfig?.weightMutationMagnitude || 0.3,
-        outputBias: simulationConfig?.neuralOutputBias ?? 0.0
+        neuralMode: simulationConfig?.neural_mode || 'hybrid',
+        hiddenSize: simulationConfig?.neural_hidden_size || 8,
+        activation: simulationConfig?.neural_activation || 'tanh',
+        weightMutationRate: simulationConfig?.weight_mutation_rate || 0.1,
+        weightMutationMagnitude: simulationConfig?.weight_mutation_magnitude || 0.3,
+        outputBias: simulationConfig?.neural_output_bias ?? 0.0
       })
     : undefined;
 

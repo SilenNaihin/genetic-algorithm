@@ -615,7 +615,6 @@ class TestSimulationConfigAccepted:
             "max_nodes": 10,
             "max_muscles": 20,
             "cull_percentage": 0.4,
-            "use_mutation": True,
             "use_crossover": True,
             "crossover_rate": 0.6,
             # Fitness panel

@@ -99,31 +99,31 @@ export interface CreatureGenome {
 
 // Creature constraints configuration
 export interface GenomeConstraints {
-  minNodes: number;
-  maxNodes: number;
-  minMuscles: number;
-  maxMuscles: number;
-  minSize: number;
-  maxSize: number;
-  minStiffness: number;
-  maxStiffness: number;
-  minFrequency: number;
-  maxFrequency: number;
-  maxAmplitude: number;
-  spawnRadius: number;   // How far apart nodes can spawn
+  min_nodes: number;
+  max_nodes: number;
+  min_muscles: number;
+  max_muscles: number;
+  min_size: number;
+  max_size: number;
+  min_stiffness: number;
+  max_stiffness: number;
+  min_frequency: number;
+  max_frequency: number;
+  max_amplitude: number;
+  spawn_radius: number;   // How far apart nodes can spawn
 }
 
 export const DEFAULT_GENOME_CONSTRAINTS: GenomeConstraints = {
-  minNodes: 2,
-  maxNodes: 8,
-  minMuscles: 1,
-  maxMuscles: 15,
-  minSize: 0.2,
-  maxSize: 0.8,
-  minStiffness: 50,
-  maxStiffness: 500,
-  minFrequency: 0.5,
-  maxFrequency: 3.0,
-  maxAmplitude: 0.4,
-  spawnRadius: 2.0
+  min_nodes: 2,
+  max_nodes: 8,
+  min_muscles: 1,
+  max_muscles: 15,
+  min_size: 0.2,
+  max_size: 0.8,
+  min_stiffness: 50,
+  max_stiffness: 500,
+  min_frequency: 0.5,
+  max_frequency: 3.0,
+  max_amplitude: 0.4,
+  spawn_radius: 2.0
 };

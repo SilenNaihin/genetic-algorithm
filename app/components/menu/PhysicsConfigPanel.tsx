@@ -31,25 +31,25 @@ export function PhysicsConfigPanel() {
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Sim Duration"
-          value={config.simulationDuration}
-          displayValue={`${config.simulationDuration}s`}
+          value={config.simulation_duration}
+          displayValue={`${config.simulation_duration}s`}
           min={3}
           max={60}
           tooltip={TOOLTIPS.simulationDuration}
-          onChange={(v) => setConfig({ simulationDuration: v })}
+          onChange={(v) => setConfig({ simulation_duration: v })}
           width="100%"
         />
       </div>
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Physics FPS"
-          value={config.physicsFPS}
-          displayValue={`${config.physicsFPS}`}
+          value={config.physics_fps}
+          displayValue={`${config.physics_fps}`}
           min={15}
           max={120}
           step={15}
           tooltip={TOOLTIPS.physicsFPS}
-          onChange={(v) => setConfig({ physicsFPS: v, timeStep: 1 / v })}
+          onChange={(v) => setConfig({ physics_fps: v, time_step: 1 / v })}
           width="100%"
         />
       </div>
@@ -70,62 +70,62 @@ export function PhysicsConfigPanel() {
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Damping"
-          value={config.muscleDampingMultiplier}
-          displayValue={`${config.muscleDampingMultiplier}x`}
+          value={config.muscle_damping_multiplier}
+          displayValue={`${config.muscle_damping_multiplier}x`}
           min={0.1}
           max={5}
           step={0.1}
           tooltip={TOOLTIPS.muscleDampingMultiplier}
-          onChange={(v) => setConfig({ muscleDampingMultiplier: v })}
+          onChange={(v) => setConfig({ muscle_damping_multiplier: v })}
           width="100%"
         />
       </div>
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Max Extension"
-          value={config.maxExtensionRatio}
-          displayValue={`${config.maxExtensionRatio}x`}
+          value={config.max_extension_ratio}
+          displayValue={`${config.max_extension_ratio}x`}
           min={1.2}
           max={5}
           step={0.1}
           tooltip={TOOLTIPS.maxExtensionRatio}
-          onChange={(v) => setConfig({ maxExtensionRatio: v })}
+          onChange={(v) => setConfig({ max_extension_ratio: v })}
           width="100%"
         />
       </div>
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Velocity Cap"
-          value={config.muscleVelocityCap}
-          displayValue={`${config.muscleVelocityCap}/s`}
+          value={config.muscle_velocity_cap}
+          displayValue={`${config.muscle_velocity_cap}/s`}
           min={0.1}
           max={20}
           step={0.5}
           tooltip={TOOLTIPS.muscleVelocityCap}
-          onChange={(v) => setConfig({ muscleVelocityCap: v })}
+          onChange={(v) => setConfig({ muscle_velocity_cap: v })}
           width="100%"
         />
       </div>
 
       {/* Max Frequency - hide in pure/NEAT modes since they use direct neural control */}
-      {config.neuralMode === 'hybrid' && (
+      {config.neural_mode === 'hybrid' && (
         <div style={{ marginBottom: '16px' }}>
           <ParamSlider
             name="Max Frequency"
-            value={config.maxAllowedFrequency}
-            displayValue={`${config.maxAllowedFrequency} Hz`}
+            value={config.max_allowed_frequency}
+            displayValue={`${config.max_allowed_frequency} Hz`}
             min={1}
             max={10}
             step={0.5}
             tooltip={TOOLTIPS.maxAllowedFrequency}
-            onChange={(v) => setConfig({ maxAllowedFrequency: v })}
+            onChange={(v) => setConfig({ max_allowed_frequency: v })}
             width="100%"
           />
         </div>
       )}
 
       {/* Neural Update Settings - only shown when neural net enabled */}
-      {config.useNeuralNet && (
+      {config.use_neural_net && (
         <>
           <div style={{
             fontSize: '11px',
@@ -142,26 +142,26 @@ export function PhysicsConfigPanel() {
           <div style={{ marginBottom: '16px' }}>
             <ParamSlider
               name="Update Rate"
-              value={config.neuralUpdateHz}
-              displayValue={`${config.neuralUpdateHz} Hz`}
+              value={config.neural_update_hz}
+              displayValue={`${config.neural_update_hz} Hz`}
               min={5}
               max={60}
               step={5}
               tooltip={TOOLTIPS.neuralUpdateHz}
-              onChange={(v) => setConfig({ neuralUpdateHz: v })}
+              onChange={(v) => setConfig({ neural_update_hz: v })}
               width="100%"
             />
           </div>
           <div style={{ marginBottom: '4px' }}>
             <ParamSlider
               name="Output Smoothing"
-              value={config.outputSmoothingAlpha}
-              displayValue={config.outputSmoothingAlpha.toFixed(2)}
+              value={config.output_smoothing_alpha}
+              displayValue={config.output_smoothing_alpha.toFixed(2)}
               min={0.05}
               max={1}
               step={0.05}
               tooltip={TOOLTIPS.outputSmoothingAlpha}
-              onChange={(v) => setConfig({ outputSmoothingAlpha: v })}
+              onChange={(v) => setConfig({ output_smoothing_alpha: v })}
               width="100%"
             />
           </div>

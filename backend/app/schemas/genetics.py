@@ -22,14 +22,14 @@ class MutationConfig(BaseModel):
     structural_rate: float = Field(default=0.1, ge=0.0, le=1.0)  # Add/remove nodes/muscles
 
     # Neural mutation
-    neural_rate: float = Field(default=0.1, ge=0.0, le=1.0)  # Per-weight mutation probability
-    neural_magnitude: float = Field(default=0.3, ge=0.0, le=2.0)  # Std dev of perturbation
+    neural_rate: float = Field(default=0.2, ge=0.0, le=1.0)  # Per-weight mutation probability
+    neural_magnitude: float = Field(default=0.05, ge=0.0, le=2.0)  # Std dev of perturbation
 
 
 class DecayConfig(BaseModel):
     """Configuration for mutation rate decay over generations."""
 
-    mode: Literal['off', 'linear', 'exponential'] = 'off'
+    mode: Literal['off', 'linear', 'exponential'] = 'linear'
     start_rate: float = Field(default=0.5, ge=0.0, le=1.0)
     end_rate: float = Field(default=0.1, ge=0.0, le=1.0)
     decay_generations: int = Field(default=100, ge=1, le=10000)
@@ -56,7 +56,6 @@ class EvolutionConfig(BaseModel):
 
     # Reproduction
     crossover_rate: float = Field(default=0.5, ge=0.0, le=1.0)
-    use_mutation: bool = False
     use_crossover: bool = True
 
     # Mutation
@@ -72,7 +71,7 @@ class EvolutionConfig(BaseModel):
 
     # Neural network
     use_neural_net: bool = True
-    neural_output_bias: float = Field(default=0.0, ge=-2.0, le=2.0)
+    neural_output_bias: float = Field(default=-0.1, ge=-2.0, le=2.0)
 
     # NEAT (NeuroEvolution of Augmenting Topologies) - configured when neural_mode == 'neat'
     neat_add_connection_rate: float = Field(default=0.05, ge=0.0, le=1.0)  # Probability to add connection

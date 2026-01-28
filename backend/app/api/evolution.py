@@ -109,6 +109,7 @@ async def run_generation(
 
     # Track survivor IDs for animation states
     survivor_ids: set[str] = set()
+    culled_ids: set[str] = set()  # Creatures that died (for frontend animation)
 
     # Load or create innovation counter for NEAT
     innovation_counter = None
@@ -187,7 +188,6 @@ async def run_generation(
             'selection_method': config.selection_method,
             'tournament_size': config.tournament_size,
             'crossover_rate': config.crossover_rate,
-            'use_mutation': config.use_mutation,
             'use_crossover': config.use_crossover,
             'mutation_rate': config.mutation_rate,
             'mutation_magnitude': config.mutation_magnitude,
@@ -246,7 +246,7 @@ async def run_generation(
 
         # Evolve to get new genomes
         # Note: evolve_population preserves survivor IDs, gives new IDs to offspring
-        genomes, _ = genetics_evolve_population(
+        genomes, evolution_stats = genetics_evolve_population(
             genomes=prev_genomes,
             fitness_scores=prev_fitness,
             config=evolution_config,
@@ -262,8 +262,12 @@ async def run_generation(
                 genome['id'] = f"creature_{uuid.uuid4().hex[:8]}"
             # Survivors keep their original ID from evolve_population
 
-        # Track survivor IDs for frontend animation
-        survivor_ids = survivor_creature_ids
+        # Track survivor IDs from actual selection (not just truncation)
+        survivor_ids = evolution_stats.survivor_ids or set()
+
+        # Calculate culled IDs (creatures from previous gen that didn't survive)
+        all_prev_ids = {p.creature_id for p in prev_performances}
+        culled_ids = all_prev_ids - survivor_ids
 
     # Simulate all creatures
     start_time = time.time()
@@ -514,6 +518,7 @@ async def run_generation(
         "simulation_time_ms": simulation_time_ms,
         "creature_count": len(genomes),
         "creatures": creatures_data,
+        "culled_ids": list(culled_ids),  # Creatures from previous gen that died
     }
 
     # Include innovation counter state for NEAT runs

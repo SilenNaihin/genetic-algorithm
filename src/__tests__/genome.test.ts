@@ -31,11 +31,11 @@ describe('Genome Generation', () => {
       expect(genome.controllerType).toBe('oscillator');
     });
 
-    it('respects minNodes constraint', () => {
+    it('respects min_nodes constraint', () => {
       const constraints: GenomeConstraints = {
         ...DEFAULT_GENOME_CONSTRAINTS,
-        minNodes: 5,
-        maxNodes: 8
+        min_nodes: 5,
+        max_nodes: 8
       };
 
       for (let i = 0; i < 10; i++) {
@@ -44,11 +44,11 @@ describe('Genome Generation', () => {
       }
     });
 
-    it('respects maxNodes constraint', () => {
+    it('respects max_nodes constraint', () => {
       const constraints: GenomeConstraints = {
         ...DEFAULT_GENOME_CONSTRAINTS,
-        minNodes: 2,
-        maxNodes: 4
+        min_nodes: 2,
+        max_nodes: 4
       };
 
       for (let i = 0; i < 10; i++) {
@@ -57,10 +57,10 @@ describe('Genome Generation', () => {
       }
     });
 
-    it('respects maxMuscles constraint', () => {
+    it('respects max_muscles constraint', () => {
       const constraints: GenomeConstraints = {
         ...DEFAULT_GENOME_CONSTRAINTS,
-        maxMuscles: 5
+        max_muscles: 5
       };
 
       for (let i = 0; i < 10; i++) {
@@ -80,13 +80,13 @@ describe('Genome Generation', () => {
     it('creates nodes with positions within spawn radius', () => {
       const constraints: GenomeConstraints = {
         ...DEFAULT_GENOME_CONSTRAINTS,
-        spawnRadius: 2.0
+        spawn_radius: 2.0
       };
 
       const genome = generateRandomGenome(constraints);
       for (const node of genome.nodes) {
-        expect(Math.abs(node.position.x)).toBeLessThanOrEqual(constraints.spawnRadius);
-        expect(Math.abs(node.position.z)).toBeLessThanOrEqual(constraints.spawnRadius);
+        expect(Math.abs(node.position.x)).toBeLessThanOrEqual(constraints.spawn_radius);
+        expect(Math.abs(node.position.z)).toBeLessThanOrEqual(constraints.spawn_radius);
         expect(node.position.y).toBeGreaterThanOrEqual(0); // Above ground
       }
     });
@@ -94,8 +94,8 @@ describe('Genome Generation', () => {
     it('creates nodes with size within constraints', () => {
       const genome = generateRandomGenome();
       for (const node of genome.nodes) {
-        expect(node.size).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.minSize);
-        expect(node.size).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxSize);
+        expect(node.size).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.min_size);
+        expect(node.size).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.max_size);
       }
     });
 
@@ -110,16 +110,16 @@ describe('Genome Generation', () => {
     it('creates muscles with frequency within constraints', () => {
       const genome = generateRandomGenome();
       for (const muscle of genome.muscles) {
-        expect(muscle.frequency).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.minFrequency);
-        expect(muscle.frequency).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxFrequency);
+        expect(muscle.frequency).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.min_frequency);
+        expect(muscle.frequency).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.max_frequency);
       }
     });
 
     it('creates muscles with stiffness within constraints', () => {
       const genome = generateRandomGenome();
       for (const muscle of genome.muscles) {
-        expect(muscle.stiffness).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.minStiffness);
-        expect(muscle.stiffness).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxStiffness);
+        expect(muscle.stiffness).toBeGreaterThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.min_stiffness);
+        expect(muscle.stiffness).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.max_stiffness);
       }
     });
 
@@ -127,7 +127,7 @@ describe('Genome Generation', () => {
       const genome = generateRandomGenome();
       for (const muscle of genome.muscles) {
         expect(muscle.amplitude).toBeGreaterThanOrEqual(0);
-        expect(muscle.amplitude).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.maxAmplitude);
+        expect(muscle.amplitude).toBeLessThanOrEqual(DEFAULT_GENOME_CONSTRAINTS.max_amplitude);
       }
     });
 

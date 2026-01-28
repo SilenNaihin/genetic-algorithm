@@ -388,7 +388,6 @@ class PyTorchSimulator:
             mutation_magnitude=api_config.mutation_magnitude,
             crossover_rate=api_config.crossover_rate,
             elite_count=api_config.elite_count,
-            use_mutation=api_config.use_mutation,
             use_crossover=api_config.use_crossover,
             min_nodes=api_config.min_nodes,
             max_nodes=api_config.max_nodes,

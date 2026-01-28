@@ -32,15 +32,15 @@ export function SettingsInfoBox() {
         <span>Gravity:</span>
         <span style={{ color: 'var(--text-primary)' }}>{config.gravity}</span>
         <span>Mutation:</span>
-        <span style={{ color: 'var(--text-primary)' }}>{Math.round(config.mutationRate * 100)}%</span>
+        <span style={{ color: 'var(--text-primary)' }}>{Math.round(config.mutation_rate * 100)}%</span>
         <span>Max Freq:</span>
-        <span style={{ color: 'var(--text-primary)' }}>{config.maxAllowedFrequency} Hz</span>
+        <span style={{ color: 'var(--text-primary)' }}>{config.max_allowed_frequency} Hz</span>
         <span>Duration:</span>
-        <span style={{ color: 'var(--text-primary)' }}>{config.simulationDuration}s</span>
+        <span style={{ color: 'var(--text-primary)' }}>{config.simulation_duration}s</span>
         <span>Max Nodes:</span>
-        <span style={{ color: 'var(--text-primary)' }}>{config.maxNodes}</span>
+        <span style={{ color: 'var(--text-primary)' }}>{config.max_nodes}</span>
         <span>Max Muscles:</span>
-        <span style={{ color: 'var(--text-primary)' }}>{config.maxMuscles}</span>
+        <span style={{ color: 'var(--text-primary)' }}>{config.max_muscles}</span>
       </div>
 
       {/* Fitness dropdown */}
@@ -92,21 +92,21 @@ export function SettingsInfoBox() {
             }}
           >
             <span style={{ color: 'var(--text-muted)' }}>Pellet Points:</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessPelletPoints}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{config.fitness_pellet_points}</span>
             <span style={{ color: 'var(--text-muted)' }}>Progress Max:</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessProgressMax}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{config.fitness_progress_max}</span>
             <span style={{ color: 'var(--text-muted)' }}>Dist/Unit:</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessDistancePerUnit}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{config.fitness_distance_per_unit}</span>
             <span style={{ color: 'var(--text-muted)' }}>Dist Max:</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessDistanceTraveledMax}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{config.fitness_distance_traveled_max}</span>
             <span style={{ color: 'var(--text-muted)' }}>Regression Penalty:</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessRegressionPenalty}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{config.fitness_regression_penalty}</span>
           </div>
         </div>
       )}
 
       {/* Neural dropdown - only if neural net enabled */}
-      {config.useNeuralNet && (
+      {config.use_neural_net && (
         <>
           <div
             onClick={() => setNeuralExpanded(!neuralExpanded)}
@@ -156,21 +156,21 @@ export function SettingsInfoBox() {
                 }}
               >
                 <span style={{ color: 'var(--text-muted)' }}>Mode:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{config.neuralMode}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{config.neural_mode}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Hidden Size:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{config.neuralHiddenSize}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{config.neural_hidden_size}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Activation:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{config.neuralActivation}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{config.neural_activation}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Weight Mut Rate:</span>
                 <span style={{ color: 'var(--text-secondary)' }}>
-                  {Math.round(config.weightMutationRate * 100)}%
+                  {Math.round(config.weight_mutation_rate * 100)}%
                 </span>
                 <span style={{ color: 'var(--text-muted)' }}>Weight Mut Mag:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{config.weightMutationMagnitude}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{config.weight_mutation_magnitude}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Rate Decay:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{config.weightMutationDecay}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{config.weight_mutation_decay}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Efficiency Penalty:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{config.fitnessEfficiencyPenalty}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{config.fitness_efficiency_penalty}</span>
               </div>
             </div>
           )}

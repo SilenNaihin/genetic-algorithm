@@ -525,7 +525,6 @@ class TestMultiGenerationStability:
             'compatibility_threshold': 1.0,
             'cull_percentage': 0.5,
             'mutation_rate': 0.3,
-            'use_mutation': True,
         }
 
         for gen in range(10):

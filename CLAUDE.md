@@ -89,13 +89,15 @@ All genetics operations are handled by the **backend** via the evolution API.
 
 ## Conventions
 
+- **snake_case everywhere**: Both frontend and backend use snake_case for config fields (e.g., `population_size`, `neural_mode`, `use_crossover`). No camelCase conversion needed.
 - Use shared utilities from `utils/math.ts` and `utils/id.ts`
 - Creature results are compacted for storage (frames as number arrays)
 - Tests go in `src/__tests__/*.test.ts`
 - Interface tests preferred over unit tests
 - Neural genome topology adapts when muscle count changes (`adaptNeuralTopology`)
-- Output biases default negative (-0.5) for GA optimization
+- Output biases default negative (-0.1) for GA optimization
 - Prefer Tailwind CSS classes for new component styling (avoid inline styles where possible)
+- **All offspring are mutated**: Survivors are kept unchanged, but ALL new offspring (whether from crossover or cloning) get mutated. No `useMutation` flag exists.
 
 ## What NOT to Do
 
@@ -127,8 +129,8 @@ npm test           # Run all tests
 npm test -- --run  # Run once (no watch)
 ```
 
-305 frontend tests covering: genome, storage, neural networks, brain evolution, math utilities, NEAT edge cases.
-474+ backend tests covering: physics, neural, fitness, genetics, API, parity, integration, NEAT connectivity modes.
+312 frontend tests covering: genome, storage, neural networks, brain evolution, math utilities, NEAT edge cases.
+600+ backend tests covering: physics, neural, fitness, genetics, API, parity, integration, NEAT connectivity modes.
 
 ## Global Commands
 

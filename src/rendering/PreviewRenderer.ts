@@ -4,9 +4,9 @@ import { createCreatureMesh, updateMuscleMesh } from './CreatureMeshFactory';
 import type { CreatureGenome, GenomeConstraints } from '../types';
 
 export interface PreviewConfig {
-  maxNodes: number;
-  maxMuscles: number;
-  maxAllowedFrequency: number;
+  max_nodes: number;
+  max_muscles: number;
+  max_allowed_frequency: number;
   gravity: number;
 }
 
@@ -94,20 +94,20 @@ export class PreviewRenderer {
     const config = this.getConfig();
 
     // Generate creature at MAX complexity so user can see what the limits look like
-    const effectiveMaxNodes = Math.min(config.maxNodes, config.maxMuscles + 1);
+    const effectiveMaxNodes = Math.min(config.max_nodes, config.max_muscles + 1);
     const constraints: GenomeConstraints = {
-      minNodes: effectiveMaxNodes,
-      maxNodes: effectiveMaxNodes,
-      minMuscles: 1,
-      maxMuscles: config.maxMuscles,
-      minSize: 0.2,
-      maxSize: 0.8,
-      minStiffness: 50,
-      maxStiffness: 500,
-      minFrequency: 0.5,
-      maxFrequency: config.maxAllowedFrequency,
-      maxAmplitude: 0.4,
-      spawnRadius: 2.0
+      min_nodes: effectiveMaxNodes,
+      max_nodes: effectiveMaxNodes,
+      min_muscles: 1,
+      max_muscles: config.max_muscles,
+      min_size: 0.2,
+      max_size: 0.8,
+      min_stiffness: 50,
+      max_stiffness: 500,
+      min_frequency: 0.5,
+      max_frequency: config.max_allowed_frequency,
+      max_amplitude: 0.4,
+      spawn_radius: 2.0
     };
 
     this.genome = generateRandomGenome(constraints);

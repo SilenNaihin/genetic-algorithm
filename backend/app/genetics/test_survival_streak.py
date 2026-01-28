@@ -50,7 +50,6 @@ class TestSurvivalStreakEvolution:
         config = EvolutionConfig(
             population_size=10,
             cull_percentage=0.5,  # Kill bottom 50%
-            use_mutation=True,
             use_crossover=False,
         )
 
@@ -75,7 +74,6 @@ class TestSurvivalStreakEvolution:
         config = EvolutionConfig(
             population_size=10,
             cull_percentage=0.5,
-            use_mutation=True,
             use_crossover=True,
         )
 
@@ -101,7 +99,6 @@ class TestSurvivalStreakEvolution:
         config = EvolutionConfig(
             population_size=10,
             cull_percentage=0.5,
-            use_mutation=True,
             use_crossover=False,
         )
 
@@ -137,7 +134,6 @@ class TestSurvivalStreakEvolution:
         config = EvolutionConfig(
             population_size=20,
             cull_percentage=0.5,
-            use_mutation=True,
             use_crossover=False,
         )
 

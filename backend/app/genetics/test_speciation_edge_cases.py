@@ -244,7 +244,6 @@ class TestManySmallSpeciesIntegration:
             compatibility_threshold=0.5,  # Low threshold = many species
             min_species_size=1,
             use_crossover=True,
-            use_mutation=True,
             cull_percentage=0.5,  # Should cull 50%
             neat_add_connection_rate=0.2,
             neat_add_node_rate=0.1,
@@ -501,7 +500,6 @@ class TestRealWorldScenarios:
             compatibility_threshold=1.0,
             min_species_size=1,
             cull_percentage=0.5,
-            use_mutation=True,
             neat_add_connection_rate=0.1,
             neat_add_node_rate=0.05,
         )

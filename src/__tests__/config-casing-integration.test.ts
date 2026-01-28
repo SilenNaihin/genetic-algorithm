@@ -1,72 +1,23 @@
 /**
- * Integration stress tests for config camelCase/snake_case handling.
+ * Integration stress tests for config snake_case handling.
  *
- * BUG BEING TESTED: Frontend code expects camelCase config keys but API returns snake_case.
- * This causes settings like timeEncoding and useProprioception to be undefined,
- * leading to wrong defaults being used (e.g., expecting 7 inputs instead of 56).
- *
- * The fix must handle BOTH cases since old configs may have been saved in either format.
+ * Tests that config fields are consistently snake_case throughout
+ * both frontend and backend. This ensures settings like time_encoding
+ * and use_proprioception work correctly.
  */
 
 import { describe, it, expect } from 'vitest';
-import { fromApiConfig, toApiConfig, type ApiSimulationConfig } from '../services/ApiClient';
+import { fromApiConfig, toApiConfig } from '../services/ApiClient';
 import { DEFAULT_CONFIG, type SimulationConfig } from '../types/simulation';
 
-// Helper to create a minimal API config (snake_case as returned by backend)
-function createSnakeCaseConfig(overrides: Partial<ApiSimulationConfig> = {}): ApiSimulationConfig {
-  return {
-    gravity: -9.8,
-    ground_friction: 0.5,
-    time_step: 1/30,
-    simulation_duration: 20.0,
-    population_size: 100,
-    cull_percentage: 0.5,
-    mutation_rate: 0.2,
-    mutation_magnitude: 0.3,
-    crossover_rate: 0.5,
-    elite_count: 5,
-    use_mutation: true,
-    use_crossover: false,
-    min_nodes: 3,
-    max_nodes: 8,
-    max_muscles: 15,
-    max_allowed_frequency: 3.0,
-    pellet_count: 3,
-    arena_size: 10.0,
-    fitness_pellet_points: 20.0,
-    fitness_progress_max: 80.0,
-    fitness_distance_per_unit: 3.0,
-    fitness_distance_traveled_max: 20.0,
-    fitness_regression_penalty: 20.0,
-    use_neural_net: true,
-    neural_mode: 'neat',
-    time_encoding: 'sin_raw',
-    neural_hidden_size: 8,
-    neural_activation: 'tanh',
-    weight_mutation_rate: 0.2,
-    weight_mutation_magnitude: 0.05,
-    weight_mutation_decay: 'linear',
-    neural_output_bias: -0.1,
-    fitness_efficiency_penalty: 0.1,
-    neural_dead_zone: 0.1,
-    frame_storage_mode: 'all',
-    frame_rate: 15,
-    sparse_top_count: 10,
-    sparse_bottom_count: 10,
-    use_proprioception: true,
-    proprioception_inputs: 'all',
-    ...overrides,
-  };
-}
-
-// Helper to create a camelCase config (frontend format)
-function createCamelCaseConfig(overrides: Partial<SimulationConfig> = {}): SimulationConfig {
+// Helper to create a test config with custom values
+function createTestConfig(overrides: Partial<SimulationConfig> = {}): SimulationConfig {
   return {
     ...DEFAULT_CONFIG,
-    neuralMode: 'neat',
-    timeEncoding: 'sin_raw',
-    useProprioception: true,
-    proprioceptionInputs: 'all',
+    neural_mode: 'neat',
+    time_encoding: 'sin_raw',
+    use_proprioception: true,
+    proprioception_inputs: 'all',
     ...overrides,
   };
 }
@@ -75,85 +26,81 @@ function createCamelCaseConfig(overrides: Partial<SimulationConfig> = {}): Simul
 // API Config Conversion Tests
 // =============================================================================
 
-describe('Config Casing Conversion', () => {
-  describe('fromApiConfig (snake_case to camelCase)', () => {
-    it('should convert time_encoding to timeEncoding', () => {
-      const apiConfig = createSnakeCaseConfig({ time_encoding: 'sin_raw' });
+describe('Config Snake_Case Consistency', () => {
+  describe('fromApiConfig preserves snake_case fields', () => {
+    it('should preserve time_encoding', () => {
+      const apiConfig = createTestConfig({ time_encoding: 'sin_raw' });
       const frontendConfig = fromApiConfig(apiConfig);
 
-      expect(frontendConfig.timeEncoding).toBe('sin_raw');
-      // Should NOT have snake_case key
-      expect((frontendConfig as Record<string, unknown>)['time_encoding']).toBeUndefined();
+      expect(frontendConfig.time_encoding).toBe('sin_raw');
     });
 
-    it('should convert use_proprioception to useProprioception', () => {
-      const apiConfig = createSnakeCaseConfig({ use_proprioception: true });
+    it('should preserve use_proprioception', () => {
+      const apiConfig = createTestConfig({ use_proprioception: true });
       const frontendConfig = fromApiConfig(apiConfig);
 
-      expect(frontendConfig.useProprioception).toBe(true);
-      expect((frontendConfig as Record<string, unknown>)['use_proprioception']).toBeUndefined();
+      expect(frontendConfig.use_proprioception).toBe(true);
     });
 
-    it('should convert proprioception_inputs to proprioceptionInputs', () => {
-      const apiConfig = createSnakeCaseConfig({ proprioception_inputs: 'velocity' });
+    it('should preserve proprioception_inputs', () => {
+      const apiConfig = createTestConfig({ proprioception_inputs: 'velocity' });
       const frontendConfig = fromApiConfig(apiConfig);
 
-      expect(frontendConfig.proprioceptionInputs).toBe('velocity');
-      expect((frontendConfig as Record<string, unknown>)['proprioception_inputs']).toBeUndefined();
+      expect(frontendConfig.proprioception_inputs).toBe('velocity');
     });
 
-    it('should convert neural_mode to neuralMode', () => {
-      const apiConfig = createSnakeCaseConfig({ neural_mode: 'neat' });
+    it('should preserve neural_mode', () => {
+      const apiConfig = createTestConfig({ neural_mode: 'neat' });
       const frontendConfig = fromApiConfig(apiConfig);
 
-      expect(frontendConfig.neuralMode).toBe('neat');
+      expect(frontendConfig.neural_mode).toBe('neat');
     });
 
-    it('should convert neural_dead_zone to neuralDeadZone', () => {
-      const apiConfig = createSnakeCaseConfig({ neural_dead_zone: 0.15 });
+    it('should preserve neural_dead_zone', () => {
+      const apiConfig = createTestConfig({ neural_dead_zone: 0.15 });
       const frontendConfig = fromApiConfig(apiConfig);
 
-      expect(frontendConfig.neuralDeadZone).toBe(0.15);
+      expect(frontendConfig.neural_dead_zone).toBe(0.15);
     });
 
     it('should handle all time encoding values', () => {
-      const encodings: ApiSimulationConfig['time_encoding'][] = ['none', 'cyclic', 'sin', 'raw', 'sin_raw'];
+      const encodings: SimulationConfig['time_encoding'][] = ['none', 'cyclic', 'sin', 'raw', 'sin_raw'];
 
       for (const encoding of encodings) {
-        const apiConfig = createSnakeCaseConfig({ time_encoding: encoding });
+        const apiConfig = createTestConfig({ time_encoding: encoding });
         const frontendConfig = fromApiConfig(apiConfig);
-        expect(frontendConfig.timeEncoding).toBe(encoding);
+        expect(frontendConfig.time_encoding).toBe(encoding);
       }
     });
 
     it('should handle all proprioception_inputs values', () => {
-      const inputs: ApiSimulationConfig['proprioception_inputs'][] = ['strain', 'velocity', 'ground', 'all'];
+      const inputs: SimulationConfig['proprioception_inputs'][] = ['strain', 'velocity', 'ground', 'all'];
 
       for (const input of inputs) {
-        const apiConfig = createSnakeCaseConfig({ proprioception_inputs: input });
+        const apiConfig = createTestConfig({ proprioception_inputs: input });
         const frontendConfig = fromApiConfig(apiConfig);
-        expect(frontendConfig.proprioceptionInputs).toBe(input);
+        expect(frontendConfig.proprioception_inputs).toBe(input);
       }
     });
   });
 
-  describe('toApiConfig (camelCase to snake_case)', () => {
-    it('should convert timeEncoding to time_encoding', () => {
-      const frontendConfig = createCamelCaseConfig({ timeEncoding: 'cyclic' });
+  describe('toApiConfig preserves snake_case fields', () => {
+    it('should preserve time_encoding', () => {
+      const frontendConfig = createTestConfig({ time_encoding: 'cyclic' });
       const apiConfig = toApiConfig(frontendConfig);
 
       expect(apiConfig.time_encoding).toBe('cyclic');
     });
 
-    it('should convert useProprioception to use_proprioception', () => {
-      const frontendConfig = createCamelCaseConfig({ useProprioception: true });
+    it('should preserve use_proprioception', () => {
+      const frontendConfig = createTestConfig({ use_proprioception: true });
       const apiConfig = toApiConfig(frontendConfig);
 
       expect(apiConfig.use_proprioception).toBe(true);
     });
 
-    it('should convert proprioceptionInputs to proprioception_inputs', () => {
-      const frontendConfig = createCamelCaseConfig({ proprioceptionInputs: 'ground' });
+    it('should preserve proprioception_inputs', () => {
+      const frontendConfig = createTestConfig({ proprioception_inputs: 'ground' });
       const apiConfig = toApiConfig(frontendConfig);
 
       expect(apiConfig.proprioception_inputs).toBe('ground');
@@ -162,22 +109,22 @@ describe('Config Casing Conversion', () => {
 
   describe('Round-trip conversion', () => {
     it('should preserve all config values through toApi -> fromApi round-trip', () => {
-      const original = createCamelCaseConfig({
-        timeEncoding: 'sin_raw',
-        useProprioception: true,
-        proprioceptionInputs: 'all',
-        neuralMode: 'neat',
-        neuralDeadZone: 0.15,
+      const original = createTestConfig({
+        time_encoding: 'sin_raw',
+        use_proprioception: true,
+        proprioception_inputs: 'all',
+        neural_mode: 'neat',
+        neural_dead_zone: 0.15,
       });
 
       const apiConfig = toApiConfig(original);
       const recovered = fromApiConfig(apiConfig);
 
-      expect(recovered.timeEncoding).toBe(original.timeEncoding);
-      expect(recovered.useProprioception).toBe(original.useProprioception);
-      expect(recovered.proprioceptionInputs).toBe(original.proprioceptionInputs);
-      expect(recovered.neuralMode).toBe(original.neuralMode);
-      expect(recovered.neuralDeadZone).toBe(original.neuralDeadZone);
+      expect(recovered.time_encoding).toBe(original.time_encoding);
+      expect(recovered.use_proprioception).toBe(original.use_proprioception);
+      expect(recovered.proprioception_inputs).toBe(original.proprioception_inputs);
+      expect(recovered.neural_mode).toBe(original.neural_mode);
+      expect(recovered.neural_dead_zone).toBe(original.neural_dead_zone);
     });
   });
 });
@@ -191,10 +138,9 @@ describe('Input Count Calculation', () => {
   function calculateInputCount(config: Partial<SimulationConfig>, numMuscles: number, numNodes: number): number {
     let count = 7; // base inputs always
 
-    // Use camelCase - this is what the frontend code does
-    const timeEncoding = config.timeEncoding || 'none';
-    const useProprioception = config.useProprioception || false;
-    const proprioceptionInputs = config.proprioceptionInputs || 'all';
+    const timeEncoding = config.time_encoding || 'none';
+    const useProprioception = config.use_proprioception || false;
+    const proprioceptionInputs = config.proprioception_inputs || 'all';
 
     if (timeEncoding === 'cyclic' || timeEncoding === 'sin_raw') count += 2;
     else if (timeEncoding === 'sin' || timeEncoding === 'raw') count += 1;
@@ -209,34 +155,12 @@ describe('Input Count Calculation', () => {
     return count;
   }
 
-  // Helper that handles BOTH snake_case and camelCase
-  function calculateInputCountSafe(config: Record<string, unknown>, numMuscles: number, numNodes: number): number {
-    let count = 7;
-
-    // Handle both camelCase and snake_case
-    const timeEncoding = (config.timeEncoding ?? config.time_encoding ?? 'none') as string;
-    const useProprioception = (config.useProprioception ?? config.use_proprioception ?? false) as boolean;
-    const proprioceptionInputs = (config.proprioceptionInputs ?? config.proprioception_inputs ?? 'all') as string;
-
-    if (timeEncoding === 'cyclic' || timeEncoding === 'sin_raw') count += 2;
-    else if (timeEncoding === 'sin' || timeEncoding === 'raw') count += 1;
-
-    if (useProprioception) {
-      if (proprioceptionInputs === 'strain') count += numMuscles;
-      else if (proprioceptionInputs === 'velocity') count += numNodes * 3;
-      else if (proprioceptionInputs === 'ground') count += numNodes;
-      else count += numMuscles + numNodes * 3 + numNodes;
-    }
-
-    return count;
-  }
-
-  describe('With properly converted camelCase config', () => {
+  describe('With snake_case config', () => {
     it('should calculate correct count for NEAT with sin_raw encoding and proprioception', () => {
-      const config = createCamelCaseConfig({
-        timeEncoding: 'sin_raw',
-        useProprioception: true,
-        proprioceptionInputs: 'all',
+      const config = createTestConfig({
+        time_encoding: 'sin_raw',
+        use_proprioception: true,
+        proprioception_inputs: 'all',
       });
 
       // 7 (base) + 2 (sin_raw) + 15 (muscle strain) + 24 (node velocity 8*3) + 8 (ground) = 56
@@ -245,9 +169,9 @@ describe('Input Count Calculation', () => {
     });
 
     it('should calculate correct count for pure mode with no time encoding', () => {
-      const config = createCamelCaseConfig({
-        timeEncoding: 'none',
-        useProprioception: false,
+      const config = createTestConfig({
+        time_encoding: 'none',
+        use_proprioception: false,
       });
 
       // 7 (base) + 0 (no time) + 0 (no proprio) = 7
@@ -256,71 +180,14 @@ describe('Input Count Calculation', () => {
     });
 
     it('should calculate correct count for hybrid mode with cyclic encoding', () => {
-      const config = createCamelCaseConfig({
-        timeEncoding: 'cyclic',
-        useProprioception: false,
+      const config = createTestConfig({
+        time_encoding: 'cyclic',
+        use_proprioception: false,
       });
 
       // 7 (base) + 2 (cyclic) = 9
       const count = calculateInputCount(config, 15, 8);
       expect(count).toBe(9);
-    });
-  });
-
-  describe('With snake_case config (simulating the bug)', () => {
-    it('should get WRONG count when using snake_case config directly', () => {
-      // This simulates the bug: config has snake_case keys but code expects camelCase
-      const snakeCaseConfig = {
-        time_encoding: 'sin_raw',
-        use_proprioception: true,
-        proprioception_inputs: 'all',
-      };
-
-      // The buggy code does config.timeEncoding which is undefined
-      const wrongCount = calculateInputCount(snakeCaseConfig as unknown as SimulationConfig, 15, 8);
-
-      // This will be 7 because all settings default to their fallbacks
-      expect(wrongCount).toBe(7);
-      expect(wrongCount).not.toBe(56); // But it SHOULD be 56!
-    });
-
-    it('should get CORRECT count with safe calculation that handles both formats', () => {
-      const snakeCaseConfig = {
-        time_encoding: 'sin_raw',
-        use_proprioception: true,
-        proprioception_inputs: 'all',
-      };
-
-      const correctCount = calculateInputCountSafe(snakeCaseConfig, 15, 8);
-      expect(correctCount).toBe(56);
-    });
-  });
-
-  describe('Mixed case configs (edge cases)', () => {
-    it('should handle config with some camelCase and some snake_case', () => {
-      const mixedConfig = {
-        timeEncoding: 'sin_raw',  // camelCase
-        use_proprioception: true,  // snake_case
-        proprioception_inputs: 'all',  // snake_case
-      };
-
-      const count = calculateInputCountSafe(mixedConfig, 15, 8);
-      expect(count).toBe(56);
-    });
-
-    it('should prioritize camelCase over snake_case when both present', () => {
-      const conflictingConfig = {
-        timeEncoding: 'sin_raw',  // camelCase - should win
-        time_encoding: 'none',    // snake_case - should be ignored
-        useProprioception: true,
-        use_proprioception: false,
-        proprioceptionInputs: 'all',
-        proprioception_inputs: 'strain',
-      };
-
-      const count = calculateInputCountSafe(conflictingConfig, 15, 8);
-      // Should use camelCase values: sin_raw (2), proprioception=true, all
-      expect(count).toBe(56);
     });
   });
 });
@@ -333,38 +200,23 @@ describe('NeuralVisualizer Config Handling', () => {
   // These test the same pattern used in ReplayModal when setting up the visualizer
 
   describe('setTimeEncoding parameter derivation', () => {
-    it('should use camelCase timeEncoding when available', () => {
-      const config = { timeEncoding: 'sin_raw' as const };
-      const value = config.timeEncoding || 'none';
-      expect(value).toBe('sin_raw');
-    });
-
-    it('should fall back to none when timeEncoding is undefined (simulating bug)', () => {
-      const config = { time_encoding: 'sin_raw' };
-      // This is how the buggy code works:
-      const value = (config as unknown as SimulationConfig).timeEncoding || 'none';
-      expect(value).toBe('none');  // BUG: should be 'sin_raw'
-    });
-
-    it('should handle both formats with nullish coalescing', () => {
-      const config = { time_encoding: 'sin_raw' };
-      // This is the fix:
-      const value = (config as Record<string, unknown>).timeEncoding ??
-                   (config as Record<string, unknown>).time_encoding ?? 'none';
+    it('should use time_encoding value', () => {
+      const config = { time_encoding: 'sin_raw' as const };
+      const value = config.time_encoding || 'none';
       expect(value).toBe('sin_raw');
     });
   });
 
   describe('setProprioception parameter derivation', () => {
-    it('should use camelCase values when available', () => {
+    it('should use snake_case values', () => {
       const config = {
-        useProprioception: true,
-        proprioceptionInputs: 'all' as const,
+        use_proprioception: true,
+        proprioception_inputs: 'all' as const,
       };
 
       const proprioConfig = {
-        enabled: config.useProprioception || false,
-        inputs: config.proprioceptionInputs || 'all',
+        enabled: config.use_proprioception || false,
+        inputs: config.proprioception_inputs || 'all',
         numMuscles: 15,
         numNodes: 8,
       };
@@ -372,76 +224,6 @@ describe('NeuralVisualizer Config Handling', () => {
       expect(proprioConfig.enabled).toBe(true);
       expect(proprioConfig.inputs).toBe('all');
     });
-
-    it('should get wrong values when config has snake_case (simulating bug)', () => {
-      const config = {
-        use_proprioception: true,
-        proprioception_inputs: 'velocity',
-      };
-
-      // Buggy code:
-      const proprioConfig = {
-        enabled: (config as unknown as SimulationConfig).useProprioception || false,
-        inputs: (config as unknown as SimulationConfig).proprioceptionInputs || 'all',
-        numMuscles: 15,
-        numNodes: 8,
-      };
-
-      expect(proprioConfig.enabled).toBe(false);  // BUG: should be true
-      expect(proprioConfig.inputs).toBe('all');   // BUG: should be 'velocity'
-    });
-
-    it('should handle both formats with nullish coalescing', () => {
-      const config = {
-        use_proprioception: true,
-        proprioception_inputs: 'velocity',
-      } as Record<string, unknown>;
-
-      // Fixed code:
-      const proprioConfig = {
-        enabled: (config.useProprioception ?? config.use_proprioception ?? false) as boolean,
-        inputs: (config.proprioceptionInputs ?? config.proprioception_inputs ?? 'all') as string,
-        numMuscles: 15,
-        numNodes: 8,
-      };
-
-      expect(proprioConfig.enabled).toBe(true);
-      expect(proprioConfig.inputs).toBe('velocity');
-    });
-  });
-});
-
-// =============================================================================
-// Effect Dependencies Tests (for React useEffect hooks)
-// =============================================================================
-
-describe('Effect Dependency Tracking', () => {
-  // ReplayModal has useEffect dependencies on config fields
-  // If the config has snake_case keys, the dependencies won't trigger updates
-
-  it('should track camelCase dependency correctly', () => {
-    const configs = [
-      { timeEncoding: 'none' as const },
-      { timeEncoding: 'sin_raw' as const },
-    ];
-
-    // This is what React does - checks if dependency changed
-    expect(configs[0].timeEncoding).not.toBe(configs[1].timeEncoding);
-  });
-
-  it('should NOT detect change when using wrong key name (bug scenario)', () => {
-    const configs = [
-      { time_encoding: 'none' as const },
-      { time_encoding: 'sin_raw' as const },
-    ];
-
-    // If effect depends on config.timeEncoding, it won't see the change
-    const dep1 = (configs[0] as unknown as SimulationConfig).timeEncoding;
-    const dep2 = (configs[1] as unknown as SimulationConfig).timeEncoding;
-
-    // Both are undefined, so React thinks nothing changed!
-    expect(dep1).toBe(dep2);  // Both undefined
-    expect(dep1).toBeUndefined();
   });
 });
 
@@ -450,25 +232,23 @@ describe('Effect Dependency Tracking', () => {
 // =============================================================================
 
 describe('Stored Config Format', () => {
-  // The backend stores configs with snake_case keys
-  // When loading a run, the config should be converted to camelCase
+  // Both frontend and backend use snake_case
 
-  it('should recognize backend config format (snake_case)', () => {
-    const backendConfig = {
+  it('should recognize snake_case config format', () => {
+    const config = {
       neural_mode: 'neat',
       time_encoding: 'sin_raw',
       use_proprioception: true,
       proprioception_inputs: 'all',
     };
 
-    // These are the snake_case keys from backend
-    expect(backendConfig.time_encoding).toBe('sin_raw');
-    expect(backendConfig.use_proprioception).toBe(true);
-    expect(backendConfig.proprioception_inputs).toBe('all');
+    expect(config.time_encoding).toBe('sin_raw');
+    expect(config.use_proprioception).toBe(true);
+    expect(config.proprioception_inputs).toBe('all');
   });
 
-  it('should convert backend format to frontend format', () => {
-    const backendConfig = createSnakeCaseConfig({
+  it('should preserve backend format through conversion', () => {
+    const backendConfig = createTestConfig({
       neural_mode: 'neat',
       time_encoding: 'sin_raw',
       use_proprioception: true,
@@ -477,10 +257,9 @@ describe('Stored Config Format', () => {
 
     const frontendConfig = fromApiConfig(backendConfig);
 
-    // These should now be camelCase
-    expect(frontendConfig.neuralMode).toBe('neat');
-    expect(frontendConfig.timeEncoding).toBe('sin_raw');
-    expect(frontendConfig.useProprioception).toBe(true);
-    expect(frontendConfig.proprioceptionInputs).toBe('all');
+    expect(frontendConfig.neural_mode).toBe('neat');
+    expect(frontendConfig.time_encoding).toBe('sin_raw');
+    expect(frontendConfig.use_proprioception).toBe(true);
+    expect(frontendConfig.proprioception_inputs).toBe('all');
   });
 });

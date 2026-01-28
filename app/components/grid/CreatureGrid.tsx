@@ -213,7 +213,7 @@ export function CreatureGrid() {
   const gridHeight = GRID_ROWS * CARD_SIZE + (GRID_ROWS - 1) * CARD_GAP;
 
   // Elite threshold (top 10%)
-  const eliteCount = Math.floor(config.populationSize * 0.1);
+  const eliteCount = Math.floor(config.population_size * 0.1);
 
   const handleCardClick = (result: CreatureSimulationResult) => {
     // Don't allow replay for disqualified creatures

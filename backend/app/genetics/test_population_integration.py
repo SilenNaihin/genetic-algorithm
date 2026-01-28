@@ -176,7 +176,6 @@ class TestEvolvePopulationNeat:
             population_size=20,
             use_neat=True,
             use_crossover=True,
-            use_mutation=True,
             cull_percentage=0.5,
         )
 
@@ -246,7 +245,6 @@ class TestEvolvePopulationNeat:
         config = EvolutionConfig(
             population_size=10,
             use_neat=True,
-            use_mutation=True,
             neat_add_connection_rate=1.0,  # High rate
             neat_add_node_rate=1.0,  # High rate
         )
@@ -312,7 +310,6 @@ class TestEvolvePopulationNeat:
             population_size=20,
             use_neat=True,
             use_crossover=True,
-            use_mutation=True,
         )
 
         # Evolve for several generations
@@ -408,7 +405,6 @@ class TestMultipleGenerations:
             population_size=30,
             use_neat=True,
             use_crossover=True,
-            use_mutation=True,
             neat_add_connection_rate=0.1,
             neat_add_node_rate=0.05,
         )
@@ -460,7 +456,6 @@ class TestMultipleGenerations:
         config_dict = {
             'population_size': 20,
             'neural_mode': 'neat',  # New way to enable NEAT
-            'use_mutation': True,
             'neat_add_connection_rate': 0.5,  # High rates for test
             'neat_add_node_rate': 0.5,
             'neat_max_hidden_nodes': 20,

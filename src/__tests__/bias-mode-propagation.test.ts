@@ -1,8 +1,8 @@
 /**
  * Integration stress tests for bias_mode propagation.
  *
- * Tests that biasMode is correctly converted between frontend (camelCase)
- * and backend (snake_case) formats throughout the entire data flow.
+ * Tests that bias_mode is correctly preserved throughout the entire data flow.
+ * Both frontend and backend now use snake_case consistently.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -14,23 +14,22 @@ describe('bias_mode Propagation', () => {
     it('toApiConfig should include bias_mode', () => {
       const config: SimulationConfig = {
         ...DEFAULT_CONFIG,
-        biasMode: 'bias_node',
+        bias_mode: 'bias_node',
       };
 
       const apiConfig = toApiConfig(config);
 
-      // BUG: bias_mode is missing from the conversion
       expect(apiConfig).toHaveProperty('bias_mode');
       expect(apiConfig.bias_mode).toBe('bias_node');
     });
 
-    it('toApiConfig should convert all three bias_mode values', () => {
+    it('toApiConfig should preserve all three bias_mode values', () => {
       const modes: Array<'none' | 'node' | 'bias_node'> = ['none', 'node', 'bias_node'];
 
       for (const mode of modes) {
         const config: SimulationConfig = {
           ...DEFAULT_CONFIG,
-          biasMode: mode,
+          bias_mode: mode,
         };
 
         const apiConfig = toApiConfig(config);
@@ -38,161 +37,82 @@ describe('bias_mode Propagation', () => {
       }
     });
 
-    it('fromApiConfig should convert bias_mode to biasMode', () => {
+    it('fromApiConfig should preserve bias_mode', () => {
       const apiConfig = {
-        gravity: -9.8,
-        ground_friction: 0.5,
-        time_step: 1 / 30,
-        simulation_duration: 20,
-        population_size: 100,
-        cull_percentage: 0.5,
-        mutation_rate: 0.2,
-        mutation_magnitude: 0.3,
-        crossover_rate: 0.5,
-        elite_count: 5,
-        use_mutation: false,
-        use_crossover: true,
-        min_nodes: 3,
-        max_nodes: 8,
-        max_muscles: 15,
-        max_allowed_frequency: 3.0,
-        pellet_count: 3,
-        arena_size: 10,
-        fitness_pellet_points: 20,
-        fitness_progress_max: 80,
-        fitness_distance_per_unit: 3,
-        fitness_distance_traveled_max: 20,
-        fitness_regression_penalty: 20,
+        ...DEFAULT_CONFIG,
         use_neural_net: true,
         neural_mode: 'neat' as const,
-        bias_mode: 'bias_node' as const,  // snake_case from API
-        time_encoding: 'none' as const,
-        neural_hidden_size: 8,
-        neural_activation: 'tanh',
-        weight_mutation_rate: 0.2,
-        weight_mutation_magnitude: 0.05,
-        weight_mutation_decay: 'linear' as const,
-        neural_output_bias: -0.1,
-        fitness_efficiency_penalty: 0.1,
-        neural_dead_zone: 0.1,
-        frame_storage_mode: 'all' as const,
-        frame_rate: 15,
-        sparse_top_count: 10,
-        sparse_bottom_count: 5,
-        use_proprioception: false,
-        proprioception_inputs: 'all' as const,
+        bias_mode: 'bias_node' as const,
       };
 
       const frontendConfig = fromApiConfig(apiConfig);
 
-      // BUG: biasMode is missing from the conversion
-      expect(frontendConfig).toHaveProperty('biasMode');
-      expect(frontendConfig.biasMode).toBe('bias_node');
+      expect(frontendConfig).toHaveProperty('bias_mode');
+      expect(frontendConfig.bias_mode).toBe('bias_node');
     });
 
-    it('fromApiConfig should convert all three bias_mode values', () => {
+    it('fromApiConfig should preserve all three bias_mode values', () => {
       const modes: Array<'none' | 'node' | 'bias_node'> = ['none', 'node', 'bias_node'];
 
       for (const mode of modes) {
         const apiConfig = {
-          gravity: -9.8,
-          ground_friction: 0.5,
-          time_step: 1 / 30,
-          simulation_duration: 20,
-          population_size: 100,
-          cull_percentage: 0.5,
-          mutation_rate: 0.2,
-          mutation_magnitude: 0.3,
-          crossover_rate: 0.5,
-          elite_count: 5,
-          use_mutation: false,
-          use_crossover: true,
-          min_nodes: 3,
-          max_nodes: 8,
-          max_muscles: 15,
-          max_allowed_frequency: 3.0,
-          pellet_count: 3,
-          arena_size: 10,
-          fitness_pellet_points: 20,
-          fitness_progress_max: 80,
-          fitness_distance_per_unit: 3,
-          fitness_distance_traveled_max: 20,
-          fitness_regression_penalty: 20,
-          use_neural_net: true,
-          neural_mode: 'neat' as const,
+          ...DEFAULT_CONFIG,
           bias_mode: mode,
-          time_encoding: 'none' as const,
-          neural_hidden_size: 8,
-          neural_activation: 'tanh',
-          weight_mutation_rate: 0.2,
-          weight_mutation_magnitude: 0.05,
-          weight_mutation_decay: 'linear' as const,
-          neural_output_bias: -0.1,
-          fitness_efficiency_penalty: 0.1,
-          neural_dead_zone: 0.1,
-          frame_storage_mode: 'all' as const,
-          frame_rate: 15,
-          sparse_top_count: 10,
-          sparse_bottom_count: 5,
-          use_proprioception: false,
-          proprioception_inputs: 'all' as const,
         };
 
         const frontendConfig = fromApiConfig(apiConfig);
-        expect(frontendConfig.biasMode).toBe(mode);
+        expect(frontendConfig.bias_mode).toBe(mode);
       }
     });
   });
 
   describe('Round-trip conversion', () => {
-    it('should preserve biasMode through toApiConfig -> fromApiConfig', () => {
+    it('should preserve bias_mode through toApiConfig -> fromApiConfig', () => {
       const originalConfig: SimulationConfig = {
         ...DEFAULT_CONFIG,
-        biasMode: 'bias_node',
-        neuralMode: 'neat',
+        bias_mode: 'bias_node',
+        neural_mode: 'neat',
       };
 
       const apiConfig = toApiConfig(originalConfig);
       const roundTrippedConfig = fromApiConfig(apiConfig);
 
-      expect(roundTrippedConfig.biasMode).toBe(originalConfig.biasMode);
+      expect(roundTrippedConfig.bias_mode).toBe(originalConfig.bias_mode);
     });
 
-    it('should preserve all biasMode values through round-trip', () => {
+    it('should preserve all bias_mode values through round-trip', () => {
       const modes: Array<'none' | 'node' | 'bias_node'> = ['none', 'node', 'bias_node'];
 
       for (const mode of modes) {
         const originalConfig: SimulationConfig = {
           ...DEFAULT_CONFIG,
-          biasMode: mode,
+          bias_mode: mode,
         };
 
         const apiConfig = toApiConfig(originalConfig);
         const roundTrippedConfig = fromApiConfig(apiConfig);
 
-        expect(roundTrippedConfig.biasMode).toBe(mode);
+        expect(roundTrippedConfig.bias_mode).toBe(mode);
       }
     });
   });
 
   describe('ApiSimulationConfig interface', () => {
     it('should have bias_mode field typed correctly', () => {
-      // This test ensures the TypeScript interface is updated
       const apiConfig = toApiConfig({
         ...DEFAULT_CONFIG,
-        biasMode: 'node',
+        bias_mode: 'node',
       });
 
-      // TypeScript compile-time check - if bias_mode is missing from
-      // ApiSimulationConfig interface, this assignment will fail
+      // TypeScript compile-time check
       const biasMode: 'none' | 'node' | 'bias_node' = apiConfig.bias_mode;
       expect(biasMode).toBe('node');
     });
   });
 
   describe('Default value handling', () => {
-    it('toApiConfig should use default biasMode when not explicitly set', () => {
-      // DEFAULT_CONFIG.biasMode should be 'node'
+    it('toApiConfig should use default bias_mode when not explicitly set', () => {
+      // DEFAULT_CONFIG.bias_mode should be 'node'
       const apiConfig = toApiConfig(DEFAULT_CONFIG);
 
       expect(apiConfig.bias_mode).toBe('node');
@@ -201,60 +121,21 @@ describe('bias_mode Propagation', () => {
     it('fromApiConfig should handle missing bias_mode gracefully', () => {
       // Simulate old API response without bias_mode
       const oldApiConfig = {
-        gravity: -9.8,
-        ground_friction: 0.5,
-        time_step: 1 / 30,
-        simulation_duration: 20,
-        population_size: 100,
-        cull_percentage: 0.5,
-        mutation_rate: 0.2,
-        mutation_magnitude: 0.3,
-        crossover_rate: 0.5,
-        elite_count: 5,
-        use_mutation: false,
-        use_crossover: true,
-        min_nodes: 3,
-        max_nodes: 8,
-        max_muscles: 15,
-        max_allowed_frequency: 3.0,
-        pellet_count: 3,
-        arena_size: 10,
-        fitness_pellet_points: 20,
-        fitness_progress_max: 80,
-        fitness_distance_per_unit: 3,
-        fitness_distance_traveled_max: 20,
-        fitness_regression_penalty: 20,
-        use_neural_net: true,
-        neural_mode: 'pure' as const,
-        // bias_mode intentionally missing
-        time_encoding: 'none' as const,
-        neural_hidden_size: 8,
-        neural_activation: 'tanh',
-        weight_mutation_rate: 0.2,
-        weight_mutation_magnitude: 0.05,
-        weight_mutation_decay: 'linear' as const,
-        neural_output_bias: -0.1,
-        fitness_efficiency_penalty: 0.1,
-        neural_dead_zone: 0.1,
-        frame_storage_mode: 'all' as const,
-        frame_rate: 15,
-        sparse_top_count: 10,
-        sparse_bottom_count: 5,
-        use_proprioception: false,
-        proprioception_inputs: 'all' as const,
+        ...DEFAULT_CONFIG,
+        bias_mode: undefined,
       };
 
       const frontendConfig = fromApiConfig(oldApiConfig as any);
 
       // Should default to 'node' when missing
-      expect(frontendConfig.biasMode).toBe('node');
+      expect(frontendConfig.bias_mode).toBe('node');
     });
   });
 
   describe('NEAT mode auto-defaults', () => {
-    it('NEAT mode should use bias_node by default in frontend', () => {
+    it('NEAT mode should use node bias by default in frontend', () => {
       // Verify the frontend default for NEAT
-      expect(DEFAULT_CONFIG.biasMode).toBe('node');
+      expect(DEFAULT_CONFIG.bias_mode).toBe('node');
       // Note: The NeuralPanel.tsx auto-switches to 'bias_node' when NEAT is selected
     });
   });
@@ -263,12 +144,12 @@ describe('bias_mode Propagation', () => {
     it('should preserve bias_mode alongside other NEAT settings', () => {
       const neatConfig: SimulationConfig = {
         ...DEFAULT_CONFIG,
-        neuralMode: 'neat',
-        biasMode: 'bias_node',
-        selectionMethod: 'speciation',
-        useFitnessSharing: false,
-        neatAddConnectionRate: 0.05,
-        neatAddNodeRate: 0.03,
+        neural_mode: 'neat',
+        bias_mode: 'bias_node',
+        selection_method: 'speciation',
+        use_fitness_sharing: false,
+        neat_add_connection_rate: 0.05,
+        neat_add_node_rate: 0.03,
       };
 
       const apiConfig = toApiConfig(neatConfig);
@@ -283,15 +164,15 @@ describe('bias_mode Propagation', () => {
     it('toApiConfig should include all NEAT settings', () => {
       const config: SimulationConfig = {
         ...DEFAULT_CONFIG,
-        neuralMode: 'neat',
-        neatAddConnectionRate: 0.1,
-        neatAddNodeRate: 0.05,
-        neatEnableRate: 0.03,
-        neatDisableRate: 0.02,
-        neatExcessCoefficient: 2.0,
-        neatDisjointCoefficient: 1.5,
-        neatWeightCoefficient: 0.5,
-        neatMaxHiddenNodes: 32,
+        neural_mode: 'neat',
+        neat_add_connection_rate: 0.1,
+        neat_add_node_rate: 0.05,
+        neat_enable_rate: 0.03,
+        neat_disable_rate: 0.02,
+        neat_excess_coefficient: 2.0,
+        neat_disjoint_coefficient: 1.5,
+        neat_weight_coefficient: 0.5,
+        neat_max_hidden_nodes: 32,
       };
 
       const apiConfig = toApiConfig(config);
@@ -306,50 +187,11 @@ describe('bias_mode Propagation', () => {
       expect(apiConfig.neat_max_hidden_nodes).toBe(32);
     });
 
-    it('fromApiConfig should convert all NEAT settings', () => {
+    it('fromApiConfig should preserve all NEAT settings', () => {
       const apiConfig = {
-        gravity: -9.8,
-        ground_friction: 0.5,
-        time_step: 1 / 30,
-        simulation_duration: 20,
-        population_size: 100,
-        cull_percentage: 0.5,
-        mutation_rate: 0.2,
-        mutation_magnitude: 0.3,
-        crossover_rate: 0.5,
-        elite_count: 5,
-        use_mutation: false,
-        use_crossover: true,
-        min_nodes: 3,
-        max_nodes: 8,
-        max_muscles: 15,
-        max_allowed_frequency: 3.0,
-        pellet_count: 3,
-        arena_size: 10,
-        fitness_pellet_points: 20,
-        fitness_progress_max: 80,
-        fitness_distance_per_unit: 3,
-        fitness_distance_traveled_max: 20,
-        fitness_regression_penalty: 20,
-        use_neural_net: true,
+        ...DEFAULT_CONFIG,
         neural_mode: 'neat' as const,
         bias_mode: 'bias_node' as const,
-        time_encoding: 'none' as const,
-        neural_hidden_size: 8,
-        neural_activation: 'tanh',
-        weight_mutation_rate: 0.2,
-        weight_mutation_magnitude: 0.05,
-        weight_mutation_decay: 'linear' as const,
-        neural_output_bias: -0.1,
-        fitness_efficiency_penalty: 0.1,
-        neural_dead_zone: 0.1,
-        frame_storage_mode: 'all' as const,
-        frame_rate: 15,
-        sparse_top_count: 10,
-        sparse_bottom_count: 5,
-        use_proprioception: false,
-        proprioception_inputs: 'all' as const,
-        // NEAT settings
         neat_add_connection_rate: 0.08,
         neat_add_node_rate: 0.04,
         neat_enable_rate: 0.05,
@@ -362,100 +204,64 @@ describe('bias_mode Propagation', () => {
 
       const frontendConfig = fromApiConfig(apiConfig);
 
-      expect(frontendConfig.neatAddConnectionRate).toBe(0.08);
-      expect(frontendConfig.neatAddNodeRate).toBe(0.04);
-      expect(frontendConfig.neatEnableRate).toBe(0.05);
-      expect(frontendConfig.neatDisableRate).toBe(0.03);
-      expect(frontendConfig.neatExcessCoefficient).toBe(1.5);
-      expect(frontendConfig.neatDisjointCoefficient).toBe(1.2);
-      expect(frontendConfig.neatWeightCoefficient).toBe(0.6);
-      expect(frontendConfig.neatMaxHiddenNodes).toBe(24);
+      expect(frontendConfig.neat_add_connection_rate).toBe(0.08);
+      expect(frontendConfig.neat_add_node_rate).toBe(0.04);
+      expect(frontendConfig.neat_enable_rate).toBe(0.05);
+      expect(frontendConfig.neat_disable_rate).toBe(0.03);
+      expect(frontendConfig.neat_excess_coefficient).toBe(1.5);
+      expect(frontendConfig.neat_disjoint_coefficient).toBe(1.2);
+      expect(frontendConfig.neat_weight_coefficient).toBe(0.6);
+      expect(frontendConfig.neat_max_hidden_nodes).toBe(24);
     });
 
     it('should use defaults for missing NEAT settings', () => {
       const apiConfig = {
-        gravity: -9.8,
-        ground_friction: 0.5,
-        time_step: 1 / 30,
-        simulation_duration: 20,
-        population_size: 100,
-        cull_percentage: 0.5,
-        mutation_rate: 0.2,
-        mutation_magnitude: 0.3,
-        crossover_rate: 0.5,
-        elite_count: 5,
-        use_mutation: false,
-        use_crossover: true,
-        min_nodes: 3,
-        max_nodes: 8,
-        max_muscles: 15,
-        max_allowed_frequency: 3.0,
-        pellet_count: 3,
-        arena_size: 10,
-        fitness_pellet_points: 20,
-        fitness_progress_max: 80,
-        fitness_distance_per_unit: 3,
-        fitness_distance_traveled_max: 20,
-        fitness_regression_penalty: 20,
-        use_neural_net: true,
+        ...DEFAULT_CONFIG,
         neural_mode: 'neat' as const,
         bias_mode: 'bias_node' as const,
-        time_encoding: 'none' as const,
-        neural_hidden_size: 8,
-        neural_activation: 'tanh',
-        weight_mutation_rate: 0.2,
-        weight_mutation_magnitude: 0.05,
-        weight_mutation_decay: 'linear' as const,
-        neural_output_bias: -0.1,
-        fitness_efficiency_penalty: 0.1,
-        neural_dead_zone: 0.1,
-        frame_storage_mode: 'all' as const,
-        frame_rate: 15,
-        sparse_top_count: 10,
-        sparse_bottom_count: 5,
-        use_proprioception: false,
-        proprioception_inputs: 'all' as const,
-        // No NEAT settings - should use defaults
+        // NEAT settings missing - should use defaults
+        neat_add_connection_rate: undefined,
+        neat_add_node_rate: undefined,
       };
 
       const frontendConfig = fromApiConfig(apiConfig as any);
 
       // Should use default values
-      expect(frontendConfig.neatAddConnectionRate).toBe(0.05);
-      expect(frontendConfig.neatAddNodeRate).toBe(0.03);
-      expect(frontendConfig.neatEnableRate).toBe(0.02);
-      expect(frontendConfig.neatDisableRate).toBe(0.01);
-      expect(frontendConfig.neatExcessCoefficient).toBe(1.0);
-      expect(frontendConfig.neatDisjointCoefficient).toBe(1.0);
-      expect(frontendConfig.neatWeightCoefficient).toBe(0.4);
-      expect(frontendConfig.neatMaxHiddenNodes).toBe(16);
+      expect(frontendConfig.neat_add_connection_rate).toBe(0.05);
+      expect(frontendConfig.neat_add_node_rate).toBe(0.03);
+      expect(frontendConfig.neat_enable_rate).toBe(0.02);
+      expect(frontendConfig.neat_disable_rate).toBe(0.01);
+      expect(frontendConfig.neat_excess_coefficient).toBe(1.0);
+      expect(frontendConfig.neat_disjoint_coefficient).toBe(1.0);
+      expect(frontendConfig.neat_weight_coefficient).toBe(0.4);
+      expect(frontendConfig.neat_max_hidden_nodes).toBe(16);
     });
 
     it('should round-trip NEAT settings correctly', () => {
       const originalConfig: SimulationConfig = {
         ...DEFAULT_CONFIG,
-        neuralMode: 'neat',
-        neatAddConnectionRate: 0.07,
-        neatAddNodeRate: 0.04,
-        neatEnableRate: 0.06,
-        neatDisableRate: 0.02,
-        neatExcessCoefficient: 2.5,
-        neatDisjointCoefficient: 1.8,
-        neatWeightCoefficient: 0.3,
-        neatMaxHiddenNodes: 48,
+        neural_mode: 'neat',
+        neat_add_connection_rate: 0.07,
+        neat_add_node_rate: 0.04,
+        neat_enable_rate: 0.06,
+        neat_disable_rate: 0.02,
+        neat_excess_coefficient: 2.5,
+        neat_disjoint_coefficient: 1.8,
+        neat_weight_coefficient: 0.3,
+        neat_max_hidden_nodes: 48,
       };
 
       const apiConfig = toApiConfig(originalConfig);
       const roundTripped = fromApiConfig(apiConfig);
 
-      expect(roundTripped.neatAddConnectionRate).toBe(originalConfig.neatAddConnectionRate);
-      expect(roundTripped.neatAddNodeRate).toBe(originalConfig.neatAddNodeRate);
-      expect(roundTripped.neatEnableRate).toBe(originalConfig.neatEnableRate);
-      expect(roundTripped.neatDisableRate).toBe(originalConfig.neatDisableRate);
-      expect(roundTripped.neatExcessCoefficient).toBe(originalConfig.neatExcessCoefficient);
-      expect(roundTripped.neatDisjointCoefficient).toBe(originalConfig.neatDisjointCoefficient);
-      expect(roundTripped.neatWeightCoefficient).toBe(originalConfig.neatWeightCoefficient);
-      expect(roundTripped.neatMaxHiddenNodes).toBe(originalConfig.neatMaxHiddenNodes);
+      expect(roundTripped.neat_add_connection_rate).toBe(originalConfig.neat_add_connection_rate);
+      expect(roundTripped.neat_add_node_rate).toBe(originalConfig.neat_add_node_rate);
+      expect(roundTripped.neat_enable_rate).toBe(originalConfig.neat_enable_rate);
+      expect(roundTripped.neat_disable_rate).toBe(originalConfig.neat_disable_rate);
+      expect(roundTripped.neat_excess_coefficient).toBe(originalConfig.neat_excess_coefficient);
+      expect(roundTripped.neat_disjoint_coefficient).toBe(originalConfig.neat_disjoint_coefficient);
+      expect(roundTripped.neat_weight_coefficient).toBe(originalConfig.neat_weight_coefficient);
+      expect(roundTripped.neat_max_hidden_nodes).toBe(originalConfig.neat_max_hidden_nodes);
     });
   });
 });

@@ -15,19 +15,19 @@ export function NeuralPanel() {
   // ENFORCE NEAT defaults whenever neuralMode is 'neat'
   // These settings are REQUIRED for NEAT topology evolution to work
   useEffect(() => {
-    if (config.neuralMode === 'neat') {
+    if (config.neural_mode === 'neat') {
       const needsUpdate =
-        config.selectionMethod !== 'speciation' ||  // Speciation is REQUIRED
-        config.useFitnessSharing;  // Should be off (redundant with speciation)
+        config.selection_method !== 'speciation' ||  // Speciation is REQUIRED
+        config.use_fitness_sharing;  // Should be off (redundant with speciation)
 
       if (needsUpdate) {
         setConfig({
-          selectionMethod: 'speciation',
-          useFitnessSharing: false,
+          selection_method: 'speciation',
+          use_fitness_sharing: false,
         });
       }
     }
-  }, [config.neuralMode, config.selectionMethod, config.useFitnessSharing, setConfig]);
+  }, [config.neural_mode, config.selection_method, config.use_fitness_sharing, setConfig]);
 
   const selectStyle = {
     width: '100%',
@@ -82,15 +82,15 @@ export function NeuralPanel() {
         <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
           <input
             type="checkbox"
-            checked={config.useNeuralNet}
-            onChange={(e) => setConfig({ useNeuralNet: e.target.checked })}
+            checked={config.use_neural_net}
+            onChange={(e) => setConfig({ use_neural_net: e.target.checked })}
             style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--accent)' }}
           />
         </label>
       </div>
 
       {/* Options - only shown when neural net enabled */}
-      {config.useNeuralNet && (
+      {config.use_neural_net && (
         <div style={{ padding: '16px 20px' }}>
           {/* Mode */}
           <div style={{ marginBottom: '16px' }}>
@@ -101,22 +101,22 @@ export function NeuralPanel() {
               </span>
             </div>
             <select
-              value={config.neuralMode}
+              value={config.neural_mode}
               onChange={(e) => {
                 const newMode = e.target.value as 'hybrid' | 'pure' | 'neat';
                 // Auto-switch defaults when mode changes
                 if (newMode === 'neat') {
                   // NEAT mode: enable speciation selection, disable fitness sharing, use bias node
                   setConfig({
-                    neuralMode: newMode,
-                    selectionMethod: 'speciation',
-                    useFitnessSharing: false,
-                    biasMode: 'bias_node',  // Original NEAT style
+                    neural_mode: newMode,
+                    selection_method: 'speciation',
+                    use_fitness_sharing: false,
+                    bias_mode: 'bias_node',  // Original NEAT style
                   });
                 } else if (newMode === 'hybrid') {
-                  setConfig({ neuralMode: newMode, timeEncoding: 'cyclic', biasMode: 'node' });
+                  setConfig({ neural_mode: newMode, time_encoding: 'cyclic', bias_mode: 'node' });
                 } else {
-                  setConfig({ neuralMode: newMode, timeEncoding: 'none', biasMode: 'node' });
+                  setConfig({ neural_mode: newMode, time_encoding: 'none', bias_mode: 'node' });
                 }
               }}
               style={selectStyle}
@@ -136,8 +136,8 @@ export function NeuralPanel() {
               </span>
             </div>
             <select
-              value={config.timeEncoding}
-              onChange={(e) => setConfig({ timeEncoding: e.target.value as 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw' })}
+              value={config.time_encoding}
+              onChange={(e) => setConfig({ time_encoding: e.target.value as 'none' | 'cyclic' | 'sin' | 'raw' | 'sin_raw' })}
               style={selectStyle}
             >
               <option value="none">None (7 inputs)</option>
@@ -149,16 +149,16 @@ export function NeuralPanel() {
           </div>
 
           {/* Hidden Size - hide when NEAT mode is enabled (topology is variable) */}
-          {config.neuralMode !== 'neat' && (
+          {config.neural_mode !== 'neat' && (
             <div style={{ marginBottom: '16px' }}>
               <ParamSlider
                 name="Hidden Size"
-                value={config.neuralHiddenSize}
-                displayValue={String(config.neuralHiddenSize)}
+                value={config.neural_hidden_size}
+                displayValue={String(config.neural_hidden_size)}
                 min={4}
                 max={32}
                 step={4}
-                onChange={(v) => setConfig({ neuralHiddenSize: v })}
+                onChange={(v) => setConfig({ neural_hidden_size: v })}
                 tooltip={TOOLTIPS.hiddenSize}
                 width="100%"
               />
@@ -174,8 +174,8 @@ export function NeuralPanel() {
               </span>
             </div>
             <select
-              value={config.neuralActivation}
-              onChange={(e) => setConfig({ neuralActivation: e.target.value as 'tanh' | 'relu' | 'sigmoid' })}
+              value={config.neural_activation}
+              onChange={(e) => setConfig({ neural_activation: e.target.value as 'tanh' | 'relu' | 'sigmoid' })}
               style={selectStyle}
             >
               <option value="tanh">tanh</option>
@@ -190,17 +190,17 @@ export function NeuralPanel() {
               <span style={labelStyle}>
                 Bias Mode
                 <InfoTooltip text={
-                  config.biasMode === 'none'
+                  config.bias_mode === 'none'
                     ? "No biases - neurons have no bias terms"
-                    : config.biasMode === 'node'
+                    : config.bias_mode === 'node'
                     ? "Per-node biases - each neuron has its own bias value"
                     : "Bias node - a special input always=1.0, connections from it act as biases (original NEAT style)"
                 } />
               </span>
             </div>
             <select
-              value={config.biasMode}
-              onChange={(e) => setConfig({ biasMode: e.target.value as 'none' | 'node' | 'bias_node' })}
+              value={config.bias_mode}
+              onChange={(e) => setConfig({ bias_mode: e.target.value as 'none' | 'node' | 'bias_node' })}
               style={selectStyle}
             >
               <option value="node">Per-Node Biases</option>
@@ -213,11 +213,11 @@ export function NeuralPanel() {
           <div style={{ marginBottom: '16px' }}>
             <ParamSlider
               name="Weight Mut. Rate"
-              value={config.weightMutationRate * 100}
-              displayValue={`${Math.round(config.weightMutationRate * 100)}%`}
+              value={config.weight_mutation_rate * 100}
+              displayValue={`${Math.round(config.weight_mutation_rate * 100)}%`}
               min={1}
               max={50}
-              onChange={(v) => setConfig({ weightMutationRate: v / 100 })}
+              onChange={(v) => setConfig({ weight_mutation_rate: v / 100 })}
               tooltip={TOOLTIPS.weightMutationRate}
               width="100%"
             />
@@ -232,8 +232,8 @@ export function NeuralPanel() {
               </span>
             </div>
             <select
-              value={config.weightMutationDecay}
-              onChange={(e) => setConfig({ weightMutationDecay: e.target.value as 'off' | 'linear' | 'exponential' })}
+              value={config.weight_mutation_decay}
+              onChange={(e) => setConfig({ weight_mutation_decay: e.target.value as 'off' | 'linear' | 'exponential' })}
               style={selectStyle}
             >
               <option value="off">Off</option>
@@ -246,12 +246,12 @@ export function NeuralPanel() {
           <div style={{ marginBottom: '16px' }}>
             <ParamSlider
               name="Weight Mut. Mag"
-              value={config.weightMutationMagnitude}
-              displayValue={String(config.weightMutationMagnitude)}
+              value={config.weight_mutation_magnitude}
+              displayValue={String(config.weight_mutation_magnitude)}
               min={0.1}
               max={1.0}
               step={0.1}
-              onChange={(v) => setConfig({ weightMutationMagnitude: v })}
+              onChange={(v) => setConfig({ weight_mutation_magnitude: v })}
               tooltip={TOOLTIPS.weightMutationMagnitude}
               width="100%"
             />
@@ -261,28 +261,28 @@ export function NeuralPanel() {
           <div style={{ marginBottom: '16px' }}>
             <ParamSlider
               name="Output Bias"
-              value={config.neuralOutputBias}
-              displayValue={String(config.neuralOutputBias)}
+              value={config.neural_output_bias}
+              displayValue={String(config.neural_output_bias)}
               min={-2}
               max={0}
               step={0.1}
-              onChange={(v) => setConfig({ neuralOutputBias: v })}
+              onChange={(v) => setConfig({ neural_output_bias: v })}
               tooltip={TOOLTIPS.outputBias}
               width="100%"
             />
           </div>
 
           {/* Dead Zone - shown in Pure and NEAT modes */}
-          {(config.neuralMode === 'pure' || config.neuralMode === 'neat') && (
+          {(config.neural_mode === 'pure' || config.neural_mode === 'neat') && (
             <div style={{ marginBottom: '16px' }}>
               <ParamSlider
                 name="Dead Zone"
-                value={config.neuralDeadZone}
-                displayValue={String(config.neuralDeadZone)}
+                value={config.neural_dead_zone}
+                displayValue={String(config.neural_dead_zone)}
                 min={0}
                 max={0.5}
                 step={0.05}
-                onChange={(v) => setConfig({ neuralDeadZone: v })}
+                onChange={(v) => setConfig({ neural_dead_zone: v })}
                 tooltip="Outputs with absolute value below this threshold become 0. Higher values make muscles harder to activate, encouraging sparse activation patterns."
                 width="100%"
               />
@@ -293,12 +293,12 @@ export function NeuralPanel() {
           <div style={{ marginBottom: '16px' }}>
             <ParamSlider
               name="Efficiency Penalty"
-              value={config.fitnessEfficiencyPenalty}
-              displayValue={String(config.fitnessEfficiencyPenalty)}
+              value={config.fitness_efficiency_penalty}
+              displayValue={String(config.fitness_efficiency_penalty)}
               min={0}
               max={2}
               step={0.1}
-              onChange={(v) => setConfig({ fitnessEfficiencyPenalty: v })}
+              onChange={(v) => setConfig({ fitness_efficiency_penalty: v })}
               tooltip={TOOLTIPS.efficiencyPenalty}
               width="100%"
             />
@@ -313,23 +313,23 @@ export function NeuralPanel() {
               </span>
               <input
                 type="checkbox"
-                checked={config.useAdaptiveMutation}
-                onChange={(e) => setConfig({ useAdaptiveMutation: e.target.checked })}
+                checked={config.use_adaptive_mutation}
+                onChange={(e) => setConfig({ use_adaptive_mutation: e.target.checked })}
                 style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
               />
             </div>
 
-            {config.useAdaptiveMutation && (
+            {config.use_adaptive_mutation && (
               <>
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
                     name="Window Size"
-                    value={config.stagnationThreshold}
-                    displayValue={`${config.stagnationThreshold} gens`}
+                    value={config.stagnation_threshold}
+                    displayValue={`${config.stagnation_threshold} gens`}
                     min={10}
                     max={50}
                     step={5}
-                    onChange={(v) => setConfig({ stagnationThreshold: v })}
+                    onChange={(v) => setConfig({ stagnation_threshold: v })}
                     tooltip={TOOLTIPS.stagnationThreshold}
                     width="100%"
                   />
@@ -337,12 +337,12 @@ export function NeuralPanel() {
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
                     name="Boost Factor"
-                    value={config.adaptiveMutationBoost}
-                    displayValue={`${config.adaptiveMutationBoost}x`}
+                    value={config.adaptive_mutation_boost}
+                    displayValue={`${config.adaptive_mutation_boost}x`}
                     min={1.5}
                     max={4}
                     step={0.5}
-                    onChange={(v) => setConfig({ adaptiveMutationBoost: v })}
+                    onChange={(v) => setConfig({ adaptive_mutation_boost: v })}
                     tooltip={TOOLTIPS.adaptiveMutationBoost}
                     width="100%"
                   />
@@ -350,12 +350,12 @@ export function NeuralPanel() {
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
                     name="Max Boost"
-                    value={config.maxAdaptiveBoost}
-                    displayValue={`${config.maxAdaptiveBoost}x`}
+                    value={config.max_adaptive_boost}
+                    displayValue={`${config.max_adaptive_boost}x`}
                     min={2}
                     max={16}
                     step={2}
-                    onChange={(v) => setConfig({ maxAdaptiveBoost: v })}
+                    onChange={(v) => setConfig({ max_adaptive_boost: v })}
                     tooltip={TOOLTIPS.maxAdaptiveBoost}
                     width="100%"
                   />
@@ -363,12 +363,12 @@ export function NeuralPanel() {
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
                     name="Improve Threshold"
-                    value={config.improvementThreshold}
-                    displayValue={`${config.improvementThreshold} pts`}
+                    value={config.improvement_threshold}
+                    displayValue={`${config.improvement_threshold} pts`}
                     min={1}
                     max={20}
                     step={1}
-                    onChange={(v) => setConfig({ improvementThreshold: v })}
+                    onChange={(v) => setConfig({ improvement_threshold: v })}
                     tooltip={TOOLTIPS.improvementThreshold}
                     width="100%"
                   />
@@ -386,13 +386,13 @@ export function NeuralPanel() {
               </span>
               <input
                 type="checkbox"
-                checked={config.useProprioception}
-                onChange={(e) => setConfig({ useProprioception: e.target.checked })}
+                checked={config.use_proprioception}
+                onChange={(e) => setConfig({ use_proprioception: e.target.checked })}
                 style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
               />
             </div>
 
-            {config.useProprioception && (
+            {config.use_proprioception && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <span style={labelStyle}>
@@ -401,8 +401,8 @@ export function NeuralPanel() {
                   </span>
                 </div>
                 <select
-                  value={config.proprioceptionInputs}
-                  onChange={(e) => setConfig({ proprioceptionInputs: e.target.value as 'strain' | 'velocity' | 'ground' | 'all' })}
+                  value={config.proprioception_inputs}
+                  onChange={(e) => setConfig({ proprioception_inputs: e.target.value as 'strain' | 'velocity' | 'ground' | 'all' })}
                   style={selectStyle}
                 >
                   <option value="all">All (strain + velocity + ground)</option>
@@ -415,7 +415,7 @@ export function NeuralPanel() {
           </div>
 
           {/* NEAT Settings (shown when mode is 'neat') */}
-          {config.neuralMode === 'neat' && (
+          {config.neural_mode === 'neat' && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
                 <span style={labelStyle}>
@@ -433,8 +433,8 @@ export function NeuralPanel() {
                   </span>
                 </div>
                 <select
-                  value={config.neatInitialConnectivity}
-                  onChange={(e) => setConfig({ neatInitialConnectivity: e.target.value as 'full' | 'sparse_inputs' | 'sparse_outputs' | 'none' })}
+                  value={config.neat_initial_connectivity}
+                  onChange={(e) => setConfig({ neat_initial_connectivity: e.target.value as 'full' | 'sparse_inputs' | 'sparse_outputs' | 'none' })}
                   style={selectStyle}
                 >
                   <option value="full">Full (all inputs → all outputs)</option>
@@ -447,12 +447,12 @@ export function NeuralPanel() {
               <div style={{ marginBottom: '16px' }}>
                 <ParamSlider
                   name="Add Connection %"
-                  value={config.neatAddConnectionRate * 100}
-                  displayValue={`${Math.round(config.neatAddConnectionRate * 100)}%`}
+                  value={config.neat_add_connection_rate * 100}
+                  displayValue={`${Math.round(config.neat_add_connection_rate * 100)}%`}
                   min={1}
                   max={20}
                   step={1}
-                  onChange={(v) => setConfig({ neatAddConnectionRate: v / 100 })}
+                  onChange={(v) => setConfig({ neat_add_connection_rate: v / 100 })}
                   tooltip={TOOLTIPS.neatAddConnectionRate}
                   width="100%"
                 />
@@ -460,12 +460,12 @@ export function NeuralPanel() {
               <div style={{ marginBottom: '16px' }}>
                 <ParamSlider
                   name="Add Node %"
-                  value={config.neatAddNodeRate * 100}
-                  displayValue={`${Math.round(config.neatAddNodeRate * 100)}%`}
+                  value={config.neat_add_node_rate * 100}
+                  displayValue={`${Math.round(config.neat_add_node_rate * 100)}%`}
                   min={1}
                   max={10}
                   step={1}
-                  onChange={(v) => setConfig({ neatAddNodeRate: v / 100 })}
+                  onChange={(v) => setConfig({ neat_add_node_rate: v / 100 })}
                   tooltip={TOOLTIPS.neatAddNodeRate}
                   width="100%"
                 />
@@ -473,12 +473,12 @@ export function NeuralPanel() {
               <div style={{ marginBottom: '16px' }}>
                 <ParamSlider
                   name="Max Hidden Nodes"
-                  value={config.neatMaxHiddenNodes}
-                  displayValue={String(config.neatMaxHiddenNodes)}
+                  value={config.neat_max_hidden_nodes}
+                  displayValue={String(config.neat_max_hidden_nodes)}
                   min={4}
                   max={64}
                   step={4}
-                  onChange={(v) => setConfig({ neatMaxHiddenNodes: v })}
+                  onChange={(v) => setConfig({ neat_max_hidden_nodes: v })}
                   tooltip={TOOLTIPS.neatMaxHiddenNodes}
                   width="100%"
                 />
@@ -486,12 +486,12 @@ export function NeuralPanel() {
               <div style={{ marginBottom: '16px' }}>
                 <ParamSlider
                   name="Enable Conn %"
-                  value={config.neatEnableRate * 100}
-                  displayValue={`${Math.round(config.neatEnableRate * 100)}%`}
+                  value={config.neat_enable_rate * 100}
+                  displayValue={`${Math.round(config.neat_enable_rate * 100)}%`}
                   min={0}
                   max={10}
                   step={1}
-                  onChange={(v) => setConfig({ neatEnableRate: v / 100 })}
+                  onChange={(v) => setConfig({ neat_enable_rate: v / 100 })}
                   tooltip={TOOLTIPS.neatEnableRate}
                   width="100%"
                 />
@@ -499,12 +499,12 @@ export function NeuralPanel() {
               <div style={{ marginBottom: '16px' }}>
                 <ParamSlider
                   name="Disable Conn %"
-                  value={config.neatDisableRate * 100}
-                  displayValue={`${Math.round(config.neatDisableRate * 100)}%`}
+                  value={config.neat_disable_rate * 100}
+                  displayValue={`${Math.round(config.neat_disable_rate * 100)}%`}
                   min={0}
                   max={10}
                   step={1}
-                  onChange={(v) => setConfig({ neatDisableRate: v / 100 })}
+                  onChange={(v) => setConfig({ neat_disable_rate: v / 100 })}
                   tooltip={TOOLTIPS.neatDisableRate}
                   width="100%"
                 />

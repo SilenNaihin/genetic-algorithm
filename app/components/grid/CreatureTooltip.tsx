@@ -11,7 +11,7 @@ import type { CreatureSimulationResult } from '../../../src/types';
  */
 function generateTooltipHTML(result: CreatureSimulationResult, rank?: number, stackDepth?: number): string {
   const config = useEvolutionStore.getState().config;
-  const isPureMode = config.neuralMode === 'pure';
+  const isPureMode = config.neural_mode === 'pure';
   const genome = result.genome;
   const creatureName = getCreatureName(genome);
   const avgStiffness = genome.muscles.length > 0

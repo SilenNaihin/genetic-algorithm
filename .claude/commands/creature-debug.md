@@ -44,6 +44,20 @@ GET /api/runs/{run_id}/generations/{gen}
 GET /api/runs/{run_id}/generations/{gen}/creatures
 ```
 
+### Evolution API
+```bash
+# Run evolution step - returns new generation + culled_ids
+POST /api/evolution/{run_id}/step
+
+# Response includes:
+# - creatures: array of creatures in new generation
+# - culled_ids: array of creature IDs that died (based on selection method)
+#   This varies by selection method:
+#   - truncation: bottom N% by fitness
+#   - tournament: losers of tournament rounds
+#   - speciation: culled per-species based on adjusted fitness
+```
+
 ## Step 1: Fetch Creature Data
 
 ```bash

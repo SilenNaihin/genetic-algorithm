@@ -254,7 +254,7 @@ export function StatsPanel() {
       </div>
 
       {/* NEAT topology stats - only show when NEAT mode is enabled */}
-      {config.neuralMode === 'neat' && hasResults && (() => {
+      {config.neural_mode === 'neat' && hasResults && (() => {
         const neatResults = validResults.filter(r => r.genome.neatGenome);
         if (neatResults.length === 0) return null;
 
@@ -452,7 +452,7 @@ export function StatsPanel() {
       )}
 
       {/* Compare Brains button - only show in neural mode with history */}
-      {config.neuralMode && generation > 0 && (
+      {config.neural_mode && generation > 0 && (
         <button
           className="btn btn-secondary"
           onClick={() => setBrainEvolutionModalOpen(true)}

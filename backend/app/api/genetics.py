@@ -104,7 +104,6 @@ def evolve_one_generation(request: EvolveRequest):
         elite_count=request.config.elite_count,
         cull_percentage=request.config.cull_percentage,
         crossover_rate=request.config.crossover_rate,
-        use_mutation=request.config.use_mutation,
         use_crossover=request.config.use_crossover,
         mutation_rate=request.config.mutation.rate,
         mutation_magnitude=request.config.mutation.magnitude,

@@ -49,26 +49,26 @@ export function EvolutionPanel() {
           Selection
           <InfoTooltip
             text={
-              config.selectionMethod === 'truncation' ? TOOLTIPS.selectionTruncation :
-              config.selectionMethod === 'tournament' ? TOOLTIPS.selectionTournament :
-              config.selectionMethod === 'speciation' ? TOOLTIPS.selectionSpeciation :
+              config.selection_method === 'truncation' ? TOOLTIPS.selectionTruncation :
+              config.selection_method === 'tournament' ? TOOLTIPS.selectionTournament :
+              config.selection_method === 'speciation' ? TOOLTIPS.selectionSpeciation :
               TOOLTIPS.selectionRank
             }
             width={280}
           />
         </div>
         <select
-          value={config.selectionMethod}
-          onChange={(e) => setConfig({ selectionMethod: e.target.value as 'truncation' | 'tournament' | 'rank' | 'speciation' })}
+          value={config.selection_method}
+          onChange={(e) => setConfig({ selection_method: e.target.value as 'truncation' | 'tournament' | 'rank' | 'speciation' })}
           style={selectStyle}
-          disabled={config.neuralMode === 'neat'}  // NEAT requires speciation
+          disabled={config.neural_mode === 'neat'}  // NEAT requires speciation
         >
           <option value="rank">Rank</option>
           <option value="tournament">Tournament</option>
           <option value="truncation">Truncation</option>
           <option value="speciation">Speciation</option>
         </select>
-        {config.neuralMode === 'neat' && (
+        {config.neural_mode === 'neat' && (
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
             NEAT mode requires speciation selection
           </div>
@@ -76,17 +76,17 @@ export function EvolutionPanel() {
       </div>
 
       {/* Tournament size - only shown when tournament selected */}
-      {config.selectionMethod === 'tournament' && (
+      {config.selection_method === 'tournament' && (
         <div style={{ marginBottom: '16px' }}>
           <ParamSlider
             name="Tournament Size"
-            value={config.tournamentSize}
-            displayValue={String(config.tournamentSize)}
+            value={config.tournament_size}
+            displayValue={String(config.tournament_size)}
             min={2}
             max={10}
             step={1}
             tooltip={TOOLTIPS.tournamentSize}
-            onChange={(v) => setConfig({ tournamentSize: v })}
+            onChange={(v) => setConfig({ tournament_size: v })}
             width="100%"
           />
         </div>
@@ -96,12 +96,12 @@ export function EvolutionPanel() {
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Cull %"
-          value={config.cullPercentage * 100}
-          displayValue={`${Math.round(config.cullPercentage * 100)}%`}
+          value={config.cull_percentage * 100}
+          displayValue={`${Math.round(config.cull_percentage * 100)}%`}
           min={10}
           max={90}
           tooltip={TOOLTIPS.cullPercentage}
-          onChange={(v) => setConfig({ cullPercentage: v / 100 })}
+          onChange={(v) => setConfig({ cull_percentage: v / 100 })}
           width="100%"
         />
       </div>
@@ -113,37 +113,40 @@ export function EvolutionPanel() {
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Mutation Rate"
-          value={config.mutationRate * 100}
-          displayValue={`${Math.round(config.mutationRate * 100)}%`}
+          value={config.mutation_rate * 100}
+          displayValue={`${Math.round(config.mutation_rate * 100)}%`}
           min={5}
           max={80}
           tooltip={TOOLTIPS.mutationRate}
-          onChange={(v) => setConfig({ mutationRate: v / 100 })}
+          onChange={(v) => setConfig({ mutation_rate: v / 100 })}
           width="100%"
         />
       </div>
       <div style={{ marginBottom: '16px' }}>
         <ParamSlider
           name="Mutation Magnitude"
-          value={config.mutationMagnitude}
-          displayValue={config.mutationMagnitude.toFixed(1)}
+          value={config.mutation_magnitude}
+          displayValue={config.mutation_magnitude.toFixed(1)}
           min={0.1}
           max={1.0}
           step={0.1}
           tooltip={TOOLTIPS.mutationMagnitude}
-          onChange={(v) => setConfig({ mutationMagnitude: v })}
+          onChange={(v) => setConfig({ mutation_magnitude: v })}
           width="100%"
         />
       </div>
+
+      {/* Breeding Mode */}
+      <div style={sectionStyle}>Breeding</div>
 
       <div style={{ marginBottom: '12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
           <input
             type="checkbox"
-            checked={config.useMutation && !config.useCrossover}
+            checked={!config.use_crossover}
             onChange={(e) => {
               if (e.target.checked) {
-                setConfig({ useMutation: true, useCrossover: false });
+                setConfig({ use_crossover: false });
               }
             }}
             style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
@@ -153,17 +156,14 @@ export function EvolutionPanel() {
         </label>
       </div>
 
-      {/* Crossover Section */}
-      <div style={sectionStyle}>Crossover</div>
-
       <div style={{ marginBottom: '12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '13px' }}>
           <input
             type="checkbox"
-            checked={config.useCrossover}
+            checked={config.use_crossover}
             onChange={(e) => {
               if (e.target.checked) {
-                setConfig({ useCrossover: true, useMutation: false });
+                setConfig({ use_crossover: true });
               }
             }}
             style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
@@ -173,23 +173,23 @@ export function EvolutionPanel() {
         </label>
       </div>
 
-      {config.useCrossover && (
+      {config.use_crossover && (
         <>
           {/* Crossover method - only for fixed-topology neural networks (not NEAT) */}
-          {config.useNeuralNet && config.neuralMode !== 'neat' && (
+          {config.use_neural_net && config.neural_mode !== 'neat' && (
             <>
               <div style={{ marginBottom: '16px' }}>
                 <div style={labelStyle}>
                   Method
                   <InfoTooltip text={
-                    config.neuralCrossoverMethod === 'sbx' ? TOOLTIPS.crossoverSbx :
-                    config.neuralCrossoverMethod === 'uniform' ? TOOLTIPS.crossoverUniform :
+                    config.neural_crossover_method === 'sbx' ? TOOLTIPS.crossoverSbx :
+                    config.neural_crossover_method === 'uniform' ? TOOLTIPS.crossoverUniform :
                     TOOLTIPS.crossoverInterpolation
                   } />
                 </div>
                 <select
-                  value={config.neuralCrossoverMethod}
-                  onChange={(e) => setConfig({ neuralCrossoverMethod: e.target.value as 'interpolation' | 'uniform' | 'sbx' })}
+                  value={config.neural_crossover_method}
+                  onChange={(e) => setConfig({ neural_crossover_method: e.target.value as 'interpolation' | 'uniform' | 'sbx' })}
                   style={selectStyle}
                 >
                   <option value="sbx">SBX</option>
@@ -198,17 +198,17 @@ export function EvolutionPanel() {
                 </select>
               </div>
 
-              {config.neuralCrossoverMethod === 'sbx' && (
+              {config.neural_crossover_method === 'sbx' && (
                 <div style={{ marginBottom: '16px' }}>
                   <ParamSlider
                     name="SBX Eta"
-                    value={config.sbxEta}
-                    displayValue={`${config.sbxEta} ${config.sbxEta <= 1 ? '(explore)' : config.sbxEta >= 4 ? '(exploit)' : ''}`}
+                    value={config.sbx_eta}
+                    displayValue={`${config.sbx_eta} ${config.sbx_eta <= 1 ? '(explore)' : config.sbx_eta >= 4 ? '(exploit)' : ''}`}
                     min={0.5}
                     max={5}
                     step={0.5}
                     tooltip={TOOLTIPS.sbxEta}
-                    onChange={(v) => setConfig({ sbxEta: v })}
+                    onChange={(v) => setConfig({ sbx_eta: v })}
                     width="100%"
                   />
                 </div>
@@ -221,7 +221,7 @@ export function EvolutionPanel() {
       {/* Diversity Section */}
       <div style={sectionStyle}>
         Diversity
-        {config.neuralMode === 'neat' && (
+        {config.neural_mode === 'neat' && (
           <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--accent)', fontWeight: 'normal' }}>
             (NEAT mode)
           </span>
@@ -233,20 +233,20 @@ export function EvolutionPanel() {
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer',
-          color: config.neuralMode === 'neat' ? 'var(--text-muted)' : 'var(--text-primary)',
+          cursor: config.neural_mode === 'neat' ? 'not-allowed' : 'pointer',
+          color: config.neural_mode === 'neat' ? 'var(--text-muted)' : 'var(--text-primary)',
           fontSize: '13px',
         }}>
           <input
             type="checkbox"
-            checked={config.useFitnessSharing}
-            disabled={config.neuralMode === 'neat'}
-            onChange={(e) => setConfig({ useFitnessSharing: e.target.checked })}
-            style={{ width: '16px', height: '16px', cursor: config.neuralMode === 'neat' ? 'not-allowed' : 'pointer', accentColor: 'var(--accent)' }}
+            checked={config.use_fitness_sharing}
+            disabled={config.neural_mode === 'neat'}
+            onChange={(e) => setConfig({ use_fitness_sharing: e.target.checked })}
+            style={{ width: '16px', height: '16px', cursor: config.neural_mode === 'neat' ? 'not-allowed' : 'pointer', accentColor: 'var(--accent)' }}
           />
           Fitness Sharing
           <InfoTooltip
-            text={config.neuralMode === 'neat'
+            text={config.neural_mode === 'neat'
               ? "Disabled in NEAT mode (redundant with speciation)"
               : TOOLTIPS.fitnessSharing}
             width={280}
@@ -254,34 +254,34 @@ export function EvolutionPanel() {
         </label>
       </div>
 
-      {config.useFitnessSharing && config.neuralMode !== 'neat' && (
+      {config.use_fitness_sharing && config.neural_mode !== 'neat' && (
         <div style={{ marginBottom: '16px' }}>
           <ParamSlider
             name="Sharing Radius"
-            value={config.sharingRadius}
-            displayValue={`${config.sharingRadius.toFixed(1)} ${config.sharingRadius <= 0.3 ? '(narrow)' : config.sharingRadius >= 1.0 ? '(wide)' : ''}`}
+            value={config.sharing_radius}
+            displayValue={`${config.sharing_radius.toFixed(1)} ${config.sharing_radius <= 0.3 ? '(narrow)' : config.sharing_radius >= 1.0 ? '(wide)' : ''}`}
             min={0.1}
             max={2.0}
             step={0.1}
             tooltip={TOOLTIPS.sharingRadius}
-            onChange={(v) => setConfig({ sharingRadius: v })}
+            onChange={(v) => setConfig({ sharing_radius: v })}
             width="100%"
           />
         </div>
       )}
 
       {/* Compatibility threshold - only shown when speciation selected */}
-      {config.selectionMethod === 'speciation' && (
+      {config.selection_method === 'speciation' && (
         <div style={{ marginBottom: '4px' }}>
           <ParamSlider
             name="Compatibility"
-            value={config.compatibilityThreshold}
-            displayValue={`${config.compatibilityThreshold.toFixed(1)} ${config.compatibilityThreshold <= 0.5 ? '(many species)' : config.compatibilityThreshold >= 2.0 ? '(few species)' : ''}`}
+            value={config.compatibility_threshold}
+            displayValue={`${config.compatibility_threshold.toFixed(1)} ${config.compatibility_threshold <= 0.5 ? '(many species)' : config.compatibility_threshold >= 2.0 ? '(few species)' : ''}`}
             min={0.1}
             max={3.0}
             step={0.1}
             tooltip={TOOLTIPS.compatibilityThreshold}
-            onChange={(v) => setConfig({ compatibilityThreshold: v })}
+            onChange={(v) => setConfig({ compatibility_threshold: v })}
             width="100%"
           />
         </div>
