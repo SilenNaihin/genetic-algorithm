@@ -1159,8 +1159,8 @@ def compute_neural_rest_lengths(
     # Apply global frequency multiplier
     effective_freq = frequency * global_freq
 
-    if mode == 'pure':
-        # Pure mode: NN directly controls contraction
+    if mode in ('pure', 'neat'):
+        # Pure/NEAT mode: NN directly controls contraction
         # NN output [-1, 1] maps directly to contraction (no amplitude scaling)
         # rest_length clamp at 0.01 provides physics safety boundary
         contraction = nn_outputs
@@ -1419,7 +1419,8 @@ def simulate_with_neural(
         velocity_com = get_center_of_mass(batch)
 
         # 2. Forward pass through NN
-        if mode == 'pure':
+        # Dead zone applies to pure and neat modes (direct NN control)
+        if mode in ('pure', 'neat'):
             nn_outputs = neural_network.forward_with_dead_zone(sensor_inputs, dead_zone)
         else:
             nn_outputs = neural_network.forward(sensor_inputs)
@@ -1607,7 +1608,9 @@ def simulate_with_fitness_neural(
                 sensor_inputs = torch.cat([sensor_inputs, prop_inputs], dim=1)
 
             # Forward pass through NN - get full activations for visualization
-            if mode == 'pure':
+            # Dead zone applies to pure and neat modes (direct NN control)
+            # Hybrid mode doesn't use dead zone (NN modulates base oscillation)
+            if mode in ('pure', 'neat'):
                 current_full_activations = neural_network.forward_full_with_dead_zone(sensor_inputs, dead_zone)
                 raw_outputs = current_full_activations['outputs']
             else:

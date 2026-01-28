@@ -27,6 +27,11 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - Bug: Bias neurons were included in topological sort queue but excluded from expected count
   - Fix: Changed queue initialization to exclude bias neurons (same as input neurons)
   - Affected line: `neat_network.py:235` - now checks `n.type not in ('input', 'bias')`
+- **NEAT Dead Zone Not Applied**: Fixed NEAT mode ignoring dead zone threshold
+  - Bug: Dead zone only applied for `mode == 'pure'`, not for NEAT
+  - Symptom: Creatures moved even with `connectivity='none'` because bias output (-0.1) wasn't zeroed
+  - Fix: Changed condition to `mode in ('pure', 'neat')` in three places in physics.py
+  - Now NEAT mode respects `neural_dead_zone` setting like pure mode
 
 ### Added
 - **Muscle Velocity Cap**: Physics-level constraint on muscle speed (v2-prd Phase 1)
