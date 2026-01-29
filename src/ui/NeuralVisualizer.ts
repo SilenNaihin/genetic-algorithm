@@ -104,21 +104,42 @@ function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, numb
     }
   }
 
-  // Find max depth and ensure all outputs have the same (max) depth
+  // Find max depth from BFS (before adjusting outputs)
   let maxDepth = Math.max(...depths.values(), 1);
+
+  // Collect hidden neuron depths for adjustment
+  const hiddenNeurons = genome.neurons.filter(n => n.type === 'hidden');
+  const hasHiddenNeurons = hiddenNeurons.length > 0;
+
+  // If we have hidden neurons, ensure there's room between inputs (0) and outputs
+  // Minimum depth structure: inputs=0, hidden=1+, outputs=maxDepth
+  if (hasHiddenNeurons) {
+    // Ensure maxDepth is at least 2 so hidden nodes have space
+    maxDepth = Math.max(maxDepth, 2);
+  }
+
+  // Set all outputs to maxDepth
   for (const outputId of outputIds) {
     depths.set(outputId, maxDepth);
   }
 
-  // Any hidden neuron not reached gets depth 1 (between input and output layers)
-  // This handles edge cases like isolated hidden nodes
+  // Handle hidden neurons that weren't reached or are at invalid depths
   for (const neuron of genome.neurons) {
-    if (!depths.has(neuron.id)) {
-      if (neuron.type === 'hidden') {
-        depths.set(neuron.id, 1);  // Place hidden nodes in middle, not at input level
-      } else {
-        depths.set(neuron.id, 0);
+    if (neuron.type === 'hidden') {
+      const currentDepth = depths.get(neuron.id);
+      if (currentDepth === undefined) {
+        // Unreached hidden node - place in middle
+        depths.set(neuron.id, Math.floor(maxDepth / 2));
+      } else if (currentDepth === 0) {
+        // Hidden at input level - move to depth 1
+        depths.set(neuron.id, 1);
+      } else if (currentDepth >= maxDepth) {
+        // Hidden at output level - move one layer up
+        depths.set(neuron.id, maxDepth - 1);
       }
+    } else if (!depths.has(neuron.id)) {
+      // Other unreached neurons (shouldn't happen, but handle gracefully)
+      depths.set(neuron.id, 0);
     }
   }
 
