@@ -14,7 +14,7 @@ class GeneticsService:
 
     def generate_id(self, prefix: str = "g") -> str:
         """Generate a unique ID."""
-        return f"{prefix}_{uuid.uuid4().hex[:8]}"
+        return f"{prefix}_{uuid.uuid4().hex[:16]}"
 
     def generate_initial_population(
         self,

@@ -45,7 +45,7 @@ class GenomeConstraints:
 
 def generate_id(prefix: str = '') -> str:
     """Generate a unique ID with optional prefix."""
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+    return f"{prefix}_{uuid.uuid4().hex[:16]}"
 
 
 def clamp(value: float, min_val: float, max_val: float) -> float:
