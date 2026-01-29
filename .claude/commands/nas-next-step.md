@@ -107,8 +107,8 @@ nas analyze --study-name my-search
 nas/
 ├── nas-plan.md           # Architecture plan (done)
 ├── nas-prd.json          # Task tracker (done)
-├── nas-intuitions.ipynb  # Learning notebook
-├── cli.py                # Click/Typer CLI entry point
+├── nas-intuitions.ipynb  # Learning notebook (done)
+├── cli.py                # Typer CLI entry point
 ├── parameters.py         # Parameter space definition
 ├── objectives.py         # Fitness/diversity calculations
 ├── runner.py             # Trial runner (calls backend APIs)
@@ -116,7 +116,8 @@ nas/
 ├── storage.py            # PostgreSQL integration
 ├── screening.py          # Morris/low-fidelity screening
 ├── analysis.py           # fANOVA, Pareto front analysis
-└── logging.py            # CLI progress output
+├── logging.py            # CLI progress output
+└── nas-findings.ipynb    # Results notebook (created after search completes)
 ```
 
 ## Checklist

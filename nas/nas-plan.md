@@ -213,6 +213,16 @@ Parameters: mutation_rate=0.32, hidden_size=16, ...
 3. **Pareto front** showing fitness-diversity tradeoffs
 4. **Reproducible** - any config can be re-run with same results
 
+## Deliverables
+
+### `nas-findings.ipynb` (created after search completes)
+- **Pareto Frontier**: Interactive plot of fitness vs diversity tradeoffs
+- **Parameter Importance**: fANOVA rankings with confidence intervals
+- **Mode Comparison**: pure vs hybrid vs NEAT head-to-head analysis
+- **Best Configs**: Top performers with links to dashboard runs
+- **Behavioral Analysis**: What strategies emerged? (locomotion patterns, body shapes)
+- **Recommendations**: Production configs for different use cases (fast training, max fitness, diverse population)
+
 ## Search Strategies
 
 Three approaches depending on your goal:

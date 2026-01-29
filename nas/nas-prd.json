@@ -150,6 +150,13 @@
           "description": "Export/display Pareto front of fitness vs diversity tradeoffs",
           "status": "not_started",
           "file": "analysis.py"
+        },
+        {
+          "id": "4.5",
+          "name": "Findings notebook",
+          "description": "Create nas-findings.ipynb documenting results: Pareto frontier visualization, parameter importance rankings from fANOVA, best configurations with hyperlinks to specific runs, comparison of pure vs hybrid vs NEAT, behavioral analysis of top performers, recommendations for production configs",
+          "status": "not_started",
+          "file": "nas-findings.ipynb"
         }
       ]
     },
