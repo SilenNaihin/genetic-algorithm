@@ -33,6 +33,7 @@ def run(
     population_size: Optional[int] = typer.Option(None, "--population-size", "-p", help="Override population size"),
     device: Optional[str] = typer.Option(None, "--device", "-d", help="PyTorch device (cuda:0, cuda:1, cpu)"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
+    batched: bool = typer.Option(True, "--batched/--no-batched", "-b", help="Batch all seeds together (1.4-1.6x faster)"),
 ):
     """
     Run evolution experiment with specified config.
@@ -43,7 +44,7 @@ def run(
     """
     import torch
     from configs import get_config, list_configs, CONFIGS
-    from runner import run_evolution, run_multi_seed, get_aggregate_stats, GenerationStats
+    from runner import run_evolution, run_multi_seed, run_multi_seed_batched, get_aggregate_stats, GenerationStats
     from results_io import IncrementalResultWriter
 
     # Get config
@@ -78,31 +79,67 @@ def run(
     console.print(f"  Population: {cfg['population_size']}")
     console.print(f"  Seeds: {seed_list}")
     console.print(f"  Mode: {cfg.get('neural_mode', 'pure')}")
+    console.print(f"  Batched: {batched}")
     console.print()
 
     results = []
 
-    for i, seed in enumerate(seed_list):
-        console.print(f"[cyan][seed {i+1}/{len(seed_list)}][/cyan] seed={seed}")
-        writer.start_seed(i)
+    if batched and len(seed_list) > 1:
+        # Use batched runner for better throughput
+        console.print("[yellow]Using batched mode (all seeds simulated together)[/yellow]\n")
 
-        def on_generation(stats: GenerationStats):
-            writer.add_generation(stats)
-            if not quiet and stats.generation % 10 == 0:
-                console.print(f"  gen {stats.generation+1:3d}/{generations} | best: {stats.best_fitness:6.1f} | avg: {stats.avg_fitness:6.1f} | {stats.simulation_time_ms}ms")
+        # Track generation progress for each seed
+        last_gen_per_seed = [-1] * len(seed_list)
 
-        result = run_evolution(
+        def on_generation_batched(seed_idx: int, stats: GenerationStats):
+            # Initialize seed tracking on first generation
+            if last_gen_per_seed[seed_idx] < 0:
+                writer.start_seed(seed_idx)
+            last_gen_per_seed[seed_idx] = stats.generation
+            writer.add_generation(stats, seed_idx=seed_idx)
+            if not quiet and stats.generation % 10 == 0 and seed_idx == 0:
+                # Only print progress for first seed to avoid spam
+                console.print(f"  gen {stats.generation+1:3d}/{generations} | best: {stats.best_fitness:6.1f} | avg: {stats.avg_fitness:6.1f}")
+
+        results = run_multi_seed_batched(
             config=cfg,
             generations=generations,
-            seed=seed,
+            seeds=seed_list,
             device=torch_device,
-            callback=on_generation,
+            callback=on_generation_batched,
             verbose=not quiet,
         )
-        results.append(result)
-        writer.complete_seed(result)
 
-        console.print(f"  [green]Done![/green] Best: {result.best_fitness:.1f} | Time: {result.total_time_s:.1f}s | {result.creatures_per_second:.0f} creatures/s\n")
+        # Complete each seed in the writer
+        for i, result in enumerate(results):
+            writer.complete_seed(result, seed_idx=i)
+            console.print(f"  [green]Seed {seed_list[i]}:[/green] Best: {result.best_fitness:.1f}")
+
+        console.print(f"\n  [green]Total:[/green] {results[0].creatures_per_second:.0f} creatures/s")
+
+    else:
+        # Use sequential runner
+        for i, seed in enumerate(seed_list):
+            console.print(f"[cyan][seed {i+1}/{len(seed_list)}][/cyan] seed={seed}")
+            writer.start_seed(i)
+
+            def on_generation(stats: GenerationStats):
+                writer.add_generation(stats)
+                if not quiet and stats.generation % 10 == 0:
+                    console.print(f"  gen {stats.generation+1:3d}/{generations} | best: {stats.best_fitness:6.1f} | avg: {stats.avg_fitness:6.1f} | {stats.simulation_time_ms}ms")
+
+            result = run_evolution(
+                config=cfg,
+                generations=generations,
+                seed=seed,
+                device=torch_device,
+                callback=on_generation,
+                verbose=not quiet,
+            )
+            results.append(result)
+            writer.complete_seed(result)
+
+            console.print(f"  [green]Done![/green] Best: {result.best_fitness:.1f} | Time: {result.total_time_s:.1f}s | {result.creatures_per_second:.0f} creatures/s\n")
 
     # Aggregate stats
     agg = get_aggregate_stats(results)

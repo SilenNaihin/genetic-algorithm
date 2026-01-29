@@ -355,13 +355,56 @@ NEAT networks use Numba JIT compilation for optimal performance:
 
 The physics is NOT the bottleneck. For NEAT mode, the neural forward pass dominates runtime because each creature has a unique network structure that must be evaluated sequentially (within Numba's parallel batch loop).
 
+### Multi-Seed Batching (Recommended)
+
+When running multiple seeds, the CLI batches all seeds together for simulation:
+
+```bash
+# Default: batched mode (1.4-1.6x faster)
+python cli.py run -c neat_baseline -g 100 -s 3
+
+# Disable batching (sequential seeds)
+python cli.py run -c neat_baseline -g 100 -s 3 --no-batched
+```
+
+**Benchmark results (3 seeds, 5 generations, pop=300):**
+
+| Mode | Sequential | Batched | Speedup |
+|------|-----------|---------|---------|
+| NEAT | 138.6s (32/s) | 100.5s (45/s) | **1.38x** |
+| Pure | 52.6s (86/s) | 32.6s (138/s) | **1.61x** |
+
+Why batching helps:
+- Combines all seeds into single simulation batch (900 creatures instead of 300)
+- Better utilizes Numba parallel loops and GPU tensor batching
+- Single simulator instance (no re-initialization overhead)
+- Shared JIT-compiled code
+
+### Parallel Configs Warning
+
+**Do NOT use `nas parallel` on single-GPU or CPU-only machines!**
+
+| Mode | Sequential (2 configs) | Parallel (2 configs) | Result |
+|------|------------------------|----------------------|--------|
+| NEAT | 82s | 220s | **2.7x slower** |
+| Pure | 34s | 250s | **7x slower** |
+
+Why? Both Numba (`prange`) and PyTorch use all CPU cores internally. Running 2 processes causes massive thread contention - each gets ~1/5th the throughput instead of 1/2.
+
+**When `parallel` IS useful:**
+- Multiple GPUs: Each process gets a dedicated GPU
+- Distributed machines: Run configs on different machines
+
+**For single machines**: Run configs sequentially (just run multiple `nas run` commands one after another).
+
 ### Optimization Tips
 
-1. **Use CPU for NEAT**: GPU adds transfer overhead with no benefit
-2. **Use larger populations**: Numba parallel kicks in at 300+ creatures
-3. **Use GPU for Pure mode**: At population 500+, GPU is 1.2-1.3x faster
-4. **Run configs in parallel**: Use `nas parallel` to utilize multiple CPU cores
-5. **Reduce generations for testing**: Use `-g 10 -s 1` for quick tests
+1. **Use batched mode**: Default for multi-seed runs, 1.4-1.6x faster
+2. **Use CPU for NEAT**: GPU adds transfer overhead with no benefit
+3. **Use larger populations**: Numba parallel kicks in at 300+ creatures
+4. **Use GPU for Pure mode**: At population 500+, GPU is 1.2-1.3x faster
+5. **Run configs sequentially**: Do NOT use `nas parallel` on single machines
+6. **Reduce generations for testing**: Use `-g 10 -s 1` for quick tests
 
 ### Machine Benchmarks
 

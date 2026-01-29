@@ -60,6 +60,7 @@ class IncrementalResultWriter:
     Writes results incrementally to JSON file.
 
     Crash-safe: partial results are still valid JSON.
+    Supports both sequential and batched modes.
     """
 
     def __init__(self, config_name: str, config: dict[str, Any], seeds: list[int]):
@@ -70,26 +71,35 @@ class IncrementalResultWriter:
         self.config_name = config_name
         self.config = config
         self.seeds = seeds
-        self.seed_results: list[dict[str, Any]] = []
+        self.seed_results: list[dict[str, Any] | None] = [None] * len(seeds)
         self.current_seed_idx = 0
+        # For batched mode: track generations per seed
+        self.generations_per_seed: list[list[dict[str, Any]]] = [[] for _ in seeds]
+        # For sequential mode: current generations
         self.current_generations: list[dict[str, Any]] = []
+        self.batched_mode = False
 
         # Write initial structure
         self._write()
 
     def _write(self):
         """Write current state to file."""
+        # Get current generations (either from batched or sequential)
+        current_gens = self.current_generations
+        if self.batched_mode and self.current_seed_idx < len(self.seeds):
+            current_gens = self.generations_per_seed[self.current_seed_idx]
+
         data = {
             'config_name': self.config_name,
             'config': self.config,
             'seeds': self.seeds,
             'timestamp': self.timestamp,
             'status': 'in_progress',
-            'seed_results': self.seed_results,
+            'seed_results': [r for r in self.seed_results if r is not None],
             'current_seed': {
                 'seed_idx': self.current_seed_idx,
                 'seed': self.seeds[self.current_seed_idx] if self.current_seed_idx < len(self.seeds) else None,
-                'generations': self.current_generations,
+                'generations': current_gens,
             } if self.current_seed_idx < len(self.seeds) else None,
         }
 
@@ -100,30 +110,57 @@ class IncrementalResultWriter:
         """Start a new seed run."""
         self.current_seed_idx = seed_idx
         self.current_generations = []
+        if seed_idx < len(self.generations_per_seed):
+            self.generations_per_seed[seed_idx] = []
         self._write()
 
-    def add_generation(self, stats: GenerationStats):
-        """Add a generation's stats."""
-        self.current_generations.append(generation_stats_to_dict(stats))
-        # Write every 10 generations to reduce I/O
-        if len(self.current_generations) % 10 == 0:
-            self._write()
+    def add_generation(self, stats: GenerationStats, seed_idx: int | None = None):
+        """Add a generation's stats.
 
-    def complete_seed(self, result: RunResult):
-        """Complete a seed run."""
-        self.seed_results.append(run_result_to_dict(result))
+        Args:
+            stats: Generation statistics
+            seed_idx: For batched mode, which seed this belongs to. None for sequential.
+        """
+        if seed_idx is not None:
+            # Batched mode
+            self.batched_mode = True
+            if seed_idx < len(self.generations_per_seed):
+                self.generations_per_seed[seed_idx].append(generation_stats_to_dict(stats))
+                # Write every 10 generations (check first seed only)
+                if seed_idx == 0 and len(self.generations_per_seed[0]) % 10 == 0:
+                    self._write()
+        else:
+            # Sequential mode
+            self.current_generations.append(generation_stats_to_dict(stats))
+            # Write every 10 generations to reduce I/O
+            if len(self.current_generations) % 10 == 0:
+                self._write()
+
+    def complete_seed(self, result: RunResult, seed_idx: int | None = None):
+        """Complete a seed run.
+
+        Args:
+            result: Run result for this seed
+            seed_idx: For batched mode, which seed. None for sequential (uses current_seed_idx).
+        """
+        idx = seed_idx if seed_idx is not None else self.current_seed_idx
+        if idx < len(self.seed_results):
+            self.seed_results[idx] = run_result_to_dict(result)
         self.current_generations = []
         self._write()
 
     def complete_all(self, aggregate_stats: dict[str, Any] | None = None):
         """Mark run as complete with aggregate stats."""
+        # Filter out None entries from seed_results
+        completed_results = [r for r in self.seed_results if r is not None]
+
         data = {
             'config_name': self.config_name,
             'config': self.config,
             'seeds': self.seeds,
             'timestamp': self.timestamp,
             'status': 'completed',
-            'seed_results': self.seed_results,
+            'seed_results': completed_results,
             'aggregate': aggregate_stats,
         }
 

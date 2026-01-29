@@ -322,6 +322,461 @@ def get_aggregate_stats(results: list[RunResult]) -> dict[str, Any]:
     }
 
 
+def run_multi_seed_batched(
+    config: dict[str, Any],
+    generations: int,
+    seeds: list[int],
+    device: torch.device | None = None,
+    callback: Callable[[int, GenerationStats], None] | None = None,
+    verbose: bool = True,
+) -> list[RunResult]:
+    """
+    Run evolution with multiple seeds, batching all seeds together for simulation.
+
+    This combines all seeds' populations into a single batch for simulation,
+    maximizing GPU/Numba utilization, then splits results for independent evolution.
+
+    Args:
+        config: Simulation configuration dict
+        generations: Number of generations per seed
+        seeds: List of random seeds
+        device: PyTorch device
+        callback: Called with (seed_idx, stats) after each generation
+        verbose: Print progress
+
+    Returns:
+        List of RunResults, one per seed
+    """
+    import random
+    import numpy as np
+
+    num_seeds = len(seeds)
+
+    # Initialize simulator once
+    simulator = PyTorchSimulator(device=device)
+
+    # Convert config to SimulationConfig
+    sim_config = SimulationConfig(**config)
+    pop_size = sim_config.population_size
+
+    # Prepare evolution config (same as run_evolution)
+    use_neat = sim_config.neural_mode == 'neat'
+
+    evolution_config = {
+        'population_size': sim_config.population_size,
+        'elite_count': sim_config.elite_count,
+        'cull_percentage': sim_config.cull_percentage,
+        'selection_method': sim_config.selection_method,
+        'tournament_size': sim_config.tournament_size,
+        'crossover_rate': sim_config.crossover_rate,
+        'use_crossover': sim_config.use_crossover,
+        'mutation_rate': sim_config.mutation_rate,
+        'mutation_magnitude': sim_config.mutation_magnitude,
+        'weight_mutation_rate': sim_config.weight_mutation_rate,
+        'weight_mutation_magnitude': sim_config.weight_mutation_magnitude,
+        'weight_mutation_decay': sim_config.weight_mutation_decay,
+        'use_neural_net': sim_config.use_neural_net,
+        'neural_hidden_size': sim_config.neural_hidden_size,
+        'neural_output_bias': sim_config.neural_output_bias,
+        'min_nodes': sim_config.min_nodes,
+        'max_nodes': sim_config.max_nodes,
+        'max_muscles': sim_config.max_muscles,
+        'max_frequency': sim_config.max_allowed_frequency,
+        'use_fitness_sharing': sim_config.use_fitness_sharing,
+        'sharing_radius': sim_config.sharing_radius,
+        'compatibility_threshold': sim_config.compatibility_threshold,
+        'min_species_size': sim_config.min_species_size,
+        'use_neat': use_neat,
+        'neat_add_connection_rate': sim_config.neat_add_connection_rate,
+        'neat_add_node_rate': sim_config.neat_add_node_rate,
+        'neat_enable_rate': sim_config.neat_enable_rate,
+        'neat_disable_rate': sim_config.neat_disable_rate,
+        'neat_excess_coefficient': sim_config.neat_excess_coefficient,
+        'neat_disjoint_coefficient': sim_config.neat_disjoint_coefficient,
+        'neat_weight_coefficient': sim_config.neat_weight_coefficient,
+        'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+    }
+
+    batch_config = {
+        'simulation_duration': sim_config.simulation_duration,
+        'frame_storage_mode': 'none',
+        'frame_rate': 15,
+        'pellet_count': sim_config.pellet_count,
+        'arena_size': sim_config.arena_size,
+        'max_allowed_frequency': sim_config.max_allowed_frequency,
+        'fitness_pellet_points': sim_config.fitness_pellet_points,
+        'fitness_progress_max': sim_config.fitness_progress_max,
+        'fitness_distance_per_unit': sim_config.fitness_distance_per_unit,
+        'fitness_distance_traveled_max': sim_config.fitness_distance_traveled_max,
+        'fitness_regression_penalty': sim_config.fitness_regression_penalty,
+        'fitness_efficiency_penalty': sim_config.fitness_efficiency_penalty,
+        'neural_dead_zone': sim_config.neural_dead_zone,
+        'use_neural_net': sim_config.use_neural_net,
+        'neural_mode': sim_config.neural_mode,
+        'neural_hidden_size': sim_config.neural_hidden_size,
+        'time_encoding': sim_config.time_encoding,
+        'use_proprioception': sim_config.use_proprioception,
+        'proprioception_inputs': sim_config.proprioception_inputs,
+        'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+    }
+
+    # Initialize populations for each seed
+    populations: list[list[dict]] = []
+    innovation_counters: list[InnovationCounter | None] = []
+
+    constraints = GenomeConstraints(
+        min_nodes=sim_config.min_nodes,
+        max_nodes=sim_config.max_nodes,
+        max_muscles=sim_config.max_muscles,
+        max_frequency=sim_config.max_allowed_frequency,
+    )
+
+    for seed in seeds:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
+        innovation_counter = InnovationCounter() if use_neat else None
+        innovation_counters.append(innovation_counter)
+
+        genomes = generate_population(
+            size=pop_size,
+            constraints=constraints,
+            use_neural_net=sim_config.use_neural_net,
+            neural_hidden_size=sim_config.neural_hidden_size,
+            neural_output_bias=sim_config.neural_output_bias,
+            neural_mode=sim_config.neural_mode,
+            time_encoding=sim_config.time_encoding,
+            use_proprioception=sim_config.use_proprioception,
+            proprioception_inputs=sim_config.proprioception_inputs,
+            use_neat=use_neat,
+            innovation_counter=innovation_counter,
+            bias_mode=sim_config.bias_mode,
+            neat_initial_connectivity=sim_config.neat_initial_connectivity,
+        )
+        populations.append(genomes)
+
+    # Track results per seed
+    gen_stats_per_seed: list[list[GenerationStats]] = [[] for _ in seeds]
+    best_genomes: list[dict | None] = [None] * num_seeds
+    best_fitnesses: list[float] = [float('-inf')] * num_seeds
+
+    total_start = time.time()
+
+    for gen in range(generations):
+        # Combine all populations into single batch
+        combined_genomes = []
+        for pop in populations:
+            combined_genomes.extend(pop)
+
+        # Single batched simulation
+        sim_start = time.time()
+        all_results = simulator.simulate_batch(combined_genomes, batch_config)
+        sim_time_ms = int((time.time() - sim_start) * 1000)
+
+        # Split results and evolve each seed independently
+        evo_start = time.time()
+        for seed_idx in range(num_seeds):
+            start_idx = seed_idx * pop_size
+            end_idx = start_idx + pop_size
+
+            seed_results = all_results[start_idx:end_idx]
+            fitness_scores = [r.fitness for r in seed_results]
+            sorted_fitness = sorted(fitness_scores, reverse=True)
+
+            # Stats for this seed
+            stats = GenerationStats(
+                generation=gen,
+                best_fitness=sorted_fitness[0],
+                avg_fitness=sum(fitness_scores) / len(fitness_scores),
+                median_fitness=sorted_fitness[len(sorted_fitness) // 2],
+                worst_fitness=sorted_fitness[-1],
+                simulation_time_ms=sim_time_ms // num_seeds,  # Amortized
+            )
+
+            # Track best
+            if sorted_fitness[0] > best_fitnesses[seed_idx]:
+                best_fitnesses[seed_idx] = sorted_fitness[0]
+                best_idx = fitness_scores.index(sorted_fitness[0])
+                best_genomes[seed_idx] = populations[seed_idx][best_idx].copy()
+
+            # Evolve (if not last generation)
+            if gen < generations - 1:
+                populations[seed_idx], _ = evolve_population(
+                    genomes=populations[seed_idx],
+                    fitness_scores=fitness_scores,
+                    config=evolution_config,
+                    generation=gen,
+                    innovation_counter=innovation_counters[seed_idx],
+                )
+
+            gen_stats_per_seed[seed_idx].append(stats)
+
+            if callback:
+                callback(seed_idx, stats)
+
+        evo_time_ms = int((time.time() - evo_start) * 1000)
+
+        # Update evolution time in stats
+        for seed_idx in range(num_seeds):
+            gen_stats_per_seed[seed_idx][-1].evolution_time_ms = evo_time_ms // num_seeds
+
+        if verbose:
+            # Print aggregate stats
+            avg_best = sum(s[-1].best_fitness for s in gen_stats_per_seed) / num_seeds
+            print(f"  gen {gen+1:3d}/{generations} | avg_best: {avg_best:6.1f} | sim: {sim_time_ms}ms | evo: {evo_time_ms}ms")
+
+    total_time = time.time() - total_start
+    total_creatures = generations * pop_size * num_seeds
+
+    # Build results
+    results = []
+    for seed_idx, seed in enumerate(seeds):
+        results.append(RunResult(
+            config=config,
+            seed=seed,
+            generations=gen_stats_per_seed[seed_idx],
+            best_genome=best_genomes[seed_idx],
+            best_fitness=best_fitnesses[seed_idx],
+            total_time_s=total_time / num_seeds,  # Amortized per seed
+            creatures_per_second=total_creatures / total_time if total_time > 0 else 0,
+        ))
+
+    return results
+
+
+def run_multi_seed_pipelined(
+    config: dict[str, Any],
+    generations: int,
+    seeds: list[int],
+    device: torch.device | None = None,
+    callback: Callable[[int, GenerationStats], None] | None = None,
+    verbose: bool = True,
+) -> list[RunResult]:
+    """
+    Run evolution with pipelining: overlap simulation N+1 with evolution N.
+
+    Uses threading to run simulation and evolution in parallel where possible.
+
+    Args:
+        config: Simulation configuration dict
+        generations: Number of generations per seed
+        seeds: List of random seeds
+        device: PyTorch device
+        callback: Called with (seed_idx, stats) after each generation
+        verbose: Print progress
+
+    Returns:
+        List of RunResults, one per seed
+    """
+    import random
+    import numpy as np
+    from concurrent.futures import ThreadPoolExecutor
+
+    num_seeds = len(seeds)
+
+    # Initialize simulator once
+    simulator = PyTorchSimulator(device=device)
+
+    # Convert config to SimulationConfig
+    sim_config = SimulationConfig(**config)
+    pop_size = sim_config.population_size
+
+    use_neat = sim_config.neural_mode == 'neat'
+
+    evolution_config = {
+        'population_size': sim_config.population_size,
+        'elite_count': sim_config.elite_count,
+        'cull_percentage': sim_config.cull_percentage,
+        'selection_method': sim_config.selection_method,
+        'tournament_size': sim_config.tournament_size,
+        'crossover_rate': sim_config.crossover_rate,
+        'use_crossover': sim_config.use_crossover,
+        'mutation_rate': sim_config.mutation_rate,
+        'mutation_magnitude': sim_config.mutation_magnitude,
+        'weight_mutation_rate': sim_config.weight_mutation_rate,
+        'weight_mutation_magnitude': sim_config.weight_mutation_magnitude,
+        'weight_mutation_decay': sim_config.weight_mutation_decay,
+        'use_neural_net': sim_config.use_neural_net,
+        'neural_hidden_size': sim_config.neural_hidden_size,
+        'neural_output_bias': sim_config.neural_output_bias,
+        'min_nodes': sim_config.min_nodes,
+        'max_nodes': sim_config.max_nodes,
+        'max_muscles': sim_config.max_muscles,
+        'max_frequency': sim_config.max_allowed_frequency,
+        'use_fitness_sharing': sim_config.use_fitness_sharing,
+        'sharing_radius': sim_config.sharing_radius,
+        'compatibility_threshold': sim_config.compatibility_threshold,
+        'min_species_size': sim_config.min_species_size,
+        'use_neat': use_neat,
+        'neat_add_connection_rate': sim_config.neat_add_connection_rate,
+        'neat_add_node_rate': sim_config.neat_add_node_rate,
+        'neat_enable_rate': sim_config.neat_enable_rate,
+        'neat_disable_rate': sim_config.neat_disable_rate,
+        'neat_excess_coefficient': sim_config.neat_excess_coefficient,
+        'neat_disjoint_coefficient': sim_config.neat_disjoint_coefficient,
+        'neat_weight_coefficient': sim_config.neat_weight_coefficient,
+        'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+    }
+
+    batch_config = {
+        'simulation_duration': sim_config.simulation_duration,
+        'frame_storage_mode': 'none',
+        'frame_rate': 15,
+        'pellet_count': sim_config.pellet_count,
+        'arena_size': sim_config.arena_size,
+        'max_allowed_frequency': sim_config.max_allowed_frequency,
+        'fitness_pellet_points': sim_config.fitness_pellet_points,
+        'fitness_progress_max': sim_config.fitness_progress_max,
+        'fitness_distance_per_unit': sim_config.fitness_distance_per_unit,
+        'fitness_distance_traveled_max': sim_config.fitness_distance_traveled_max,
+        'fitness_regression_penalty': sim_config.fitness_regression_penalty,
+        'fitness_efficiency_penalty': sim_config.fitness_efficiency_penalty,
+        'neural_dead_zone': sim_config.neural_dead_zone,
+        'use_neural_net': sim_config.use_neural_net,
+        'neural_mode': sim_config.neural_mode,
+        'neural_hidden_size': sim_config.neural_hidden_size,
+        'time_encoding': sim_config.time_encoding,
+        'use_proprioception': sim_config.use_proprioception,
+        'proprioception_inputs': sim_config.proprioception_inputs,
+        'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+    }
+
+    # Initialize populations for each seed
+    populations: list[list[dict]] = []
+    innovation_counters: list[InnovationCounter | None] = []
+
+    constraints = GenomeConstraints(
+        min_nodes=sim_config.min_nodes,
+        max_nodes=sim_config.max_nodes,
+        max_muscles=sim_config.max_muscles,
+        max_frequency=sim_config.max_allowed_frequency,
+    )
+
+    for seed in seeds:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
+        innovation_counter = InnovationCounter() if use_neat else None
+        innovation_counters.append(innovation_counter)
+
+        genomes = generate_population(
+            size=pop_size,
+            constraints=constraints,
+            use_neural_net=sim_config.use_neural_net,
+            neural_hidden_size=sim_config.neural_hidden_size,
+            neural_output_bias=sim_config.neural_output_bias,
+            neural_mode=sim_config.neural_mode,
+            time_encoding=sim_config.time_encoding,
+            use_proprioception=sim_config.use_proprioception,
+            proprioception_inputs=sim_config.proprioception_inputs,
+            use_neat=use_neat,
+            innovation_counter=innovation_counter,
+            bias_mode=sim_config.bias_mode,
+            neat_initial_connectivity=sim_config.neat_initial_connectivity,
+        )
+        populations.append(genomes)
+
+    # Track results per seed
+    gen_stats_per_seed: list[list[GenerationStats]] = [[] for _ in seeds]
+    best_genomes: list[dict | None] = [None] * num_seeds
+    best_fitnesses: list[float] = [float('-inf')] * num_seeds
+
+    total_start = time.time()
+
+    # Pending evolution tasks from previous generation
+    pending_evolution = None
+    pending_fitness_scores = None
+    pending_gen = -1
+
+    def do_evolution(gen: int, fitness_scores_per_seed: list[list[float]]):
+        """Evolve all seeds based on fitness scores."""
+        for seed_idx in range(num_seeds):
+            if gen < generations - 1:
+                populations[seed_idx], _ = evolve_population(
+                    genomes=populations[seed_idx],
+                    fitness_scores=fitness_scores_per_seed[seed_idx],
+                    config=evolution_config,
+                    generation=gen,
+                    innovation_counter=innovation_counters[seed_idx],
+                )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        for gen in range(generations):
+            # Wait for previous evolution to complete before using populations
+            if pending_evolution is not None:
+                pending_evolution.result()
+
+            # Combine all populations into single batch
+            combined_genomes = []
+            for pop in populations:
+                combined_genomes.extend(pop)
+
+            # Simulate current generation
+            sim_start = time.time()
+            all_results = simulator.simulate_batch(combined_genomes, batch_config)
+            sim_time_ms = int((time.time() - sim_start) * 1000)
+
+            # Extract fitness scores for all seeds
+            fitness_scores_per_seed = []
+            for seed_idx in range(num_seeds):
+                start_idx = seed_idx * pop_size
+                end_idx = start_idx + pop_size
+                seed_results = all_results[start_idx:end_idx]
+                fitness_scores = [r.fitness for r in seed_results]
+                fitness_scores_per_seed.append(fitness_scores)
+
+                sorted_fitness = sorted(fitness_scores, reverse=True)
+
+                # Stats for this seed
+                stats = GenerationStats(
+                    generation=gen,
+                    best_fitness=sorted_fitness[0],
+                    avg_fitness=sum(fitness_scores) / len(fitness_scores),
+                    median_fitness=sorted_fitness[len(sorted_fitness) // 2],
+                    worst_fitness=sorted_fitness[-1],
+                    simulation_time_ms=sim_time_ms // num_seeds,
+                )
+
+                # Track best
+                if sorted_fitness[0] > best_fitnesses[seed_idx]:
+                    best_fitnesses[seed_idx] = sorted_fitness[0]
+                    best_idx = fitness_scores.index(sorted_fitness[0])
+                    best_genomes[seed_idx] = populations[seed_idx][best_idx].copy()
+
+                gen_stats_per_seed[seed_idx].append(stats)
+
+                if callback:
+                    callback(seed_idx, stats)
+
+            # Start evolution in background (overlaps with next simulation)
+            if gen < generations - 1:
+                pending_evolution = executor.submit(do_evolution, gen, fitness_scores_per_seed)
+
+            if verbose:
+                avg_best = sum(s[-1].best_fitness for s in gen_stats_per_seed) / num_seeds
+                print(f"  gen {gen+1:3d}/{generations} | avg_best: {avg_best:6.1f} | sim: {sim_time_ms}ms")
+
+    total_time = time.time() - total_start
+    total_creatures = generations * pop_size * num_seeds
+
+    # Build results
+    results = []
+    for seed_idx, seed in enumerate(seeds):
+        results.append(RunResult(
+            config=config,
+            seed=seed,
+            generations=gen_stats_per_seed[seed_idx],
+            best_genome=best_genomes[seed_idx],
+            best_fitness=best_fitnesses[seed_idx],
+            total_time_s=total_time / num_seeds,
+            creatures_per_second=total_creatures / total_time if total_time > 0 else 0,
+        ))
+
+    return results
+
+
 def run_parallel_configs(
     configs: list[tuple[str, dict[str, Any]]],
     generations: int,
