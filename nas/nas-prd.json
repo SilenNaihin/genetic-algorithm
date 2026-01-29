@@ -2,240 +2,207 @@
   "name": "Neural Architecture Search CLI",
   "description": "Pure CLI for hyperparameter optimization and neural architecture search for Evolution Lab",
   "version": "0.2.0",
-  "status": "planning",
+  "status": "in_progress",
   "created": "2025-01-25",
   "updated": "2025-01-29",
+  "architecture": {
+    "execution_model": "In-memory evolution (no per-generation DB writes)",
+    "rationale": "~10x speedup by skipping creature records, frame compression, ORM commits",
+    "data_tracked_per_run": [
+      "Config (JSON blob)",
+      "Fitness curve ([gen, best, avg, median] per generation)",
+      "Final stats (best fitness, generations to plateau)",
+      "Best genome (for verification replay)"
+    ],
+    "output": {
+      "console": "Real-time progress per generation",
+      "json": "Incremental writes to nas/results/<config>_<timestamp>.json (crash-safe)",
+      "database": "Optional - only for winners we want to replay on frontend"
+    }
+  },
   "phases": [
     {
       "id": "phase-1",
-      "name": "Foundation",
-      "status": "not_started",
+      "name": "Fast CLI (V1)",
+      "status": "completed",
+      "description": "Minimal CLI for running evolution without database overhead. Focus on speed.",
       "tasks": [
         {
           "id": "1.1",
-          "name": "Parameter space definition",
-          "description": "Define all searchable parameters with types, ranges, and tiers (high/medium/low impact). Include NEAT params and auto-enforcement rules.",
-          "status": "not_started",
-          "file": "parameters.py"
-        },
-        {
-          "id": "1.2",
-          "name": "Objective functions",
-          "description": "Implement fitness and diversity objective calculations from simulation results",
-          "status": "not_started",
-          "file": "objectives.py"
-        },
-        {
-          "id": "1.3",
-          "name": "Trial runner",
-          "description": "Run a single trial: generate population, evolve N generations, compute objectives. Handle NEAT vs fixed topology modes.",
-          "status": "not_started",
+          "name": "In-memory runner",
+          "description": "Evolution loop using PyTorchSimulator + genetics directly. No DB writes during run. Track [gen, best, avg, median] per generation.",
+          "status": "completed",
           "file": "runner.py"
         },
         {
+          "id": "1.2",
+          "name": "Results persistence",
+          "description": "Write fitness curves to JSON incrementally (crash-safe). Store config + per-gen stats + best genome.",
+          "status": "completed",
+          "file": "results_io.py"
+        },
+        {
+          "id": "1.3",
+          "name": "CLI run command",
+          "description": "nas run --config <name> --generations N --seeds 3. Load config from /use-config system or inline params.",
+          "status": "completed",
+          "file": "cli.py"
+        },
+        {
           "id": "1.4",
-          "name": "PostgreSQL storage",
-          "description": "Optuna storage backend using existing PostgreSQL, plus custom tables for metadata",
-          "status": "not_started",
-          "file": "storage.py"
+          "name": "Console logging",
+          "description": "Real-time progress: [seed 1/3] gen 25/100 | best: 342.5 | avg: 156.2 | 1.2s/gen",
+          "status": "completed",
+          "file": "cli.py"
+        },
+        {
+          "id": "1.5",
+          "name": "Speed validation",
+          "description": "Target: 1000 creatures x 100 gens in <5 min on T4 GPU",
+          "status": "completed",
+          "file": null,
+          "notes": "Pure mode: ~130-160 creatures/s. NEAT mode: ~14-16 creatures/s (CPU-bound due to variable topology). Pure meets target, NEAT is slower due to sequential forward passes."
         }
       ]
     },
     {
       "id": "phase-2",
-      "name": "Search Infrastructure",
+      "name": "Config Comparison (V1.1)",
       "status": "not_started",
+      "description": "Compare multiple configs and create replay runs for winners",
       "tasks": [
         {
           "id": "2.1",
-          "name": "Optuna study management",
-          "description": "Create/resume studies, configure NSGA-II sampler, set up pruning",
-          "status": "not_started",
-          "file": "search.py"
+          "name": "Compare command",
+          "description": "nas compare config1 config2 config3 - load results JSONs and show comparison table",
+          "status": "completed",
+          "file": "cli.py"
         },
         {
           "id": "2.2",
-          "name": "Multi-seed evaluation",
-          "description": "Run each config with 5 seeds, aggregate results (mean, std)",
+          "name": "Replay command",
+          "description": "nas replay --config <winner> --generations N - create full DB run with frame storage for frontend viewing",
           "status": "not_started",
-          "file": "search.py"
-        },
-        {
-          "id": "2.3",
-          "name": "Pruning integration",
-          "description": "MedianPruner with checkpoints at gen 10, 20, 50 for early stopping",
-          "status": "not_started",
-          "file": "search.py"
-        },
-        {
-          "id": "2.4",
-          "name": "Progress logging",
-          "description": "Real-time CLI output showing trial progress, current best, ETA",
-          "status": "not_started",
-          "file": "logging.py"
+          "file": "cli.py"
         }
       ]
     },
     {
       "id": "phase-3",
-      "name": "CLI Interface",
+      "name": "Optuna Integration (V2)",
       "status": "not_started",
+      "description": "Automated hyperparameter search with Optuna",
       "tasks": [
         {
           "id": "3.1",
-          "name": "CLI scaffold",
-          "description": "Click/Typer CLI with subcommands: run, status, export, analyze, best",
+          "name": "Parameter space definition",
+          "description": "Define searchable parameters with types, ranges for Optuna sampler",
           "status": "not_started",
-          "file": "cli.py"
+          "file": "config.py"
         },
         {
           "id": "3.2",
-          "name": "Run command",
-          "description": "nas run --study-name <name> [--n-trials N] [--resume] [--phase screening|deep] [--mode pure|hybrid|neat]",
+          "name": "Optuna study management",
+          "description": "Create/resume studies, configure NSGA-II sampler for multi-objective",
           "status": "not_started",
-          "file": "cli.py"
+          "file": "search.py"
         },
         {
           "id": "3.3",
-          "name": "Status command",
-          "description": "nas status --study-name <name> - show progress, best so far, time remaining",
+          "name": "Multi-seed evaluation",
+          "description": "Run each config with 3-5 seeds, report mean +/- std",
           "status": "not_started",
-          "file": "cli.py"
+          "file": "search.py"
         },
         {
           "id": "3.4",
-          "name": "Export command",
-          "description": "nas export --study-name <name> --format csv|json - export all trial results",
+          "name": "Pruning integration",
+          "description": "MedianPruner to early-stop bad configs",
           "status": "not_started",
-          "file": "cli.py"
-        },
-        {
-          "id": "3.5",
-          "name": "Best command",
-          "description": "nas best --study-name <name> [--n-top 5] - show best configurations",
-          "status": "not_started",
-          "file": "cli.py"
+          "file": "search.py"
         }
       ]
     },
     {
       "id": "phase-4",
-      "name": "Analysis",
+      "name": "Analysis (V2.1)",
       "status": "not_started",
+      "description": "Sensitivity analysis and findings documentation",
       "tasks": [
         {
           "id": "4.1",
-          "name": "Screening phase",
-          "description": "Morris method or low-fidelity runs to identify important parameters",
+          "name": "fANOVA sensitivity",
+          "description": "Rank parameter importance after search completes",
           "status": "not_started",
-          "file": "screening.py"
+          "file": "analysis.py"
         },
         {
           "id": "4.2",
-          "name": "fANOVA sensitivity",
-          "description": "Run fANOVA on completed study to rank parameter importance",
-          "status": "not_started",
-          "file": "analysis.py"
-        },
-        {
-          "id": "4.3",
-          "name": "Analyze command",
-          "description": "nas analyze --study-name <name> - show sensitivity analysis results",
-          "status": "not_started",
-          "file": "cli.py"
-        },
-        {
-          "id": "4.4",
-          "name": "Pareto front visualization",
-          "description": "Export/display Pareto front of fitness vs diversity tradeoffs",
-          "status": "not_started",
-          "file": "analysis.py"
-        },
-        {
-          "id": "4.5",
           "name": "Findings notebook",
-          "description": "Create nas-findings.ipynb documenting results: Pareto frontier visualization, parameter importance rankings from fANOVA, best configurations with hyperlinks to specific runs, comparison of pure vs hybrid vs NEAT, behavioral analysis of top performers, recommendations for production configs",
+          "description": "Document results: parameter importance, best configs, mode comparison, recommendations",
           "status": "not_started",
           "file": "nas-findings.ipynb"
         }
       ]
-    },
-    {
-      "id": "phase-5",
-      "name": "Optimization",
-      "status": "not_started",
-      "tasks": [
-        {
-          "id": "5.1",
-          "name": "Multi-GPU support",
-          "description": "Run trials in parallel across 2x T4 GPUs",
-          "status": "not_started",
-          "file": "runner.py"
-        },
-        {
-          "id": "5.2",
-          "name": "Batch size optimization",
-          "description": "Auto-detect optimal batch size for available VRAM",
-          "status": "not_started",
-          "file": "runner.py"
-        },
-        {
-          "id": "5.3",
-          "name": "Dashboard integration",
-          "description": "Link NAS trials to Evolution Lab dashboard for replay/visualization",
-          "status": "not_started",
-          "file": "storage.py"
-        }
-      ]
     }
   ],
+  "focus": {
+    "primary": "NEAT (variable topology)",
+    "secondary": "Pure neural (fixed topology baseline)",
+    "tertiary": "Hybrid (if time permits)"
+  },
   "parameters": {
-    "tier_1_high_impact": [
-      {"name": "neural_mode", "type": "categorical", "choices": ["pure", "hybrid", "neat"], "default": "pure", "note": "Fundamental architecture choice - NEAT enables variable topology"},
-      {"name": "mutation_rate", "type": "float", "range": [0.1, 0.5], "default": 0.3},
-      {"name": "weight_mutation_magnitude", "type": "float", "range": [0.1, 1.0], "default": 0.3},
-      {"name": "neural_hidden_size", "type": "int", "range": [4, 32], "default": 8, "note": "Ignored for NEAT (topology evolves)"},
-      {"name": "population_size", "type": "int", "range": [200, 2000], "default": 100},
-      {"name": "simulation_duration", "type": "float", "range": [15, 60], "default": 20},
-      {"name": "selection_method", "type": "categorical", "choices": ["truncation", "tournament", "rank", "speciation"], "default": "rank", "note": "Auto-set to speciation when neural_mode=neat"},
-      {"name": "neat_initial_connectivity", "type": "categorical", "choices": ["full", "sparse_inputs", "sparse_outputs", "none"], "default": "full", "condition": "neural_mode=neat"},
-      {"name": "neat_add_connection_rate", "type": "float", "range": [0.0, 1.0], "default": 0.5, "condition": "neural_mode=neat"},
-      {"name": "neat_add_node_rate", "type": "float", "range": [0.0, 1.0], "default": 0.2, "condition": "neural_mode=neat"},
-      {"name": "neat_max_hidden_nodes", "type": "int", "range": [1, 128], "default": 16, "condition": "neural_mode=neat"}
-    ],
-    "tier_2_medium_impact": [
-      {"name": "neural_activation", "type": "categorical", "choices": ["tanh", "relu", "sigmoid"], "default": "tanh"},
-      {"name": "crossover_rate", "type": "float", "range": [0.0, 0.8], "default": 0.5},
+    "constant_do_not_optimize": {
+      "description": "These stay fixed to ensure consistent objective function and physics",
+      "params": [
+        {"name": "gravity", "value": -9.8},
+        {"name": "simulation_duration", "value": 40},
+        {"name": "physics_fps", "value": 30},
+        {"name": "damping", "value": "default"},
+        {"name": "velocity_cap", "value": "default"},
+        {"name": "max_extension", "value": "default"},
+        {"name": "fitness_*", "value": "all defaults"},
+        {"name": "neural_dead_zone", "value": 0.1},
+        {"name": "ground_friction", "value": 0.5}
+      ]
+    },
+    "tier_1_population_evolution": [
+      {"name": "population_size", "type": "int", "range": [100, 1000], "default": 200},
       {"name": "elite_count", "type": "int", "range": [1, 20], "default": 5},
-      {"name": "weight_mutation_decay", "type": "categorical", "choices": ["off", "linear", "exponential"], "default": "linear"},
-      {"name": "tournament_size", "type": "int", "range": [2, 10], "default": 3, "condition": "selection_method=tournament"},
-      {"name": "structural_rate", "type": "float", "range": [0.0, 0.3], "default": 0.1},
-      {"name": "time_encoding", "type": "categorical", "choices": ["none", "cyclic", "sin", "raw", "sin_raw"], "default": "none"},
-      {"name": "bias_mode", "type": "categorical", "choices": ["none", "node", "bias_node"], "default": "node", "note": "bias_node recommended for NEAT"},
-      {"name": "use_proprioception", "type": "bool", "default": false, "note": "Adds body-sensing inputs (strain, velocity, ground contact)"},
-      {"name": "neural_crossover_method", "type": "categorical", "choices": ["interpolation", "uniform", "sbx"], "default": "sbx"},
-      {"name": "use_adaptive_mutation", "type": "bool", "default": false, "note": "Auto-boost mutation on stagnation"},
-      {"name": "neat_enable_rate", "type": "float", "range": [0.0, 0.1], "default": 0.02, "condition": "neural_mode=neat"},
-      {"name": "neat_disable_rate", "type": "float", "range": [0.0, 0.1], "default": 0.01, "condition": "neural_mode=neat"},
-      {"name": "compatibility_threshold", "type": "float", "range": [0.1, 3.0], "default": 1.0, "condition": "selection_method=speciation"},
-      {"name": "neat_excess_coefficient", "type": "float", "range": [0.0, 10.0], "default": 1.0, "condition": "neural_mode=neat"},
-      {"name": "neat_disjoint_coefficient", "type": "float", "range": [0.0, 10.0], "default": 1.0, "condition": "neural_mode=neat"},
-      {"name": "neat_weight_coefficient", "type": "float", "range": [0.0, 10.0], "default": 0.4, "condition": "neural_mode=neat"}
+      {"name": "cull_percentage", "type": "float", "range": [0.3, 0.7], "default": 0.5},
+      {"name": "mutation_rate", "type": "float", "range": [0.1, 0.5], "default": 0.3},
+      {"name": "mutation_magnitude", "type": "float", "range": [0.1, 0.5], "default": 0.3},
+      {"name": "weight_mutation_rate", "type": "float", "range": [0.1, 0.5], "default": 0.2},
+      {"name": "weight_mutation_magnitude", "type": "float", "range": [0.1, 1.0], "default": 0.3},
+      {"name": "crossover_rate", "type": "float", "range": [0.0, 0.8], "default": 0.5},
+      {"name": "selection_method", "type": "categorical", "choices": ["truncation", "tournament", "rank", "speciation"], "default": "rank"},
+      {"name": "tournament_size", "type": "int", "range": [2, 7], "default": 3, "condition": "selection_method=tournament"}
     ],
-    "tier_3_low_impact": [
-      {"name": "ground_friction", "type": "float", "range": [0.3, 1.0], "default": 0.5},
-      {"name": "gravity", "type": "float", "range": [-15.0, -5.0], "default": -9.8},
-      {"name": "neural_output_bias", "type": "float", "range": [-1.0, 0.5], "default": -0.1},
-      {"name": "neural_dead_zone", "type": "float", "range": [0.0, 0.3], "default": 0.1},
-      {"name": "sbx_eta", "type": "float", "range": [0.5, 5.0], "default": 2.0, "condition": "neural_crossover_method=sbx"},
-      {"name": "stagnation_threshold", "type": "int", "range": [5, 100], "default": 20, "condition": "use_adaptive_mutation=true"},
-      {"name": "adaptive_mutation_boost", "type": "float", "range": [1.1, 5.0], "default": 2.0, "condition": "use_adaptive_mutation=true"},
-      {"name": "max_adaptive_boost", "type": "float", "range": [2.0, 32.0], "default": 8.0, "condition": "use_adaptive_mutation=true"},
-      {"name": "use_fitness_sharing", "type": "bool", "default": false, "note": "Auto-disabled when neural_mode=neat"},
-      {"name": "sharing_radius", "type": "float", "range": [0.1, 2.0], "default": 0.5, "condition": "use_fitness_sharing=true"},
-      {"name": "output_smoothing_alpha", "type": "float", "range": [0.05, 1.0], "default": 0.15, "note": "1.0=no smoothing"},
-      {"name": "neural_update_hz", "type": "int", "range": [5, 60], "default": 10},
-      {"name": "min_species_size", "type": "int", "range": [1, 20], "default": 2, "condition": "selection_method=speciation"}
+    "tier_2_neat_specific": [
+      {"name": "neat_initial_connectivity", "type": "categorical", "choices": ["full", "sparse_inputs", "sparse_outputs", "none"], "default": "full"},
+      {"name": "neat_add_connection_rate", "type": "float", "range": [0.0, 0.8], "default": 0.5},
+      {"name": "neat_add_node_rate", "type": "float", "range": [0.0, 0.5], "default": 0.2},
+      {"name": "neat_enable_rate", "type": "float", "range": [0.0, 0.1], "default": 0.02},
+      {"name": "neat_disable_rate", "type": "float", "range": [0.0, 0.1], "default": 0.01},
+      {"name": "neat_max_hidden_nodes", "type": "int", "range": [4, 32], "default": 16},
+      {"name": "compatibility_threshold", "type": "float", "range": [0.5, 3.0], "default": 1.0},
+      {"name": "neat_excess_coefficient", "type": "float", "range": [0.5, 2.0], "default": 1.0},
+      {"name": "neat_disjoint_coefficient", "type": "float", "range": [0.5, 2.0], "default": 1.0},
+      {"name": "neat_weight_coefficient", "type": "float", "range": [0.1, 1.0], "default": 0.4},
+      {"name": "bias_mode", "type": "categorical", "choices": ["node", "bias_node"], "default": "bias_node"},
+      {"name": "use_fitness_sharing", "type": "bool", "default": false},
+      {"name": "sharing_radius", "type": "float", "range": [0.3, 1.0], "default": 0.5}
+    ],
+    "tier_3_body_constraints": [
+      {"name": "min_nodes", "type": "int", "range": [3, 4], "default": 3},
+      {"name": "max_nodes", "type": "int", "range": [5, 10], "default": 8},
+      {"name": "max_muscles", "type": "int", "range": [10, 20], "default": 15}
+    ],
+    "tier_4_pure_hybrid_only": [
+      {"name": "neural_hidden_size", "type": "int", "range": [4, 24], "default": 8},
+      {"name": "neural_output_bias", "type": "float", "range": [-0.5, 0.0], "default": -0.1},
+      {"name": "time_encoding", "type": "categorical", "choices": ["cyclic", "sin", "raw"], "default": "cyclic", "condition": "neural_mode=hybrid"},
+      {"name": "use_proprioception", "type": "bool", "default": false}
     ]
   },
   "auto_enforcement_rules": {
@@ -270,15 +237,26 @@
   ],
   "compute": {
     "hardware": "2x NVIDIA T4 (16GB VRAM each), 56GB RAM",
-    "screening_trial": {"generations": 20, "creatures": 200, "seeds": 1, "est_time_min": 5},
-    "full_trial": {"generations": 100, "creatures": 1000, "seeds": 5, "est_time_min": 60}
+    "target_speed": "1000 creatures x 100 gens in <5 min",
+    "screening_trial": {"generations": 50, "creatures": 200, "seeds": 1},
+    "full_trial": {"generations": 100, "creatures": 500, "seeds": 3}
   },
   "decisions": {
-    "framework": "Optuna with NSGA-II",
-    "storage": "PostgreSQL (existing)",
-    "pruning": "MedianPruner at gen 10, 20, 50",
-    "seeds_per_config": 5,
-    "sensitivity_method": "fANOVA"
+    "v1_architecture": {
+      "execution": "In-memory evolution (no per-gen DB writes)",
+      "persistence": "JSON files written incrementally (crash-safe)",
+      "database": "Only for replay runs of winning configs"
+    },
+    "seeds_per_config": "3 for speed, 5 for final validation",
+    "output": {
+      "console": "Real-time per-generation progress",
+      "json": "nas/results/<config>_<timestamp>.json"
+    },
+    "v2_optuna": {
+      "framework": "Optuna with NSGA-II",
+      "pruning": "MedianPruner",
+      "sensitivity_method": "fANOVA"
+    }
   },
   "search_strategies": {
     "fixed_topology_search": {
@@ -297,10 +275,17 @@
       "focus_params": ["neural_mode", "mutation_rate", "population_size", "simulation_duration"]
     }
   },
+  "resolved_decisions": [
+    "In-memory evolution for speed (no per-gen DB writes)",
+    "JSON persistence with incremental writes (crash-safe)",
+    "3-5 seeds per config",
+    "Console + JSON output",
+    "Physics/fitness stay constant, only optimize evolution/neural/body params",
+    "NEAT is primary focus"
+  ],
   "open_questions": [
     "How to measure behavioral diversity?",
     "Multi-GPU: parallel trials or larger batches?",
-    "Pruning aggressiveness threshold",
-    "Should NEAT vs fixed-topology be separate studies or one study with neural_mode as a parameter?"
+    "Optimal batch size for T4 VRAM"
   ]
 }

@@ -1,0 +1,1181 @@
+{
+  "config_name": "neat_baseline",
+  "config": {
+    "gravity": -9.8,
+    "simulation_duration": 30.0,
+    "time_step": 0.03333333333333333,
+    "ground_friction": 0.5,
+    "pellet_count": 3,
+    "arena_size": 10.0,
+    "fitness_pellet_points": 20.0,
+    "fitness_progress_max": 80.0,
+    "fitness_distance_per_unit": 3.0,
+    "fitness_distance_traveled_max": 20.0,
+    "fitness_regression_penalty": 20.0,
+    "fitness_efficiency_penalty": 0.1,
+    "neural_dead_zone": 0.1,
+    "frame_storage_mode": "none",
+    "population_size": 200,
+    "elite_count": 5,
+    "cull_percentage": 0.5,
+    "mutation_rate": 0.3,
+    "mutation_magnitude": 0.3,
+    "crossover_rate": 0.5,
+    "use_crossover": true,
+    "selection_method": "speciation",
+    "use_neural_net": true,
+    "neural_mode": "neat",
+    "neural_hidden_size": 8,
+    "neural_output_bias": -0.1,
+    "weight_mutation_rate": 0.2,
+    "weight_mutation_magnitude": 0.3,
+    "weight_mutation_decay": "linear",
+    "time_encoding": "none",
+    "min_nodes": 3,
+    "max_nodes": 8,
+    "max_muscles": 15,
+    "max_allowed_frequency": 3.0,
+    "bias_mode": "bias_node",
+    "neat_initial_connectivity": "full",
+    "neat_add_connection_rate": 0.5,
+    "neat_add_node_rate": 0.2,
+    "neat_enable_rate": 0.02,
+    "neat_disable_rate": 0.01,
+    "neat_max_hidden_nodes": 16,
+    "compatibility_threshold": 1.0,
+    "neat_excess_coefficient": 1.0,
+    "neat_disjoint_coefficient": 1.0,
+    "neat_weight_coefficient": 0.4,
+    "use_fitness_sharing": false
+  },
+  "seeds": [
+    42
+  ],
+  "timestamp": "20260129_192401",
+  "status": "completed",
+  "seed_results": [
+    {
+      "config": {
+        "gravity": -9.8,
+        "simulation_duration": 30.0,
+        "time_step": 0.03333333333333333,
+        "ground_friction": 0.5,
+        "pellet_count": 3,
+        "arena_size": 10.0,
+        "fitness_pellet_points": 20.0,
+        "fitness_progress_max": 80.0,
+        "fitness_distance_per_unit": 3.0,
+        "fitness_distance_traveled_max": 20.0,
+        "fitness_regression_penalty": 20.0,
+        "fitness_efficiency_penalty": 0.1,
+        "neural_dead_zone": 0.1,
+        "frame_storage_mode": "none",
+        "population_size": 200,
+        "elite_count": 5,
+        "cull_percentage": 0.5,
+        "mutation_rate": 0.3,
+        "mutation_magnitude": 0.3,
+        "crossover_rate": 0.5,
+        "use_crossover": true,
+        "selection_method": "speciation",
+        "use_neural_net": true,
+        "neural_mode": "neat",
+        "neural_hidden_size": 8,
+        "neural_output_bias": -0.1,
+        "weight_mutation_rate": 0.2,
+        "weight_mutation_magnitude": 0.3,
+        "weight_mutation_decay": "linear",
+        "time_encoding": "none",
+        "min_nodes": 3,
+        "max_nodes": 8,
+        "max_muscles": 15,
+        "max_allowed_frequency": 3.0,
+        "bias_mode": "bias_node",
+        "neat_initial_connectivity": "full",
+        "neat_add_connection_rate": 0.5,
+        "neat_add_node_rate": 0.2,
+        "neat_enable_rate": 0.02,
+        "neat_disable_rate": 0.01,
+        "neat_max_hidden_nodes": 16,
+        "compatibility_threshold": 1.0,
+        "neat_excess_coefficient": 1.0,
+        "neat_disjoint_coefficient": 1.0,
+        "neat_weight_coefficient": 0.4,
+        "use_fitness_sharing": false
+      },
+      "seed": 42,
+      "generations": [
+        {
+          "generation": 0,
+          "best_fitness": 10.31602954864502,
+          "avg_fitness": 0.8267917524650693,
+          "median_fitness": 0.0,
+          "worst_fitness": 0.0,
+          "simulation_time_ms": 14034,
+          "evolution_time_ms": 230
+        },
+        {
+          "generation": 1,
+          "best_fitness": 8.134766578674316,
+          "avg_fitness": 0.8235946813598275,
+          "median_fitness": 0.09810870885848999,
+          "worst_fitness": 0.0,
+          "simulation_time_ms": 13528,
+          "evolution_time_ms": 80
+        },
+        {
+          "generation": 2,
+          "best_fitness": 35.20009994506836,
+          "avg_fitness": 0.9859658542647958,
+          "median_fitness": 0.06303458660840988,
+          "worst_fitness": 0.0,
+          "simulation_time_ms": 11826,
+          "evolution_time_ms": 158
+        },
+        {
+          "generation": 3,
+          "best_fitness": 99.03886413574219,
+          "avg_fitness": 1.606542922705412,
+          "median_fitness": 0.0,
+          "worst_fitness": 0.0,
+          "simulation_time_ms": 12026,
+          "evolution_time_ms": 170
+        },
+        {
+          "generation": 4,
+          "best_fitness": 39.48295593261719,
+          "avg_fitness": 1.3715879578888417,
+          "median_fitness": 0.07891999185085297,
+          "worst_fitness": 0.0,
+          "simulation_time_ms": 13670,
+          "evolution_time_ms": 0
+        }
+      ],
+      "best_genome": {
+        "id": "creature_dc9f4a3048844919",
+        "generation": 3,
+        "parentIds": [
+          "creature_730632d6d8af4cc3",
+          "creature_65d4aae1ca244cc7"
+        ],
+        "survivalStreak": 0,
+        "nodes": [
+          {
+            "id": "node_58e9a9c8fd004de9",
+            "size": 0.45832907192616934,
+            "friction": 0.6996262305329455,
+            "position": {
+              "x": 0.4551488550249058,
+              "y": 0.7127226904445269,
+              "z": 1.1773622380425786
+            }
+          },
+          {
+            "id": "node_9e441e3ee6304983",
+            "size": 0.4581685995071349,
+            "friction": 0.5102404558956244,
+            "position": {
+              "x": -0.552378732762907,
+              "y": 1.2431717349948188,
+              "z": -0.05955946563113329
+            }
+          },
+          {
+            "id": "node_48cf3b717a724d2f",
+            "size": 0.2754574862126147,
+            "friction": 0.7092950940310254,
+            "position": {
+              "x": -0.5395857919852898,
+              "y": 0.44317724482878423,
+              "z": 0.37853480118816984
+            }
+          },
+          {
+            "id": "node_18aecf3817cd4e65",
+            "size": 0.32052594127782386,
+            "friction": 0.42003462597980856,
+            "position": {
+              "x": -0.7048309246907367,
+              "y": 0.4368253805816292,
+              "z": -0.0018804776651347582
+            }
+          },
+          {
+            "id": "node_34a51b42525049bb",
+            "size": 0.43186122913118247,
+            "friction": 0.780573002000633,
+            "position": {
+              "x": -0.40088649300967116,
+              "y": 0.7839486089675269,
+              "z": 0.013122196693334642
+            }
+          },
+          {
+            "id": "node_e4633eb725014eba",
+            "size": 0.2884554607315197,
+            "friction": 0.34362667012448433,
+            "position": {
+              "x": 0.17237815308548932,
+              "y": 1.166641423874904,
+              "z": -1.3523326700182292
+            }
+          }
+        ],
+        "muscles": [
+          {
+            "id": "muscle_e5fada61ad1b4907",
+            "nodeA": "node_58e9a9c8fd004de9",
+            "nodeB": "node_e4633eb725014eba",
+            "restLength": 2.643570385406656,
+            "stiffness": 111.58698120766874,
+            "damping": 2.991926337901923,
+            "frequency": 1.9861663491577979,
+            "amplitude": 0.36805255778233725,
+            "phase": 2.3202241387777853,
+            "directionBias": {
+              "x": 0.487534797907651,
+              "y": -0.2391837165901919,
+              "z": -0.839702906120521
+            },
+            "biasStrength": 0.3304829380467771,
+            "velocityBias": {
+              "x": 0.22939429826373475,
+              "y": 0.7936817954688493,
+              "z": -0.5634247629146525
+            },
+            "velocityStrength": 0.3750608910315488,
+            "distanceBias": 0.3936308667101742,
+            "distanceStrength": 0.10945818335729127
+          },
+          {
+            "id": "muscle_a897cf7535134d8f",
+            "nodeA": "node_58e9a9c8fd004de9",
+            "nodeB": "node_9e441e3ee6304983",
+            "restLength": 1.64024313570018,
+            "stiffness": 117.71032911909032,
+            "damping": 4.245489122502196,
+            "frequency": 2.6517740496507853,
+            "amplitude": 0.3402333306894985,
+            "phase": 2.318221881360596,
+            "directionBias": {
+              "x": 0.41248450179913443,
+              "y": 0.6770136518889526,
+              "z": 0.6095154230464591
+            },
+            "biasStrength": 0.2269667539794864,
+            "velocityBias": {
+              "x": -0.40966260995534104,
+              "y": 0.6769271947530119,
+              "z": 0.6115113400488955
+            },
+            "velocityStrength": 0.08600138027777553,
+            "distanceBias": 0.028213986744971664,
+            "distanceStrength": 0.2298886998034179
+          },
+          {
+            "id": "muscle_8b89ca0948dd4a28",
+            "nodeA": "node_58e9a9c8fd004de9",
+            "nodeB": "node_18aecf3817cd4e65",
+            "restLength": 1.5815019372404375,
+            "stiffness": 141.22928135805915,
+            "damping": 3.5276616435646933,
+            "frequency": 1.2619852588754958,
+            "amplitude": 0.29981055816594193,
+            "phase": 4.869585842510311,
+            "directionBias": {
+              "x": -0.9649260158557206,
+              "y": 0.19209827479116762,
+              "z": 0.1789302566562261
+            },
+            "biasStrength": 0.37095768882914193,
+            "velocityBias": {
+              "x": 0.6558542918327801,
+              "y": -0.31423907154717917,
+              "z": 0.6863737712046472
+            },
+            "velocityStrength": 0.26562287797492334,
+            "distanceBias": 0.4191552949095263,
+            "distanceStrength": 0.32237421439312364
+          },
+          {
+            "id": "muscle_6ecede62cdfe4084",
+            "nodeA": "node_58e9a9c8fd004de9",
+            "nodeB": "node_34a51b42525049bb",
+            "restLength": 1.4279868818956187,
+            "stiffness": 160.4959613315593,
+            "damping": 3.5908720180709004,
+            "frequency": 1.526151831507485,
+            "amplitude": 0.2890820427083157,
+            "phase": 2.395733025889997,
+            "directionBias": {
+              "x": -0.5983502507673613,
+              "y": -0.4827200487133993,
+              "z": -0.639498500371009
+            },
+            "biasStrength": 0.6902006147138119,
+            "velocityBias": {
+              "x": 0.687187616721751,
+              "y": 0.11145185082890537,
+              "z": 0.7178799790850078
+            },
+            "velocityStrength": 0.708960247088029,
+            "distanceBias": -0.21753314760841683,
+            "distanceStrength": 0.23890677808176888
+          },
+          {
+            "id": "muscle_13bd79f6d7b74095",
+            "nodeA": "node_18aecf3817cd4e65",
+            "nodeB": "node_48cf3b717a724d2f",
+            "restLength": 0.41740293500203635,
+            "stiffness": 119.38330985411395,
+            "damping": 2.4899336022463103,
+            "frequency": 1.93834045597895,
+            "amplitude": 0.2848439844827173,
+            "phase": 4.396318104364853,
+            "directionBias": {
+              "x": 0.5683209523869638,
+              "y": 0.8193000222783422,
+              "z": 0.07588655067060661
+            },
+            "biasStrength": 0.18054556656602994,
+            "velocityBias": {
+              "x": 0.2051789604238845,
+              "y": -0.7144176118365007,
+              "z": 0.6689611872875774
+            },
+            "velocityStrength": 0.37243792440358475,
+            "distanceBias": -0.14224865693427796,
+            "distanceStrength": 0.2890233300130165
+          },
+          {
+            "id": "muscle_aa83bec8546a4240",
+            "nodeA": "node_34a51b42525049bb",
+            "nodeB": "node_18aecf3817cd4e65",
+            "restLength": 0.4673994979726159,
+            "stiffness": 151.01550887638905,
+            "damping": 2.1627335282758637,
+            "frequency": 2.4966258650538675,
+            "amplitude": 0.2992130397759873,
+            "phase": 3.816378270576926,
+            "directionBias": {
+              "x": -0.8621271910511423,
+              "y": 0.3354964917575387,
+              "z": -0.3797088496053929
+            },
+            "biasStrength": 0.027778355002424194,
+            "velocityBias": {
+              "x": -0.47730328711984277,
+              "y": -0.22369532068643141,
+              "z": 0.8497893713194979
+            },
+            "velocityStrength": 0.30302668744447725,
+            "distanceBias": -0.44243950520086545,
+            "distanceStrength": 0.078239702874775
+          },
+          {
+            "id": "muscle_039a6ef968c94475",
+            "nodeA": "node_48cf3b717a724d2f",
+            "nodeB": "node_9e441e3ee6304983",
+            "restLength": 1.0244294877033022,
+            "stiffness": 123.14418859824038,
+            "damping": 2.5242922283055025,
+            "frequency": 1.205489924816429,
+            "amplitude": 0.25514779743016847,
+            "phase": 2.531821748732929,
+            "directionBias": {
+              "x": 0.6648395031046821,
+              "y": -0.74698483521687,
+              "z": -0.0014460524004918237
+            },
+            "biasStrength": 0.22604534270652357,
+            "velocityBias": {
+              "x": 0.7701095246710262,
+              "y": 0.2698390604785746,
+              "z": 0.5780295852731125
+            },
+            "velocityStrength": 0.18392635126857065,
+            "distanceBias": -1.0,
+            "distanceStrength": 0.3264944638377348
+          },
+          {
+            "id": "muscle_cedd0da0c74b4f98",
+            "nodeA": "node_9e441e3ee6304983",
+            "nodeB": "node_e4633eb725014eba",
+            "restLength": 1.340694605059959,
+            "stiffness": 141.07138498965134,
+            "damping": 3.4455595208216407,
+            "frequency": 2.8943805761283237,
+            "amplitude": 0.18714189978574483,
+            "phase": 4.0177674401123165,
+            "directionBias": {
+              "x": 0.18956303061709776,
+              "y": 0.8245595555003333,
+              "z": -0.5330735379442069
+            },
+            "biasStrength": 0.6015826596709438,
+            "velocityBias": {
+              "x": -0.8895446154378168,
+              "y": -0.05765160302281322,
+              "z": -0.4531960611197835
+            },
+            "velocityStrength": 0.49148120257442024,
+            "distanceBias": -0.13268397143868588,
+            "distanceStrength": 0.41986897383921734
+          },
+          {
+            "id": "muscle_e9c6fb987f614fa6",
+            "nodeA": "node_34a51b42525049bb",
+            "nodeB": "node_9e441e3ee6304983",
+            "restLength": 0.44692374519257755,
+            "stiffness": 179.55141129108702,
+            "damping": 3.6215310346570315,
+            "frequency": 1.6199170627781072,
+            "amplitude": 0.41944555118656107,
+            "phase": 4.018451672355527,
+            "directionBias": {
+              "x": -0.13089448041188445,
+              "y": 0.7585607850101875,
+              "z": 0.6383198026400488
+            },
+            "biasStrength": 0.4017692263020805,
+            "velocityBias": {
+              "x": -0.25316249421530934,
+              "y": -0.9245444589427766,
+              "z": 0.2848267806244558
+            },
+            "velocityStrength": 0.15667374113077437,
+            "distanceBias": 0.07501936104844431,
+            "distanceStrength": 0.18073203034064744
+          },
+          {
+            "id": "muscle_b1996ba6cc444db8",
+            "nodeA": "node_9e441e3ee6304983",
+            "nodeB": "node_18aecf3817cd4e65",
+            "restLength": 0.8990648729730634,
+            "stiffness": 164.4403665850313,
+            "damping": 4.154632599073661,
+            "frequency": 1.656698776778091,
+            "amplitude": 0.38834154612633287,
+            "phase": 0.8223888334612717,
+            "directionBias": {
+              "x": -0.9142279727439079,
+              "y": -0.4000816907109268,
+              "z": 0.06420167139919918
+            },
+            "biasStrength": 0.6518552201923111,
+            "velocityBias": {
+              "x": 0.14995546566510298,
+              "y": 0.8326461888201149,
+              "z": 0.533116950171817
+            },
+            "velocityStrength": 0.24264194494753474,
+            "distanceBias": -0.2594857536679407,
+            "distanceStrength": 0.08453790542135753
+          }
+        ],
+        "globalFrequencyMultiplier": 0.9856672576403328,
+        "controllerType": "neural",
+        "color": {
+          "h": 0.8072278014283406,
+          "s": 0.6678387117141563,
+          "l": 0.5487832603056737
+        },
+        "neatGenome": {
+          "neurons": [
+            {
+              "id": 0,
+              "type": "bias",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 1,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 2,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 3,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 4,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 5,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 6,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 7,
+              "type": "input",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 8,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 9,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 10,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 11,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 12,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 13,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 14,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 15,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 16,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            },
+            {
+              "id": 17,
+              "type": "output",
+              "bias": 0.0,
+              "innovation": null
+            }
+          ],
+          "connections": [
+            {
+              "from_node": 1,
+              "to_node": 8,
+              "weight": 0.2819132383265215,
+              "enabled": true,
+              "innovation": 0
+            },
+            {
+              "from_node": 1,
+              "to_node": 9,
+              "weight": 0.8165547983198038,
+              "enabled": true,
+              "innovation": 1
+            },
+            {
+              "from_node": 1,
+              "to_node": 10,
+              "weight": 0.3865269406574713,
+              "enabled": true,
+              "innovation": 2
+            },
+            {
+              "from_node": 1,
+              "to_node": 11,
+              "weight": -0.08247496400365958,
+              "enabled": true,
+              "innovation": 3
+            },
+            {
+              "from_node": 1,
+              "to_node": 12,
+              "weight": 0.6327670694440422,
+              "enabled": true,
+              "innovation": 4
+            },
+            {
+              "from_node": 1,
+              "to_node": 13,
+              "weight": 0.016647164788734944,
+              "enabled": false,
+              "innovation": 5
+            },
+            {
+              "from_node": 1,
+              "to_node": 14,
+              "weight": -0.3957748561023884,
+              "enabled": true,
+              "innovation": 6
+            },
+            {
+              "from_node": 1,
+              "to_node": 15,
+              "weight": -0.4345579620025846,
+              "enabled": true,
+              "innovation": 7
+            },
+            {
+              "from_node": 2,
+              "to_node": 8,
+              "weight": -0.1630420194327835,
+              "enabled": true,
+              "innovation": 8
+            },
+            {
+              "from_node": 2,
+              "to_node": 9,
+              "weight": 0.1229183660100964,
+              "enabled": true,
+              "innovation": 9
+            },
+            {
+              "from_node": 2,
+              "to_node": 10,
+              "weight": -0.5517505553214603,
+              "enabled": true,
+              "innovation": 10
+            },
+            {
+              "from_node": 2,
+              "to_node": 11,
+              "weight": -0.2899165040925524,
+              "enabled": true,
+              "innovation": 11
+            },
+            {
+              "from_node": 2,
+              "to_node": 12,
+              "weight": -0.008753319363670437,
+              "enabled": true,
+              "innovation": 12
+            },
+            {
+              "from_node": 2,
+              "to_node": 13,
+              "weight": 0.1297896614963185,
+              "enabled": true,
+              "innovation": 13
+            },
+            {
+              "from_node": 2,
+              "to_node": 14,
+              "weight": 0.6559387972335138,
+              "enabled": true,
+              "innovation": 14
+            },
+            {
+              "from_node": 2,
+              "to_node": 15,
+              "weight": 0.6381535603554801,
+              "enabled": true,
+              "innovation": 15
+            },
+            {
+              "from_node": 3,
+              "to_node": 8,
+              "weight": 0.203527098208527,
+              "enabled": true,
+              "innovation": 16
+            },
+            {
+              "from_node": 3,
+              "to_node": 9,
+              "weight": 0.5571351885604651,
+              "enabled": true,
+              "innovation": 17
+            },
+            {
+              "from_node": 3,
+              "to_node": 10,
+              "weight": -0.3131393699746219,
+              "enabled": true,
+              "innovation": 18
+            },
+            {
+              "from_node": 3,
+              "to_node": 11,
+              "weight": -0.10302147153495855,
+              "enabled": true,
+              "innovation": 19
+            },
+            {
+              "from_node": 3,
+              "to_node": 12,
+              "weight": 0.04812022988613719,
+              "enabled": true,
+              "innovation": 20
+            },
+            {
+              "from_node": 3,
+              "to_node": 13,
+              "weight": -0.16507893243794697,
+              "enabled": true,
+              "innovation": 21
+            },
+            {
+              "from_node": 3,
+              "to_node": 14,
+              "weight": -0.8524954905718685,
+              "enabled": true,
+              "innovation": 22
+            },
+            {
+              "from_node": 3,
+              "to_node": 15,
+              "weight": -0.009688545727802839,
+              "enabled": true,
+              "innovation": 23
+            },
+            {
+              "from_node": 4,
+              "to_node": 8,
+              "weight": -0.0930876679368795,
+              "enabled": true,
+              "innovation": 24
+            },
+            {
+              "from_node": 4,
+              "to_node": 9,
+              "weight": -0.6182482567478349,
+              "enabled": true,
+              "innovation": 25
+            },
+            {
+              "from_node": 4,
+              "to_node": 10,
+              "weight": -0.36537502680679057,
+              "enabled": true,
+              "innovation": 26
+            },
+            {
+              "from_node": 4,
+              "to_node": 11,
+              "weight": -0.32496955411726897,
+              "enabled": true,
+              "innovation": 27
+            },
+            {
+              "from_node": 4,
+              "to_node": 12,
+              "weight": 0.7046751464901162,
+              "enabled": true,
+              "innovation": 28
+            },
+            {
+              "from_node": 4,
+              "to_node": 13,
+              "weight": -0.7717770094823289,
+              "enabled": true,
+              "innovation": 29
+            },
+            {
+              "from_node": 4,
+              "to_node": 14,
+              "weight": 0.0682296374014541,
+              "enabled": true,
+              "innovation": 30
+            },
+            {
+              "from_node": 4,
+              "to_node": 15,
+              "weight": 0.1303345170285266,
+              "enabled": true,
+              "innovation": 31
+            },
+            {
+              "from_node": 5,
+              "to_node": 8,
+              "weight": 0.22555660775454867,
+              "enabled": true,
+              "innovation": 32
+            },
+            {
+              "from_node": 5,
+              "to_node": 9,
+              "weight": -0.3204818456717976,
+              "enabled": true,
+              "innovation": 33
+            },
+            {
+              "from_node": 5,
+              "to_node": 10,
+              "weight": 0.3492971732086752,
+              "enabled": true,
+              "innovation": 34
+            },
+            {
+              "from_node": 5,
+              "to_node": 11,
+              "weight": -0.3429671595833359,
+              "enabled": true,
+              "innovation": 35
+            },
+            {
+              "from_node": 5,
+              "to_node": 12,
+              "weight": 0.21459811850597277,
+              "enabled": true,
+              "innovation": 36
+            },
+            {
+              "from_node": 5,
+              "to_node": 13,
+              "weight": 0.12954295041262232,
+              "enabled": true,
+              "innovation": 37
+            },
+            {
+              "from_node": 5,
+              "to_node": 14,
+              "weight": -0.27670865824736407,
+              "enabled": true,
+              "innovation": 38
+            },
+            {
+              "from_node": 5,
+              "to_node": 15,
+              "weight": -0.4035131507526377,
+              "enabled": true,
+              "innovation": 39
+            },
+            {
+              "from_node": 6,
+              "to_node": 8,
+              "weight": 0.16089029985529424,
+              "enabled": true,
+              "innovation": 40
+            },
+            {
+              "from_node": 6,
+              "to_node": 9,
+              "weight": -0.2802571175252853,
+              "enabled": true,
+              "innovation": 41
+            },
+            {
+              "from_node": 6,
+              "to_node": 10,
+              "weight": 0.561081676275802,
+              "enabled": true,
+              "innovation": 42
+            },
+            {
+              "from_node": 6,
+              "to_node": 11,
+              "weight": -0.31779015701441593,
+              "enabled": true,
+              "innovation": 43
+            },
+            {
+              "from_node": 6,
+              "to_node": 12,
+              "weight": 0.1671130445181248,
+              "enabled": true,
+              "innovation": 44
+            },
+            {
+              "from_node": 6,
+              "to_node": 13,
+              "weight": -0.3595709372003703,
+              "enabled": true,
+              "innovation": 45
+            },
+            {
+              "from_node": 6,
+              "to_node": 14,
+              "weight": 0.6871425954107516,
+              "enabled": true,
+              "innovation": 46
+            },
+            {
+              "from_node": 6,
+              "to_node": 15,
+              "weight": -0.4507038183034037,
+              "enabled": true,
+              "innovation": 47
+            },
+            {
+              "from_node": 7,
+              "to_node": 8,
+              "weight": 0.24137229535059107,
+              "enabled": true,
+              "innovation": 48
+            },
+            {
+              "from_node": 7,
+              "to_node": 9,
+              "weight": -0.13859510046882684,
+              "enabled": true,
+              "innovation": 49
+            },
+            {
+              "from_node": 7,
+              "to_node": 10,
+              "weight": -0.5701815691485385,
+              "enabled": true,
+              "innovation": 50
+            },
+            {
+              "from_node": 7,
+              "to_node": 11,
+              "weight": -1.4571262059338137,
+              "enabled": true,
+              "innovation": 51
+            },
+            {
+              "from_node": 7,
+              "to_node": 12,
+              "weight": 0.47577873032180623,
+              "enabled": true,
+              "innovation": 52
+            },
+            {
+              "from_node": 7,
+              "to_node": 13,
+              "weight": -0.6143206529845295,
+              "enabled": true,
+              "innovation": 53
+            },
+            {
+              "from_node": 7,
+              "to_node": 14,
+              "weight": 0.7713182584439768,
+              "enabled": true,
+              "innovation": 54
+            },
+            {
+              "from_node": 7,
+              "to_node": 15,
+              "weight": 0.16105598944683905,
+              "enabled": true,
+              "innovation": 55
+            },
+            {
+              "from_node": 0,
+              "to_node": 8,
+              "weight": -0.4885583291163598,
+              "enabled": true,
+              "innovation": 56
+            },
+            {
+              "from_node": 0,
+              "to_node": 9,
+              "weight": 0.29552918500165115,
+              "enabled": true,
+              "innovation": 57
+            },
+            {
+              "from_node": 0,
+              "to_node": 10,
+              "weight": 0.1933093289302218,
+              "enabled": true,
+              "innovation": 58
+            },
+            {
+              "from_node": 0,
+              "to_node": 11,
+              "weight": -0.26834824151906894,
+              "enabled": true,
+              "innovation": 59
+            },
+            {
+              "from_node": 0,
+              "to_node": 12,
+              "weight": 0.5297466258523652,
+              "enabled": true,
+              "innovation": 60
+            },
+            {
+              "from_node": 0,
+              "to_node": 13,
+              "weight": 0.45724555122445104,
+              "enabled": true,
+              "innovation": 61
+            },
+            {
+              "from_node": 0,
+              "to_node": 14,
+              "weight": -0.2669017631278954,
+              "enabled": true,
+              "innovation": 62
+            },
+            {
+              "from_node": 0,
+              "to_node": 15,
+              "weight": 0.16905774415796557,
+              "enabled": true,
+              "innovation": 63
+            },
+            {
+              "from_node": 1,
+              "to_node": 16,
+              "weight": 0.5751676086056309,
+              "enabled": true,
+              "innovation": 64
+            },
+            {
+              "from_node": 2,
+              "to_node": 16,
+              "weight": -0.4630122742640568,
+              "enabled": true,
+              "innovation": 65
+            },
+            {
+              "from_node": 3,
+              "to_node": 16,
+              "weight": 0.2415992555068348,
+              "enabled": true,
+              "innovation": 66
+            },
+            {
+              "from_node": 4,
+              "to_node": 16,
+              "weight": -0.7793955211891443,
+              "enabled": true,
+              "innovation": 67
+            },
+            {
+              "from_node": 5,
+              "to_node": 16,
+              "weight": -0.7708351234887992,
+              "enabled": true,
+              "innovation": 68
+            },
+            {
+              "from_node": 6,
+              "to_node": 16,
+              "weight": 0.15104369010886157,
+              "enabled": true,
+              "innovation": 69
+            },
+            {
+              "from_node": 7,
+              "to_node": 16,
+              "weight": -0.5995170418906985,
+              "enabled": true,
+              "innovation": 70
+            },
+            {
+              "from_node": 0,
+              "to_node": 16,
+              "weight": -0.2293380616823404,
+              "enabled": true,
+              "innovation": 71
+            },
+            {
+              "from_node": 1,
+              "to_node": 17,
+              "weight": -0.2131945978600762,
+              "enabled": true,
+              "innovation": 72
+            },
+            {
+              "from_node": 2,
+              "to_node": 17,
+              "weight": -0.028773298133121905,
+              "enabled": true,
+              "innovation": 74
+            },
+            {
+              "from_node": 3,
+              "to_node": 17,
+              "weight": -0.3723922526584383,
+              "enabled": true,
+              "innovation": 76
+            },
+            {
+              "from_node": 4,
+              "to_node": 17,
+              "weight": -0.618939881921992,
+              "enabled": true,
+              "innovation": 78
+            },
+            {
+              "from_node": 5,
+              "to_node": 17,
+              "weight": 0.7553861663094299,
+              "enabled": true,
+              "innovation": 80
+            },
+            {
+              "from_node": 6,
+              "to_node": 17,
+              "weight": 0.6012804110832863,
+              "enabled": true,
+              "innovation": 82
+            },
+            {
+              "from_node": 7,
+              "to_node": 17,
+              "weight": 0.5908162315281582,
+              "enabled": true,
+              "innovation": 84
+            },
+            {
+              "from_node": 0,
+              "to_node": 17,
+              "weight": -0.88009956476038,
+              "enabled": true,
+              "innovation": 86
+            }
+          ],
+          "activation": "tanh"
+        }
+      },
+      "best_fitness": 99.03886413574219,
+      "total_time_s": 65.72626852989197,
+      "creatures_per_second": 15.214616961636962
+    }
+  ],
+  "aggregate": {
+    "best_fitness": {
+      "mean": 99.03886413574219,
+      "std": 0.0,
+      "min": 99.03886413574219,
+      "max": 99.03886413574219
+    },
+    "final_avg_fitness": {
+      "mean": 1.3715879578888417,
+      "std": 0.0
+    },
+    "total_time_s": {
+      "mean": 65.72626852989197,
+      "std": 0.0
+    },
+    "seeds": 1
+  }
+}

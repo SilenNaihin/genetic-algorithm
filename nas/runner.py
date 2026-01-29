@@ -1,0 +1,382 @@
+"""
+In-memory evolution runner for NAS.
+
+Runs evolution without database overhead for maximum speed.
+Uses PyTorchSimulator + genetics directly.
+"""
+
+import sys
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+# Add backend to path
+sys.path.insert(0, '/home/azureuser/projects/genetic-algorithm/backend')
+
+import torch
+
+from app.services.pytorch_simulator import PyTorchSimulator
+from app.genetics.population import (
+    generate_population,
+    evolve_population,
+    GenomeConstraints,
+)
+from app.schemas.simulation import SimulationConfig
+from app.schemas.neat import InnovationCounter
+
+
+@dataclass
+class GenerationStats:
+    """Stats for a single generation."""
+    generation: int
+    best_fitness: float
+    avg_fitness: float
+    median_fitness: float
+    worst_fitness: float
+    simulation_time_ms: int
+    evolution_time_ms: int = 0
+
+
+@dataclass
+class RunResult:
+    """Result of a complete evolution run."""
+    config: dict[str, Any]
+    seed: int
+    generations: list[GenerationStats]
+    best_genome: dict[str, Any] | None = None
+    best_fitness: float = 0.0
+    total_time_s: float = 0.0
+    creatures_per_second: float = 0.0
+
+
+def run_evolution(
+    config: dict[str, Any],
+    generations: int,
+    seed: int = 42,
+    device: torch.device | None = None,
+    callback: Callable[[GenerationStats], None] | None = None,
+    verbose: bool = True,
+) -> RunResult:
+    """
+    Run a complete evolution loop in memory.
+
+    Args:
+        config: Simulation configuration dict
+        generations: Number of generations to run
+        seed: Random seed for reproducibility
+        device: PyTorch device (auto-detect if None)
+        callback: Called after each generation with stats
+        verbose: Print progress to console
+
+    Returns:
+        RunResult with all generation stats and best genome
+    """
+    import random
+    import numpy as np
+
+    # Set seeds for reproducibility
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+    # Initialize simulator
+    simulator = PyTorchSimulator(device=device)
+
+    # Convert config to SimulationConfig for validation
+    sim_config = SimulationConfig(**config)
+
+    # Prepare evolution config
+    use_neat = sim_config.neural_mode == 'neat'
+    innovation_counter = InnovationCounter() if use_neat else None
+
+    # Generate initial population
+    constraints = GenomeConstraints(
+        min_nodes=sim_config.min_nodes,
+        max_nodes=sim_config.max_nodes,
+        max_muscles=sim_config.max_muscles,
+        max_frequency=sim_config.max_allowed_frequency,
+    )
+
+    genomes = generate_population(
+        size=sim_config.population_size,
+        constraints=constraints,
+        use_neural_net=sim_config.use_neural_net,
+        neural_hidden_size=sim_config.neural_hidden_size,
+        neural_output_bias=sim_config.neural_output_bias,
+        neural_mode=sim_config.neural_mode,
+        time_encoding=sim_config.time_encoding,
+        use_proprioception=sim_config.use_proprioception,
+        proprioception_inputs=sim_config.proprioception_inputs,
+        use_neat=use_neat,
+        innovation_counter=innovation_counter,
+        bias_mode=sim_config.bias_mode,
+        neat_initial_connectivity=sim_config.neat_initial_connectivity,
+    )
+
+    # Evolution config for genetics
+    evolution_config = {
+        'population_size': sim_config.population_size,
+        'elite_count': sim_config.elite_count,
+        'cull_percentage': sim_config.cull_percentage,
+        'selection_method': sim_config.selection_method,
+        'tournament_size': sim_config.tournament_size,
+        'crossover_rate': sim_config.crossover_rate,
+        'use_crossover': sim_config.use_crossover,
+        'mutation_rate': sim_config.mutation_rate,
+        'mutation_magnitude': sim_config.mutation_magnitude,
+        'weight_mutation_rate': sim_config.weight_mutation_rate,
+        'weight_mutation_magnitude': sim_config.weight_mutation_magnitude,
+        'weight_mutation_decay': sim_config.weight_mutation_decay,
+        'use_neural_net': sim_config.use_neural_net,
+        'neural_hidden_size': sim_config.neural_hidden_size,
+        'neural_output_bias': sim_config.neural_output_bias,
+        'min_nodes': sim_config.min_nodes,
+        'max_nodes': sim_config.max_nodes,
+        'max_muscles': sim_config.max_muscles,
+        'max_frequency': sim_config.max_allowed_frequency,
+        'use_fitness_sharing': sim_config.use_fitness_sharing,
+        'sharing_radius': sim_config.sharing_radius,
+        'compatibility_threshold': sim_config.compatibility_threshold,
+        'min_species_size': sim_config.min_species_size,
+        'use_neat': use_neat,
+        'neat_add_connection_rate': sim_config.neat_add_connection_rate,
+        'neat_add_node_rate': sim_config.neat_add_node_rate,
+        'neat_enable_rate': sim_config.neat_enable_rate,
+        'neat_disable_rate': sim_config.neat_disable_rate,
+        'neat_excess_coefficient': sim_config.neat_excess_coefficient,
+        'neat_disjoint_coefficient': sim_config.neat_disjoint_coefficient,
+        'neat_weight_coefficient': sim_config.neat_weight_coefficient,
+        'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+    }
+
+    # Simulation config for batch simulation
+    batch_config = {
+        'simulation_duration': sim_config.simulation_duration,
+        'frame_storage_mode': 'none',  # No frames for speed
+        'frame_rate': 15,
+        'pellet_count': sim_config.pellet_count,
+        'arena_size': sim_config.arena_size,
+        'max_allowed_frequency': sim_config.max_allowed_frequency,
+        'fitness_pellet_points': sim_config.fitness_pellet_points,
+        'fitness_progress_max': sim_config.fitness_progress_max,
+        'fitness_distance_per_unit': sim_config.fitness_distance_per_unit,
+        'fitness_distance_traveled_max': sim_config.fitness_distance_traveled_max,
+        'fitness_regression_penalty': sim_config.fitness_regression_penalty,
+        'fitness_efficiency_penalty': sim_config.fitness_efficiency_penalty,
+        'neural_dead_zone': sim_config.neural_dead_zone,
+        'use_neural_net': sim_config.use_neural_net,
+        'neural_mode': sim_config.neural_mode,
+        'neural_hidden_size': sim_config.neural_hidden_size,
+        'time_encoding': sim_config.time_encoding,
+        'use_proprioception': sim_config.use_proprioception,
+        'proprioception_inputs': sim_config.proprioception_inputs,
+        'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+    }
+
+    # Run evolution
+    gen_stats: list[GenerationStats] = []
+    best_genome = None
+    best_fitness = float('-inf')
+    total_start = time.time()
+
+    for gen in range(generations):
+        # Simulate
+        sim_start = time.time()
+        results = simulator.simulate_batch(genomes, batch_config)
+        sim_time_ms = int((time.time() - sim_start) * 1000)
+
+        # Extract fitness scores
+        fitness_scores = [r.fitness for r in results]
+        sorted_fitness = sorted(fitness_scores, reverse=True)
+
+        # Stats
+        stats = GenerationStats(
+            generation=gen,
+            best_fitness=sorted_fitness[0],
+            avg_fitness=sum(fitness_scores) / len(fitness_scores),
+            median_fitness=sorted_fitness[len(sorted_fitness) // 2],
+            worst_fitness=sorted_fitness[-1],
+            simulation_time_ms=sim_time_ms,
+        )
+
+        # Track best
+        if sorted_fitness[0] > best_fitness:
+            best_fitness = sorted_fitness[0]
+            best_idx = fitness_scores.index(sorted_fitness[0])
+            best_genome = genomes[best_idx].copy()
+
+        # Evolve (if not last generation)
+        if gen < generations - 1:
+            evo_start = time.time()
+            genomes, _ = evolve_population(
+                genomes=genomes,
+                fitness_scores=fitness_scores,
+                config=evolution_config,
+                generation=gen,
+                innovation_counter=innovation_counter,
+            )
+            stats.evolution_time_ms = int((time.time() - evo_start) * 1000)
+
+        gen_stats.append(stats)
+
+        # Callback
+        if callback:
+            callback(stats)
+
+        # Console output
+        if verbose:
+            print(f"  gen {gen+1:3d}/{generations} | best: {stats.best_fitness:6.1f} | avg: {stats.avg_fitness:6.1f} | {stats.simulation_time_ms}ms")
+
+    total_time = time.time() - total_start
+    total_creatures = generations * sim_config.population_size
+
+    return RunResult(
+        config=config,
+        seed=seed,
+        generations=gen_stats,
+        best_genome=best_genome,
+        best_fitness=best_fitness,
+        total_time_s=total_time,
+        creatures_per_second=total_creatures / total_time if total_time > 0 else 0,
+    )
+
+
+def run_multi_seed(
+    config: dict[str, Any],
+    generations: int,
+    seeds: list[int],
+    device: torch.device | None = None,
+    callback: Callable[[int, GenerationStats], None] | None = None,
+    verbose: bool = True,
+) -> list[RunResult]:
+    """
+    Run evolution with multiple seeds for statistical significance.
+
+    Args:
+        config: Simulation configuration dict
+        generations: Number of generations per seed
+        seeds: List of random seeds
+        device: PyTorch device
+        callback: Called with (seed_idx, stats) after each generation
+        verbose: Print progress
+
+    Returns:
+        List of RunResults, one per seed
+    """
+    results = []
+
+    for i, seed in enumerate(seeds):
+        if verbose:
+            print(f"\n[seed {i+1}/{len(seeds)}] Running with seed={seed}")
+
+        def seed_callback(stats: GenerationStats):
+            if callback:
+                callback(i, stats)
+
+        result = run_evolution(
+            config=config,
+            generations=generations,
+            seed=seed,
+            device=device,
+            callback=seed_callback,
+            verbose=verbose,
+        )
+        results.append(result)
+
+    return results
+
+
+def get_aggregate_stats(results: list[RunResult]) -> dict[str, Any]:
+    """
+    Aggregate stats across multiple seeds.
+
+    Returns:
+        Dict with mean, std, min, max for key metrics
+    """
+    import numpy as np
+
+    best_fitnesses = [r.best_fitness for r in results]
+    total_times = [r.total_time_s for r in results]
+
+    # Get final generation stats
+    final_avgs = [r.generations[-1].avg_fitness for r in results]
+
+    return {
+        'best_fitness': {
+            'mean': float(np.mean(best_fitnesses)),
+            'std': float(np.std(best_fitnesses)),
+            'min': float(np.min(best_fitnesses)),
+            'max': float(np.max(best_fitnesses)),
+        },
+        'final_avg_fitness': {
+            'mean': float(np.mean(final_avgs)),
+            'std': float(np.std(final_avgs)),
+        },
+        'total_time_s': {
+            'mean': float(np.mean(total_times)),
+            'std': float(np.std(total_times)),
+        },
+        'seeds': len(results),
+    }
+
+
+def run_parallel_configs(
+    configs: list[tuple[str, dict[str, Any]]],
+    generations: int,
+    seeds: list[int],
+    devices: list[str] | None = None,
+    verbose: bool = True,
+) -> dict[str, list[RunResult]]:
+    """
+    Run multiple configs in parallel across GPUs using multiprocessing.
+
+    Args:
+        configs: List of (config_name, config_dict) tuples
+        generations: Number of generations per run
+        seeds: List of random seeds
+        devices: List of device strings ('cuda:0', 'cuda:1'). Auto-detect if None.
+        verbose: Print progress
+
+    Returns:
+        Dict mapping config_name to list of RunResults
+    """
+    import multiprocessing as mp
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    # Auto-detect GPUs
+    if devices is None:
+        if torch.cuda.is_available():
+            devices = [f'cuda:{i}' for i in range(torch.cuda.device_count())]
+        else:
+            devices = ['cpu']
+
+    if verbose:
+        print(f"Running {len(configs)} configs across {len(devices)} devices")
+
+    # Create work items: (config_name, config, seed, device)
+    work_items = []
+    for i, (config_name, config) in enumerate(configs):
+        for seed in seeds:
+            device = devices[i % len(devices)]  # Round-robin device assignment
+            work_items.append((config_name, config, seed, device, generations))
+
+    results_by_config: dict[str, list[RunResult]] = {name: [] for name, _ in configs}
+
+    # Run sequentially (multiprocessing with CUDA is complex)
+    # For true parallelism, use separate processes via CLI
+    for config_name, config, seed, device, gens in work_items:
+        if verbose:
+            print(f"  Running {config_name} seed={seed} on {device}")
+
+        result = run_evolution(
+            config=config,
+            generations=gens,
+            seed=seed,
+            device=torch.device(device),
+            verbose=False,
+        )
+        results_by_config[config_name].append(result)
+
+    return results_by_config
