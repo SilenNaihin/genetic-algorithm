@@ -12,8 +12,74 @@ echo -e "${GREEN}=== Evolution Lab Setup ===${NC}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# --- PostgreSQL Setup ---
+echo -e "\n${YELLOW}[1/3] Setting up PostgreSQL...${NC}"
+
+OS="$(uname -s)"
+
+if [ "$OS" = "Darwin" ]; then
+    # macOS
+    if ! command -v brew &> /dev/null; then
+        echo -e "${RED}Homebrew not found.${NC}"
+        echo "Install it with:"
+        echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        exit 1
+    fi
+
+    if ! brew list postgresql@16 &> /dev/null; then
+        echo "Installing PostgreSQL 16..."
+        brew install postgresql@16
+    fi
+
+    # Ensure PostgreSQL is running
+    if ! brew services list | grep -q "postgresql@16.*started"; then
+        echo "Starting PostgreSQL service..."
+        brew services start postgresql@16
+        sleep 2
+    fi
+
+    # Add to PATH for this session
+    export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+
+    # Create database if it doesn't exist
+    echo "Setting up database..."
+    if psql -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw evolution_lab; then
+        echo "Database 'evolution_lab' already exists."
+    else
+        echo "Creating database 'evolution_lab'..."
+        createdb evolution_lab 2>/dev/null || true
+    fi
+
+elif [ "$OS" = "Linux" ]; then
+    # Linux (Ubuntu/Debian)
+    if ! command -v psql &> /dev/null; then
+        echo "Installing PostgreSQL..."
+        sudo apt-get update -qq
+        sudo apt-get install -y postgresql postgresql-contrib
+    fi
+
+    # Ensure PostgreSQL is running
+    if ! systemctl is-active --quiet postgresql; then
+        echo "Starting PostgreSQL..."
+        sudo systemctl start postgresql
+    fi
+
+    # Create database and set password (idempotent)
+    echo "Setting up database..."
+    sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'evolution_lab'" | grep -q 1 || \
+        sudo -u postgres psql -c "CREATE DATABASE evolution_lab;" 2>/dev/null
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';" 2>/dev/null
+else
+    echo -e "${RED}Unsupported OS: $OS${NC}"
+    echo "Please install PostgreSQL manually and create database 'evolution_lab'"
+    exit 1
+fi
+
+echo -e "${GREEN}PostgreSQL setup complete.${NC}"
+
 # --- Node.js / Frontend Setup ---
-echo -e "\n${YELLOW}[1/3] Setting up frontend...${NC}"
+echo -e "\n${YELLOW}[2/3] Setting up frontend...${NC}"
+cd "$SCRIPT_DIR"
 
 # Check for Node.js
 if ! command -v node &> /dev/null; then
@@ -37,30 +103,6 @@ echo "Installing frontend dependencies..."
 npm install
 echo -e "${GREEN}Frontend setup complete.${NC}"
 
-# --- PostgreSQL Setup ---
-echo -e "\n${YELLOW}[2/3] Setting up PostgreSQL...${NC}"
-
-# Check if PostgreSQL is installed
-if ! command -v psql &> /dev/null; then
-    echo "PostgreSQL not found. Installing..."
-    sudo apt-get update -qq
-    sudo apt-get install -y postgresql postgresql-contrib
-fi
-
-# Ensure PostgreSQL is running
-if ! systemctl is-active --quiet postgresql; then
-    echo "Starting PostgreSQL..."
-    sudo systemctl start postgresql
-fi
-
-# Create database and set password (idempotent)
-echo "Configuring database..."
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'evolution_lab'" | grep -q 1 || \
-    sudo -u postgres psql -c "CREATE DATABASE evolution_lab;" 2>/dev/null
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';" 2>/dev/null
-
-echo -e "${GREEN}PostgreSQL setup complete.${NC}"
-
 # --- Python / Backend Setup ---
 echo -e "\n${YELLOW}[3/3] Setting up backend...${NC}"
 
@@ -80,13 +122,25 @@ done
 if [ -z "$PYTHON_CMD" ]; then
     echo -e "${RED}Python 3.11+ not found.${NC}"
     echo "Install it with:"
-    echo "  sudo apt update && sudo apt install python3.11 python3.11-venv python3.11-dev -y"
+    echo "  macOS: brew install python@3.11"
+    echo "  Ubuntu: sudo apt install python3.11 python3.11-venv python3.11-dev -y"
     exit 1
 fi
 
 echo "Using $PYTHON_CMD ($($PYTHON_CMD --version))"
 
 cd "$SCRIPT_DIR/backend"
+
+# Create .env from example if it doesn't exist
+if [ ! -f ".env" ]; then
+    echo "Creating .env from .env.example..."
+    cp .env.example .env
+
+    # On macOS, update DATABASE_URL to use current user without password
+    if [ "$OS" = "Darwin" ]; then
+        sed -i '' "s|postgresql+asyncpg://postgres:postgres@|postgresql+asyncpg://$USER@|" .env
+    fi
+fi
 
 # Create venv if it doesn't exist
 if [ ! -d "venv" ]; then
@@ -101,12 +155,6 @@ echo "Installing backend dependencies..."
 source venv/bin/activate
 pip install --upgrade pip -q
 pip install -e .
-
-# Create .env from example if it doesn't exist
-if [ ! -f ".env" ]; then
-    echo "Creating .env from .env.example..."
-    cp .env.example .env
-fi
 
 # Run database migrations
 echo "Running database migrations..."

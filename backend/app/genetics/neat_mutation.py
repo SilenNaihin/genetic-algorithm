@@ -265,9 +265,13 @@ def mutate_neat_weights(
     """
     Mutate connection weights with Gaussian perturbation or reset.
 
+    In canonical NEAT, weight mutations are applied to all offspring.
+    Each individual weight has mutation_rate probability of being mutated.
+    Of those mutated, perturb_rate are perturbed, rest are reset.
+
     Args:
         genome: NEAT genome to mutate (modified in place)
-        mutation_rate: Probability that weight mutation occurs at all
+        mutation_rate: Probability each weight is mutated (typically 0.8)
         perturb_rate: Of mutations, probability of perturbation vs full reset
         perturb_magnitude: Standard deviation of perturbation
         reset_magnitude: Range for full weight reset [-magnitude, magnitude]
@@ -275,12 +279,9 @@ def mutate_neat_weights(
     Returns:
         Number of weights that were mutated
     """
-    if random.random() > mutation_rate:
-        return 0
-
     mutations = 0
     for conn in genome.connections:
-        # Each weight has a chance to mutate
+        # Each weight has mutation_rate chance to mutate
         if random.random() < mutation_rate:
             if random.random() < perturb_rate:
                 # Perturb existing weight
