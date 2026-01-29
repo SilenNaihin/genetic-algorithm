@@ -466,6 +466,39 @@ child_connections = _filter_cycle_creating_connections(child_neurons, child_conn
 
 The enable functions now check `would_create_cycle()` before re-enabling.
 
+### Invalid Connection Filtering
+
+**Problem**: Different genomes can have the same neuron ID with different types because:
+- `adapt_neat_topology` creates new outputs with `max_id + 1`
+- `mutate_add_node` creates hidden neurons with `max_id + 1`
+
+Example:
+```
+Parent A: neuron 16 = hidden (from mutate_add_node when outputs were 10-15)
+Parent B: neuron 16 = output (original output when 15+ muscles existed)
+```
+
+During crossover, Parent A's neuron type is used (first in lookup), but Parent B's connections may expect neuron 16 to be an output. This creates invalid connections (output→hidden).
+
+**Solution**: Filter invalid connections after crossover:
+
+```python
+def _filter_invalid_connections(neurons, connections):
+    neuron_types = {n.id: n.type for n in neurons}
+    valid = []
+    for conn in connections:
+        from_type = neuron_types.get(conn.from_node)
+        to_type = neuron_types.get(conn.to_node)
+        # Source must be input, hidden, or bias (not output)
+        if from_type == 'output':
+            continue
+        # Target must be hidden or output (not input or bias)
+        if to_type in ('input', 'bias'):
+            continue
+        valid.append(conn)
+    return valid
+```
+
 ---
 
 ## Speciation

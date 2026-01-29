@@ -5,6 +5,10 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
 ## [Unreleased]
 
 ### Fixed
+- **NEAT Invalid Connection Filtering**: Fixed output neurons being used as connection sources
+  - Root cause: `adapt_neat_topology` and `mutate_add_node` both use `max_id + 1`, so same ID can be output in one genome and hidden in another
+  - During crossover, parent A's neuron type is used but parent B's connections may expect different type
+  - Fix: Added `_filter_invalid_connections()` to remove connections with outputs as sources or inputs as targets
 - **NEAT Cycle Prevention**: Fixed multiple sources of cycle creation in NEAT networks
   - `mutate_enable_connection`: Now checks if re-enabling a disabled connection would create a cycle
   - `mutate_toggle_connection`: Same cycle check when enabling

@@ -76,6 +76,45 @@ def _filter_cycle_creating_connections(
     return filtered
 
 
+def _filter_invalid_connections(
+    neurons: list[NeuronGene],
+    connections: list[ConnectionGene],
+) -> list[ConnectionGene]:
+    """
+    Filter out structurally invalid connections.
+
+    Invalid connections can occur during crossover when parents have the same
+    neuron ID with different types (e.g., one has ID 16 as hidden, other as output).
+    When neurons are merged, connections may become invalid.
+
+    Valid connections:
+    - Source: input, hidden, or bias
+    - Target: hidden or output
+    """
+    neuron_types = {n.id: n.type for n in neurons}
+
+    valid = []
+    for conn in connections:
+        from_type = neuron_types.get(conn.from_node)
+        to_type = neuron_types.get(conn.to_node)
+
+        # Skip if neurons don't exist
+        if from_type is None or to_type is None:
+            continue
+
+        # Source must be input, hidden, or bias (not output)
+        if from_type == 'output':
+            continue
+
+        # Target must be hidden or output (not input or bias)
+        if to_type in ('input', 'bias'):
+            continue
+
+        valid.append(conn)
+
+    return valid
+
+
 def align_genes(
     parent_a: NEATGenome,
     parent_b: NEATGenome,
@@ -244,6 +283,9 @@ def neat_crossover(
                     innovation=neuron.innovation,
                 ))
 
+    # Filter out invalid connections (e.g., output as source due to neuron type conflicts)
+    child_connections = _filter_invalid_connections(child_neurons, child_connections)
+
     # Filter out any connections that would create cycles
     # (can happen when combining genes from different topologies)
     child_connections = _filter_cycle_creating_connections(child_neurons, child_connections)
@@ -348,6 +390,10 @@ def neat_crossover_equal_fitness(
 
     # Choose activation from random parent
     activation = random.choice([parent_a.activation, parent_b.activation])
+
+    # Filter out invalid connections (e.g., output as source due to neuron type conflicts)
+    # More likely in equal fitness since we inherit neurons from both parents
+    child_connections = _filter_invalid_connections(child_neurons, child_connections)
 
     # Filter out any connections that would create cycles
     # (more likely in equal fitness crossover since we inherit from both parents)
