@@ -80,6 +80,8 @@ function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, numb
   }
 
   // BFS from inputs and bias to calculate max depth
+  // Cap depth to prevent infinite loops from cycles in disabled connections
+  const maxPossibleDepth = genome.neurons.length;
   const depths = new Map<number, number>();
   for (const sourceId of sourceIds) {
     depths.set(sourceId, 0);
@@ -89,6 +91,9 @@ function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, numb
   while (queue.length > 0) {
     const current = queue.shift()!;
     const currentDepth = depths.get(current) ?? 0;
+
+    // Skip if we've already hit max depth (prevents cycles in disabled connections)
+    if (currentDepth >= maxPossibleDepth) continue;
 
     for (const target of outgoing.get(current) ?? []) {
       const newDepth = currentDepth + 1;
