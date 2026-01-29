@@ -89,6 +89,10 @@ interface EvolutionState {
 
   // Key to force MenuScreen remount on reset (increments each reset)
   menuMountKey: number;
+
+  // Config presets
+  loadedPresetId: string | null;
+  configPresetsModalOpen: boolean;
 }
 
 /**
@@ -122,6 +126,8 @@ interface EvolutionActions {
   setGenerationJumpModalOpen: (open: boolean) => void;
   setNotification: (notification: { message: string; type: 'error' | 'info' } | null) => void;
   showError: (message: string) => void;
+  setLoadedPresetId: (id: string | null) => void;
+  setConfigPresetsModalOpen: (open: boolean) => void;
 
   // Complex actions (will be implemented in later phases)
   // These are placeholders that will call services
@@ -158,6 +164,8 @@ const initialState: EvolutionState = {
   generationJumpModalOpen: false,
   notification: null,
   menuMountKey: 0,
+  loadedPresetId: null,
+  configPresetsModalOpen: false,
 };
 
 /**
@@ -225,6 +233,8 @@ export const useEvolutionStore = create<EvolutionStore>()(
       setGenerationJumpModalOpen: (generationJumpModalOpen) => set({ generationJumpModalOpen }, false, 'setGenerationJumpModalOpen'),
       setNotification: (notification) => set({ notification }, false, 'setNotification'),
       showError: (message) => set({ notification: { message, type: 'error' } }, false, 'showError'),
+      setLoadedPresetId: (loadedPresetId) => set({ loadedPresetId }, false, 'setLoadedPresetId'),
+      setConfigPresetsModalOpen: (configPresetsModalOpen) => set({ configPresetsModalOpen }, false, 'setConfigPresetsModalOpen'),
 
       // Reset to initial state (increment menuMountKey to force MenuScreen remount)
       reset: () => set((state) => ({
