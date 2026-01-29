@@ -5,7 +5,7 @@ import zlib
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -249,7 +249,7 @@ async def run_generation(
         for genome in genomes:
             if genome.get('survivalStreak', 0) == 0:
                 # New offspring - generate new unique ID
-                genome['id'] = f"creature_{uuid.uuid4().hex[:8]}"
+                genome['id'] = f"creature_{uuid.uuid4().hex[:16]}"
             # Survivors keep their original ID from evolve_population
 
         # Track survivor IDs from actual selection (not just truncation)
@@ -485,10 +485,28 @@ async def run_generation(
     await db.commit()
 
     # Build creature data for frontend display
+    # First, batch compute avg_fitness for creatures with survival_streak > 1
+    creatures_needing_avg = [
+        genome["id"] for genome in genomes
+        if genome.get("survivalStreak", genome.get("survival_streak", 0)) > 1
+    ]
+    avg_fitness_map: dict[str, float] = {}
+    if creatures_needing_avg:
+        # Compute avg_fitness in one query per creature (could be optimized to single query)
+        for cid in creatures_needing_avg:
+            result = await db.execute(
+                select(func.avg(CreaturePerformance.fitness))
+                .where(CreaturePerformance.creature_id == cid)
+            )
+            avg = result.scalar_one_or_none()
+            if avg is not None:
+                avg_fitness_map[cid] = round(avg, 1)
+
     creatures_data = []
     for genome, sim_result in zip(genomes, sim_results):
         creature_id = genome["id"]
         creature = creature_records.get(creature_id)
+        survival_streak = genome.get("survivalStreak", genome.get("survival_streak", 0))
         creatures_data.append({
             "id": creature_id,
             "genome": genome,
@@ -499,9 +517,10 @@ async def run_generation(
             "is_survivor": creature_id in survivor_ids,
             "parent_ids": genome.get("parentIds", genome.get("parent_ids", [])),
             "has_frames": creature_id in keep_frames_ids,
-            "survival_streak": genome.get("survivalStreak", genome.get("survival_streak", 0)),
+            "survival_streak": survival_streak,
             "birth_generation": creature.birth_generation if creature else None,
             "death_generation": creature.death_generation if creature else None,
+            "avg_fitness": avg_fitness_map.get(creature_id) if survival_streak > 1 else None,
         })
 
     # Build response
