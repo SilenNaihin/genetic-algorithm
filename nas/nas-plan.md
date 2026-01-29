@@ -180,9 +180,26 @@ def diversity_objective(trial_results):
 
 ## Compute Budget
 
-### Hardware
-- 2x NVIDIA T4 (16GB VRAM each)
-- 56GB RAM
+### Hardware Benchmarks
+
+Run benchmarks with: `python cli.py benchmark -c <config> -p <pop> -g 10 -d <device>`
+
+| Machine | Cores | Mode | Pop | CPU | GPU |
+|---------|-------|------|-----|-----|-----|
+| **Apple M3 Max** | 16 | NEAT | 200 | 87/s | MPS N/A |
+| | | NEAT | 500 | 108/s | MPS N/A |
+| | | Pure | 200 | 216/s | MPS N/A |
+| | | Pure | 500 | 309/s | MPS N/A |
+| **Azure VM (AMD EPYC 7V12)** | 8 | NEAT | 200 | 31/s | 20/s (T4) |
+| | | NEAT | 500 | 35/s | 23/s (T4) |
+| | | Pure | 200 | 82/s | 54/s (T4) |
+| | | Pure | 500 | 83/s | 106/s (T4) |
+
+**Notes:**
+- M3 Max is ~2.6-3.7x faster than Azure reference on CPU
+- MPS (Apple GPU) hangs - needs PyTorch MPS optimization
+- Pure mode scales better with population (batched tensor ops)
+- NEAT mode has per-creature overhead but still scales well
 
 ### Estimated Times (per trial)
 | Config | Generations | Creatures | Time/Trial |
