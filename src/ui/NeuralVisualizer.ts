@@ -67,21 +67,21 @@ function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, numb
   const sourceIds = new Set(genome.neurons.filter(n => n.type === 'input' || n.type === 'bias').map(n => n.id));
   const outputIds = new Set(genome.neurons.filter(n => n.type === 'output').map(n => n.id));
 
-  // Build outgoing adjacency list - include ALL connections (enabled or not) for layout
-  // This ensures hidden nodes are positioned correctly even if their connections are disabled
+  // Build outgoing adjacency list - use ENABLED connections only for depth calculation
+  // Disabled connections can form cycles and create artificially deep/unbalanced layouts
   const outgoing = new Map<number, Set<number>>();
   for (const n of genome.neurons) {
     outgoing.set(n.id, new Set());
   }
   for (const conn of genome.connections) {
-    // Include all connections for depth calculation (even disabled ones)
-    // This prevents hidden nodes from appearing at depth 0 when their connections are disabled
-    outgoing.get(conn.fromNode)?.add(conn.toNode);
+    if (conn.enabled) {
+      outgoing.get(conn.fromNode)?.add(conn.toNode);
+    }
   }
 
   // BFS from inputs and bias to calculate max depth
-  // Cap depth to prevent infinite loops from cycles in disabled connections
-  const maxPossibleDepth = genome.neurons.length;
+  // Since we only use enabled connections (which are guaranteed cycle-free by backend),
+  // we don't need a depth cap here
   const depths = new Map<number, number>();
   for (const sourceId of sourceIds) {
     depths.set(sourceId, 0);
@@ -91,9 +91,6 @@ function computeNEATNeuronDepths(genome: NEATGenome): { depths: Map<number, numb
   while (queue.length > 0) {
     const current = queue.shift()!;
     const currentDepth = depths.get(current) ?? 0;
-
-    // Skip if we've already hit max depth (prevents cycles in disabled connections)
-    if (currentDepth >= maxPossibleDepth) continue;
 
     for (const target of outgoing.get(current) ?? []) {
       const newDepth = currentDepth + 1;
