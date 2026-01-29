@@ -629,6 +629,9 @@ def mutate_genome_neat(
     This mutates the body (nodes/muscles) using standard mutation,
     and the neural network (neatGenome) using NEAT structural mutations.
 
+    When muscles are removed, the corresponding output neuron is removed
+    (not just the highest-numbered one), preserving the muscle→output mapping.
+
     Args:
         genome: Genome dict with 'neatGenome' key containing NEATGenome
         innovation_counter: InnovationCounter for tracking structural mutations
@@ -650,9 +653,10 @@ def mutate_genome_neat(
     if neat_config is None:
         neat_config = NEATMutationConfig()
 
-    # First, mutate the body (nodes, muscles) using standard mutation
+    # Mutate the body (nodes, muscles) using standard mutation
     # But skip neural genome mutation - we'll handle that with NEAT
-    new_genome = _mutate_body_only(genome, config, constraints)
+    # This returns both the mutated genome and which muscle indices were removed
+    new_genome, removed_indices = _mutate_body_only_with_tracking(genome, config, constraints)
 
     # Now mutate the NEAT genome if present
     neat_genome = genome.get('neatGenome') or genome.get('neat_genome')
@@ -685,8 +689,12 @@ def mutate_genome_neat(
         from app.neural.neat_network import adapt_neat_topology
         new_muscle_count = len(new_genome['muscles'])
         current_output_count = len([n for n in mutated_neat.neurons if n.type == 'output'])
-        if new_muscle_count > 0 and current_output_count != new_muscle_count:
-            mutated_neat = adapt_neat_topology(mutated_neat, new_muscle_count)
+        if new_muscle_count > 0 and (removed_indices or current_output_count != new_muscle_count):
+            mutated_neat = adapt_neat_topology(
+                mutated_neat,
+                new_muscle_count,
+                removed_indices=removed_indices if removed_indices else None,
+            )
 
         # Store as dict for JSON serialization
         new_genome['neatGenome'] = mutated_neat.model_dump()
@@ -705,8 +713,32 @@ def _mutate_body_only(
     This is used by mutate_genome_neat to handle body mutations while
     NEAT handles neural mutations separately.
     """
+    result, _ = _mutate_body_only_with_tracking(genome, config, constraints)
+    return result
+
+
+def _mutate_body_only_with_tracking(
+    genome: dict,
+    config: MutationConfig,
+    constraints: GenomeConstraints,
+) -> tuple[dict, list[int]]:
+    """
+    Mutate only the body part of a genome (nodes, muscles), not neural.
+    Returns the mutated genome AND a list of indices of removed muscles.
+
+    This is used by mutate_genome_neat to:
+    1. Handle body mutations while NEAT handles neural mutations separately
+    2. Track which muscle indices were removed so the correct NEAT outputs can be removed
+
+    Returns:
+        Tuple of (mutated_genome, removed_muscle_indices)
+        removed_muscle_indices are indices in the ORIGINAL muscle array
+    """
     nodes = genome.get('nodes', [])
     muscles = genome.get('muscles', [])
+
+    # Track the original muscle count to calculate removed indices later
+    original_muscle_count = len(muscles)
 
     # Mutate nodes and create ID mapping
     new_nodes = []
@@ -718,14 +750,20 @@ def _mutate_body_only(
         new_nodes.append(new_node)
 
     # Mutate muscles with updated node references
+    # We track which original index each new muscle came from
     new_muscles = []
-    for muscle in muscles:
+    original_to_new_index: dict[int, int] = {}  # Maps original index -> new index
+
+    for i, muscle in enumerate(muscles):
         new_muscle = mutate_muscle(muscle, config, constraints)
         old_a = muscle.get('nodeA') or muscle.get('node_a', '')
         old_b = muscle.get('nodeB') or muscle.get('node_b', '')
         new_muscle['nodeA'] = old_to_new_id.get(old_a, old_a)
         new_muscle['nodeB'] = old_to_new_id.get(old_b, old_b)
+        # Store the original index so we can track removals
+        new_muscle['_original_index'] = i
         new_muscles.append(new_muscle)
+        original_to_new_index[i] = len(new_muscles) - 1
 
     # Build new genome
     new_genome = {
@@ -755,6 +793,9 @@ def _mutate_body_only(
             new_color['h'] = (color.get('h', 0.5) + (random.random() * 0.1 - 0.05) + 1) % 1
         new_genome['color'] = new_color
 
+    # Track removed muscle indices (in original array)
+    removed_indices: list[int] = []
+
     # Structural mutations for body (not neural)
     if random.random() < config.structural_rate:
         result = add_node(new_genome, constraints)
@@ -767,12 +808,25 @@ def _mutate_body_only(
         result = remove_node(new_genome, constraints)
         if result:
             node_id, muscle_ids = result
+            # Find which ORIGINAL indices are being removed
+            muscle_ids_set = set(muscle_ids)
+            for m in new_genome['muscles']:
+                if m['id'] in muscle_ids_set and '_original_index' in m:
+                    removed_indices.append(m['_original_index'])
+
             new_genome['nodes'] = [n for n in new_genome['nodes'] if n['id'] != node_id]
-            new_genome['muscles'] = [m for m in new_genome['muscles'] if m['id'] not in muscle_ids]
+            new_genome['muscles'] = [m for m in new_genome['muscles'] if m['id'] not in muscle_ids_set]
 
     if random.random() < config.structural_rate:
         new_muscle = add_muscle(new_genome, constraints)
         if new_muscle:
             new_genome['muscles'].append(new_muscle)
 
-    return new_genome
+    # Clean up temporary tracking field from muscles
+    for m in new_genome['muscles']:
+        m.pop('_original_index', None)
+
+    # Sort removed indices for consistent ordering
+    removed_indices.sort()
+
+    return new_genome, removed_indices

@@ -410,6 +410,55 @@
       }
     ]
   },
+  "future_enhancements": {
+    "muscle_innovation_matching": {
+      "name": "Muscle Innovation Matching for NEAT Crossover",
+      "status": "planned",
+      "description": "Enable meaningful NEAT output alignment during crossover by matching muscles based on structural similarity",
+      "problem": "Currently NEAT outputs are aligned by position, which doesn't account for the fact that two creatures might have structurally similar muscles at different array indices. This limits the effectiveness of crossover between creatures with different body structures.",
+      "solution": {
+        "core_concept": "Assign innovation IDs to muscles based on 'closeness' - muscles that are structurally similar get the same innovation ID, enabling NEAT-style alignment during crossover",
+        "muscle_distance_function": {
+          "description": "Define structural similarity between two muscles across different creatures",
+          "factors": [
+            "Relative position of connected nodes (normalized to creature's bounding box)",
+            "Node pair topology (how nodes relate to center of mass)",
+            "Optional: parameter similarity (rest_length ratio, stiffness, damping)"
+          ],
+          "algorithm": "When a muscle is created, compare against all muscle patterns in population. If distance < threshold, inherit existing innovation ID. Otherwise, assign new ID."
+        },
+        "crossover_alignment": {
+          "description": "Match outputs by muscle_innovation during NEAT crossover",
+          "matching_genes": "Both parents have output for same muscle innovation → inherit from either (standard NEAT)",
+          "disjoint_genes": "Only one parent has output for a muscle innovation → inherit from fitter parent",
+          "excess_genes": "Handle as disjoint"
+        },
+        "output_tracking": {
+          "description": "Each output neuron tracks which muscle innovation it controls",
+          "schema_change": "Add muscle_innovation field to output NeuronGene"
+        }
+      },
+      "challenges": [
+        "Defining 'relative position' - relative to what? (center of mass, bounding box, first node)",
+        "Threshold tuning - too low means no matches, too high means everything matches",
+        "Performance - comparing against all population muscles could be expensive",
+        "Body node identity - nodes themselves don't have stable identity across crossover"
+      ],
+      "implementation_phases": [
+        "Phase 1: Add muscle innovation tracking infrastructure (schema, counter)",
+        "Phase 2: Implement muscle distance function",
+        "Phase 3: Integrate innovation matching into muscle creation",
+        "Phase 4: Update NEAT crossover to align outputs by muscle innovation",
+        "Phase 5: Add body node innovation tracking (if needed for distance calculation)"
+      ],
+      "depends_on": "Current work: fixing output removal to use correct indices",
+      "references": [
+        "NEAT innovation numbers: same structural mutation → same innovation",
+        "Karl Sims (1994): tree-structured genomes preserve body-brain correspondence",
+        "HyperNEAT: uses body coordinates to generate weights, sidesteps alignment problem"
+      ]
+    }
+  },
   "maybe_add": {
     "description": "Alternative strategies to explore for improved evolution",
     "interspecies_mating": {

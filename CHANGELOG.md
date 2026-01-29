@@ -28,6 +28,18 @@ All notable changes to the Genetic Algorithm Evolution Simulator.
   - Called after crossover, body mutation, and cloning
   - New outputs get sparse initial connections; removed outputs delete all their connections
   - See `docs/NEAT.md` "NEAT Body-Neural Coupling" section for details
+- **NEAT Output Removal Now Index-Based**: When a muscle is removed, the correct output neuron is removed
+  - Bug: Previously removed highest-numbered output ID (wrong muscle→output mapping)
+  - Example: Muscles [M0, M1, M2] with outputs [O7, O8, O9], removing M1 should remove O8, not O9
+  - Fix: `_mutate_body_only_with_tracking()` tracks which muscle indices are removed during mutation
+  - `adapt_neat_topology()` now accepts `removed_indices` parameter for precise output removal
+  - Crossover still uses count-based removal (no index tracking needed for new offspring)
+  - See `docs/plans/neat-output-tracking.md` for implementation details
+- **NEAT Topology Adaptation Edge Cases**: Fixed negative indices and invalid index handling
+  - Bug: Negative indices (e.g., `-1`) were treated as valid Python indices, removing wrong outputs
+  - Bug: When all provided indices were invalid, count-based fallback was skipped entirely
+  - Fix: Added bounds checking `0 <= idx < len(outputs)` for removed_indices
+  - Fix: Count-based removal now runs whenever `target < current`, even after index-based removal
 
 ### Changed
 - **Speciation is now a Selection Method**: Replaced `useSpeciation` toggle with `selectionMethod: 'speciation'`

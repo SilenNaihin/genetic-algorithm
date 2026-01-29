@@ -222,6 +222,7 @@ def create_minimal_neat_genome(
 def adapt_neat_topology(
     genome: NEATGenome,
     target_output_count: int,
+    removed_indices: list[int] | None = None,
     output_bias: float = -0.5,
     innovation_counter: InnovationCounter | None = None,
 ) -> NEATGenome:
@@ -229,7 +230,8 @@ def adapt_neat_topology(
     Adapt NEAT genome when muscle count changes.
 
     - If muscles added: adds new output neurons with sparse initial connections
-    - If muscles removed: removes excess output neurons and their connections
+    - If muscles removed: removes outputs at specific indices (from mutation)
+      or removes highest-numbered outputs (fallback for crossover)
 
     This ensures the NEAT genome always matches the creature's actual muscle count,
     preventing wasted evolution effort on non-existent outputs.
@@ -237,6 +239,9 @@ def adapt_neat_topology(
     Args:
         genome: NEAT genome to adapt
         target_output_count: Desired number of output neurons (= muscle count)
+        removed_indices: Specific muscle indices that were removed (for correct output removal).
+            If provided, removes outputs at these indices. If None, falls back to
+            count-based removal (highest IDs removed).
         output_bias: Initial bias for new output neurons
         innovation_counter: Optional counter for new connection innovations
 
@@ -248,11 +253,37 @@ def adapt_neat_topology(
     current_outputs = [n for n in genome.neurons if n.type == 'output']
     current_count = len(current_outputs)
 
-    if current_count == target_output_count:
+    if current_count == target_output_count and not removed_indices:
         return genome  # No change needed
 
     # Deep copy to avoid modifying original
     adapted = deepcopy(genome)
+
+    # Handle specific index removal (from mutation)
+    if removed_indices:
+        # Sort outputs by ID to establish index mapping
+        outputs_sorted = sorted(
+            [n for n in adapted.neurons if n.type == 'output'],
+            key=lambda n: n.id
+        )
+
+        # Find output IDs to remove (by index)
+        # Only valid indices: 0 <= idx < len(outputs_sorted)
+        outputs_to_remove = set()
+        for idx in removed_indices:
+            if 0 <= idx < len(outputs_sorted):
+                outputs_to_remove.add(outputs_sorted[idx].id)
+
+        # Remove neurons and their connections
+        adapted.neurons = [n for n in adapted.neurons if n.id not in outputs_to_remove]
+        adapted.connections = [
+            c for c in adapted.connections
+            if c.from_node not in outputs_to_remove and c.to_node not in outputs_to_remove
+        ]
+
+        # Update current count after removal
+        current_outputs = [n for n in adapted.neurons if n.type == 'output']
+        current_count = len(current_outputs)
 
     if target_output_count > current_count:
         # Need to add output neurons
@@ -317,10 +348,16 @@ def adapt_neat_topology(
                     innovation=inn_id,
                 ))
 
-    else:
-        # Need to remove output neurons
+    elif target_output_count < current_count:
+        # Still have too many outputs - do count-based removal
+        # This handles:
+        # 1. No removed_indices provided (crossover adaptation)
+        # 2. removed_indices provided but all invalid (e.g., [999999])
+        # 3. removed_indices didn't remove enough (mismatch scenario)
+        #
         # Sort outputs by ID to remove the highest-numbered ones
         # (preserves the original outputs that were evolved)
+        current_outputs = [n for n in adapted.neurons if n.type == 'output']
         output_ids_sorted = sorted(n.id for n in current_outputs)
         outputs_to_remove = set(output_ids_sorted[target_output_count:])
 
