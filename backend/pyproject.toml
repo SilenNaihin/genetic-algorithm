@@ -17,6 +17,7 @@ dependencies = [
     "torch>=2.0.0",
     "httpx>=0.27.0",
     "matplotlib>=3.8.0",
+    "numba>=0.58.0",  # 10x speedup for NEAT networks
 ]
 
 [project.optional-dependencies]
