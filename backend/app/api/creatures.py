@@ -3,7 +3,7 @@ import zlib
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,7 +14,21 @@ from app.schemas.creature import CreatureRead, CreatureWithFrames, FrameData
 router = APIRouter()
 
 
-def build_creature_read(creature: Creature, performance: CreaturePerformance) -> CreatureRead:
+async def compute_avg_fitness(db: AsyncSession, creature_id: str) -> float | None:
+    """Compute average fitness across all performances for a creature."""
+    result = await db.execute(
+        select(func.avg(CreaturePerformance.fitness))
+        .where(CreaturePerformance.creature_id == creature_id)
+    )
+    avg = result.scalar_one_or_none()
+    return round(avg, 1) if avg is not None else None
+
+
+def build_creature_read(
+    creature: Creature,
+    performance: CreaturePerformance,
+    avg_fitness: float | None = None,
+) -> CreatureRead:
     """Build CreatureRead from Creature identity and CreaturePerformance data."""
     return CreatureRead(
         id=creature.id,
@@ -31,6 +45,7 @@ def build_creature_read(creature: Creature, performance: CreaturePerformance) ->
         has_frames=performance.frames is not None,
         birth_generation=creature.birth_generation,
         death_generation=creature.death_generation,
+        avg_fitness=avg_fitness,
     )
 
 
@@ -77,7 +92,12 @@ async def get_creature(
     if not performance:
         raise HTTPException(status_code=404, detail="No performance data found for creature")
 
-    return build_creature_read(creature, performance)
+    # Compute avg_fitness for creatures that survived multiple generations
+    avg_fitness = None
+    if creature.survival_streak > 1:
+        avg_fitness = await compute_avg_fitness(db, creature_id)
+
+    return build_creature_read(creature, performance, avg_fitness)
 
 
 @router.get("/{creature_id}/with-frames", response_model=CreatureWithFrames)
@@ -280,7 +300,12 @@ async def get_best_creature(
     if not creature:
         raise HTTPException(status_code=404, detail="Creature not found")
 
-    return build_creature_read(creature, performance)
+    # Compute avg_fitness for creatures that survived multiple generations
+    avg_fitness = None
+    if creature.survival_streak > 1:
+        avg_fitness = await compute_avg_fitness(db, creature.id)
+
+    return build_creature_read(creature, performance, avg_fitness)
 
 
 @router.get("/run/{run_id}/longest-survivor")
@@ -312,7 +337,12 @@ async def get_longest_survivor(
     if not performance:
         raise HTTPException(status_code=404, detail="No performance data found")
 
-    return build_creature_read(creature, performance)
+    # Compute avg_fitness for creatures that survived multiple generations
+    avg_fitness = None
+    if creature.survival_streak > 1:
+        avg_fitness = await compute_avg_fitness(db, creature.id)
+
+    return build_creature_read(creature, performance, avg_fitness)
 
 
 @router.get("/{creature_id}/ancestors")

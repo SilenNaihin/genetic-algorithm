@@ -37,6 +37,8 @@ class CreatureRead(BaseModel):
     # Lifecycle fields
     birth_generation: int | None = None
     death_generation: int | None = None
+    # Aggregate fitness (only set for creatures with survival_streak > 1)
+    avg_fitness: float | None = None
 
     class Config:
         from_attributes = True

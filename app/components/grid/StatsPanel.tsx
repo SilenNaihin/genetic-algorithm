@@ -301,7 +301,13 @@ export function StatsPanel() {
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
             Longest Survivor{' '}
             <span style={{ color: 'var(--text-secondary)' }}>
-              ({longestSurvivingGenerations} gens, died Gen {longestSurvivingDiedAt})
+              {(() => {
+                const isStillAlive = simulationResults.some(r => r.genome.id === longestSurvivingCreature.genome.id);
+                const genText = `${longestSurvivingGenerations} gen${longestSurvivingGenerations !== 1 ? 's' : ''}`;
+                return isStillAlive
+                  ? `(${genText})`
+                  : `(${genText}, died Gen ${longestSurvivingDiedAt})`;
+              })()}
             </span>
           </div>
           <div

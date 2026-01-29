@@ -46,6 +46,7 @@ function apiCreatureToResult(creature: Api.ApiEvolutionCreature): CreatureSimula
     // Lifecycle tracking
     birthGeneration: creature.birth_generation ?? undefined,
     deathGeneration: creature.death_generation ?? undefined,
+    avgFitness: creature.avg_fitness ?? undefined,
   };
 }
 

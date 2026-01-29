@@ -78,6 +78,7 @@ export interface ApiEvolutionCreature {
   survival_streak: number;
   birth_generation: number | null;
   death_generation: number | null;
+  avg_fitness: number | null;  // Average fitness across all generations survived
 }
 
 /** Evolution step response */

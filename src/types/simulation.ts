@@ -288,6 +288,7 @@ export interface CreatureSimulationResult {
   // Lifecycle tracking (from API)
   birthGeneration?: number;  // Generation this creature was created
   deathGeneration?: number;  // Generation this creature died (null = still alive)
+  avgFitness?: number;       // Average fitness across all generations survived (only if survivalStreak > 1)
 }
 
 export interface PelletData {

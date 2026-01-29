@@ -812,6 +812,12 @@ export function ReplayModal() {
                       <span style={{ color: 'var(--text-muted)' }}>Fitness</span>
                       <span style={{ color: loadedResult.disqualified ? '#ef4444' : 'var(--success)' }}>{loadedResult.finalFitness.toFixed(1)}</span>
                     </div>
+                    {loadedResult.avgFitness !== undefined && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Avg Fitness</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{loadedResult.avgFitness.toFixed(1)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Born</span>
                       <span style={{ color: 'var(--text-primary)' }}>Gen {loadedResult.birthGeneration ?? genome.generation}</span>
