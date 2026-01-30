@@ -157,6 +157,7 @@ class PyTorchSimulator:
                     neural_genomes=neural_genomes,
                     num_muscles=num_muscles,
                     config=nn_config,
+                    max_muscles=MAX_MUSCLES,  # Use physics system constant for tensor compatibility
                     device=self.device,
                 )
 

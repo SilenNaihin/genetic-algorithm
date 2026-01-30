@@ -184,12 +184,14 @@ def diversity_objective(trial_results):
 
 Run benchmarks with: `python cli.py benchmark -c <config> -p <pop> -g <gens> -d <device>`
 
-| Machine | Cores | Mode | Pop | CPU | GPU | vs Azure |
-|---------|-------|------|-----|-----|-----|----------|
+| Machine | Cores | Mode | Pop | CPU | GPU | vs Azure 8vCPU |
+|---------|-------|------|-----|-----|-----|----------------|
 | **Apple M3 Max** | 16 | NEAT | 200 | 132/s | - | 4.3x |
 | | | NEAT | 300 | 135/s | - | 3.9x |
 | | | NEAT | 500 | 162/s | - | 4.6x |
 | | | Pure | 300 | 327/s | - | 3.3x |
+| **Azure D128as_v7 (Zen 4)** | 128 | NEAT | 500 | 116/s | - | 3.3x |
+| | | Pure | 500 | 366/s | - | 3.7x |
 | **Azure VM (AMD EPYC 7V12)** | 8 | NEAT | 200 | 31/s | 20/s (T4) | - |
 | | | NEAT | 300 | 35/s | - | - |
 | | | NEAT | 500 | 35/s | 23/s (T4) | - |
