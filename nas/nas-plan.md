@@ -182,24 +182,38 @@ def diversity_objective(trial_results):
 
 ### Hardware Benchmarks
 
-Run benchmarks with: `python cli.py benchmark -c <config> -p <pop> -g 10 -d <device>`
+Run benchmarks with: `python cli.py benchmark -c <config> -p <pop> -g <gens> -d <device>`
 
-| Machine | Cores | Mode | Pop | CPU | GPU |
-|---------|-------|------|-----|-----|-----|
-| **Apple M3 Max** | 16 | NEAT | 200 | 87/s | MPS N/A |
-| | | NEAT | 500 | 108/s | MPS N/A |
-| | | Pure | 200 | 216/s | MPS N/A |
-| | | Pure | 500 | 309/s | MPS N/A |
-| **Azure VM (AMD EPYC 7V12)** | 8 | NEAT | 200 | 31/s | 20/s (T4) |
-| | | NEAT | 500 | 35/s | 23/s (T4) |
-| | | Pure | 200 | 82/s | 54/s (T4) |
-| | | Pure | 500 | 83/s | 106/s (T4) |
+| Machine | Cores | Mode | Pop | CPU | GPU | vs Azure |
+|---------|-------|------|-----|-----|-----|----------|
+| **Apple M3 Max** | 16 | NEAT | 200 | 132/s | - | 4.3x |
+| | | NEAT | 300 | 135/s | - | 3.9x |
+| | | NEAT | 500 | 162/s | - | 4.6x |
+| | | Pure | 300 | 327/s | - | 3.3x |
+| **Azure VM (AMD EPYC 7V12)** | 8 | NEAT | 200 | 31/s | 20/s (T4) | - |
+| | | NEAT | 300 | 35/s | - | - |
+| | | NEAT | 500 | 35/s | 23/s (T4) | - |
+| | | Pure | 300 | 100/s | - | - |
+
+### Batched vs Sequential (3 seeds, NEAT 300)
+
+| Machine | Batched | Sequential | Speedup |
+|---------|---------|------------|---------|
+| M3 Max | 30.7s | 33.4s | 1.09x |
+| Azure VM | - | - | 1.38x |
+
+### Numba Parallel Threshold
+
+| Machine | Recommended | Notes |
+|---------|-------------|-------|
+| M3 Max | 150-300 | Parallel wins >1.4x at 300+ |
+| Azure VM | 300 | Default setting |
 
 **Notes:**
-- M3 Max is ~2.6-3.7x faster than Azure reference on CPU
-- MPS (Apple GPU) hangs - needs PyTorch MPS optimization
+- M3 Max is **3.3-4.6x faster** than Azure VM on CPU
+- Batched speedup smaller on M3 Max (fast single-core reduces benefit)
+- MPS (Apple GPU) not compatible - needs PyTorch optimization
 - Pure mode scales better with population (batched tensor ops)
-- NEAT mode has per-creature overhead but still scales well
 
 ### Estimated Times (per trial)
 | Config | Generations | Creatures | Time/Trial |
