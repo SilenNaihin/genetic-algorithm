@@ -34,6 +34,7 @@ def run(
     device: Optional[str] = typer.Option(None, "--device", "-d", help="PyTorch device (cuda:0, cuda:1, cpu)"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     batched: bool = typer.Option(True, "--batched/--no-batched", "-b", help="Batch all seeds together (1.4-1.6x faster)"),
+    sparse_store: bool = typer.Option(False, "--sparse-store", help="Store frames for top 10 + bottom 10 creatures (for replays)"),
 ):
     """
     Run evolution experiment with specified config.
@@ -57,6 +58,12 @@ def run(
     # Apply overrides
     if population_size:
         cfg['population_size'] = population_size
+
+    # Enable sparse frame storage for replays
+    if sparse_store:
+        cfg['frame_storage_mode'] = 'sparse'
+        cfg['sparse_top_count'] = 10
+        cfg['sparse_bottom_count'] = 10
 
     # Parse device
     torch_device = None
@@ -173,6 +180,7 @@ def configs():
         'neat_conservative': 'NEAT with tight speciation',
         'neat_high_mutation': 'NEAT with high mutation rates',
         'neat_low_mutation': 'NEAT with low mutation rates',
+        'neat_proprio': 'NEAT with proprioception (body sensing)',
         'pure_baseline': 'Fixed topology, 8 hidden neurons',
         'pure_large': 'Fixed topology, 16 hidden neurons',
         'pure_small': 'Fixed topology, 4 hidden neurons',
@@ -407,19 +415,23 @@ def search(
     n_trials: int = typer.Option(50, "--trials", "-n", help="Number of trials to run"),
     generations: int = typer.Option(30, "--generations", "-g", help="Generations per trial"),
     seeds: int = typer.Option(2, "--seeds", "-s", help="Seeds per trial (more = more reliable)"),
+    population_size: int = typer.Option(300, "--population-size", "-p", help="Fixed population size (not optimized)"),
     device: Optional[str] = typer.Option(None, "--device", "-d", help="PyTorch device"),
-    storage: Optional[str] = typer.Option(None, "--storage", help="Optuna storage URL (e.g., sqlite:///nas.db)"),
+    storage: Optional[str] = typer.Option(None, "--storage", help="Optuna storage URL for fANOVA importance (optional)"),
     multi_objective: bool = typer.Option(False, "--multi-objective", "-mo", help="Use NSGA-II for Pareto optimization"),
+    stagnation_limit: int = typer.Option(50, "--stagnation-limit", help="Stop trial early if no improvement for N generations (0 to disable)"),
 ):
     """
     Run Optuna hyperparameter search.
+
+    Results saved to JSON in results/search_<study>_<timestamp>/.
 
     Examples:
         # Quick screening (50 trials, 30 gens, 2 seeds)
         nas search exp-001 --mode neat --trials 50 --generations 30 --seeds 2
 
-        # Deep search with persistence
-        nas search exp-002 -m neat -n 200 -g 50 -s 3 --storage sqlite:///nas.db
+        # Full search (recommended)
+        nas search neat-full -m neat -n 50 -g 50 -s 3 -p 200
 
         # Multi-objective Pareto search
         nas search exp-003 -m neat -n 100 --multi-objective
@@ -437,14 +449,17 @@ def search(
     console.print(f"  Mode: {mode}")
     console.print(f"  Trials: {n_trials}")
     console.print(f"  Generations: {generations}")
+    console.print(f"  Population: {population_size}")
     console.print(f"  Seeds: {seed_list}")
     console.print(f"  Device: {torch_device}")
     console.print(f"  Multi-objective: {multi_objective}")
+    if stagnation_limit > 0:
+        console.print(f"  Early stop: {stagnation_limit} gens without improvement")
     if storage:
         console.print(f"  Storage: {storage}")
     console.print()
 
-    study = run_search(
+    study, results_dir = run_search(
         study_name=study_name,
         mode=mode,
         n_trials=n_trials,
@@ -453,25 +468,35 @@ def search(
         device=torch_device,
         storage=storage,
         multi_objective=multi_objective,
+        population_size=population_size,
+        stagnation_limit=stagnation_limit,
     )
 
     # Print summary
     print_study_summary(study)
+    console.print(f"\n[bold green]Search complete![/bold green]")
+    console.print(f"Results saved to: {results_dir}")
+
+    # Print analysis command
+    console.print(f"\n[bold cyan]To generate analysis notebook, run:[/bold cyan]")
+    console.print(f'claude "Create nas_postmortem.ipynb following nas/post-mortem-nas.md. '
+                  f'Results in {results_dir}. Be thorough."')
 
 
 @app.command()
 def importance(
     study_name: str = typer.Argument(..., help="Study name to analyze"),
-    storage: str = typer.Option("sqlite:///nas.db", "--storage", help="Optuna storage URL"),
+    storage: str = typer.Option(..., "--storage", help="Optuna storage URL (required)"),
     top_n: int = typer.Option(15, "--top", "-n", help="Number of top parameters to show"),
 ):
     """
     Show parameter importance from a completed search.
 
     Uses fANOVA to analyze which parameters most affect fitness.
+    Requires --storage flag to have been used during search.
 
     Example:
-        nas importance exp-001 --storage sqlite:///nas.db
+        nas importance exp-001 --storage postgresql://user:pass@host/db
     """
     import optuna
     from search import get_param_importance

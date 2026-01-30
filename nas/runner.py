@@ -10,8 +10,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-# Add backend to path
-sys.path.insert(0, '/home/azureuser/projects/genetic-algorithm/backend')
+# Add backend to path (relative to this file)
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / 'backend'))
 
 import torch
 
@@ -56,6 +56,7 @@ def run_evolution(
     device: torch.device | None = None,
     callback: Callable[[GenerationStats], None] | None = None,
     verbose: bool = True,
+    stagnation_limit: int = 0,
 ) -> RunResult:
     """
     Run a complete evolution loop in memory.
@@ -67,6 +68,7 @@ def run_evolution(
         device: PyTorch device (auto-detect if None)
         callback: Called after each generation with stats
         verbose: Print progress to console
+        stagnation_limit: Stop early if no improvement for N generations (0 = disabled)
 
     Returns:
         RunResult with all generation stats and best genome
@@ -173,12 +175,21 @@ def run_evolution(
         'use_proprioception': sim_config.use_proprioception,
         'proprioception_inputs': sim_config.proprioception_inputs,
         'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+        'max_muscles': sim_config.max_muscles,
     }
 
     # Run evolution
     gen_stats: list[GenerationStats] = []
     best_genome = None
     best_fitness = float('-inf')
+
+    # Early stopping: track thresholds for both best and avg fitness
+    # Improvement must exceed 5% to reset stagnation counter
+    best_threshold = float('-inf')
+    avg_threshold = float('-inf')
+    gens_since_improvement = 0
+    improvement_margin = 1.05  # 5% improvement required
+
     total_start = time.time()
 
     for gen in range(generations):
@@ -190,22 +201,37 @@ def run_evolution(
         # Extract fitness scores
         fitness_scores = [r.fitness for r in results]
         sorted_fitness = sorted(fitness_scores, reverse=True)
+        current_avg = sum(fitness_scores) / len(fitness_scores)
 
         # Stats
         stats = GenerationStats(
             generation=gen,
             best_fitness=sorted_fitness[0],
-            avg_fitness=sum(fitness_scores) / len(fitness_scores),
+            avg_fitness=current_avg,
             median_fitness=sorted_fitness[len(sorted_fitness) // 2],
             worst_fitness=sorted_fitness[-1],
             simulation_time_ms=sim_time_ms,
         )
 
-        # Track best
+        # Track overall best genome
         if sorted_fitness[0] > best_fitness:
             best_fitness = sorted_fitness[0]
             best_idx = fitness_scores.index(sorted_fitness[0])
             best_genome = genomes[best_idx].copy()
+
+        # Early stopping: check if EITHER best or avg improved by >5%
+        improved = False
+        if sorted_fitness[0] > best_threshold * improvement_margin:
+            best_threshold = sorted_fitness[0]
+            improved = True
+        if current_avg > avg_threshold * improvement_margin:
+            avg_threshold = current_avg
+            improved = True
+
+        if improved:
+            gens_since_improvement = 0
+        else:
+            gens_since_improvement += 1
 
         # Evolve (if not last generation)
         if gen < generations - 1:
@@ -229,8 +255,15 @@ def run_evolution(
         if verbose:
             print(f"  gen {gen+1:3d}/{generations} | best: {stats.best_fitness:6.1f} | avg: {stats.avg_fitness:6.1f} | {stats.simulation_time_ms}ms")
 
+        # Early stopping check
+        if stagnation_limit > 0 and gens_since_improvement >= stagnation_limit:
+            if verbose:
+                print(f"  Early stopping: no improvement for {stagnation_limit} generations")
+            break
+
     total_time = time.time() - total_start
-    total_creatures = generations * sim_config.population_size
+    actual_generations = len(gen_stats)
+    total_creatures = actual_generations * sim_config.population_size
 
     return RunResult(
         config=config,
@@ -418,6 +451,7 @@ def run_multi_seed_batched(
         'use_proprioception': sim_config.use_proprioception,
         'proprioception_inputs': sim_config.proprioception_inputs,
         'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+        'max_muscles': sim_config.max_muscles,
     }
 
     # Initialize populations for each seed
@@ -640,6 +674,7 @@ def run_multi_seed_pipelined(
         'use_proprioception': sim_config.use_proprioception,
         'proprioception_inputs': sim_config.proprioception_inputs,
         'neat_max_hidden_nodes': sim_config.neat_max_hidden_nodes,
+        'max_muscles': sim_config.max_muscles,
     }
 
     # Initialize populations for each seed

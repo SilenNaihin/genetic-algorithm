@@ -1099,6 +1099,15 @@ class NEATBatchedNetwork:
             id_to_idx = {nid: idx for idx, nid in enumerate(all_ids)}
             nn = len(all_ids)
 
+            # Sanity check: nn should never exceed max_neurons
+            if nn > max_neurons:
+                raise ValueError(
+                    f"Genome {g_idx} has {nn} neurons but max_neurons={max_neurons}. "
+                    f"This indicates a bug in max_neurons computation. "
+                    f"input_ids={len(cache['input_ids'])}, output_ids={len(cache['output_ids'])}, "
+                    f"hidden_ids={len(cache['hidden_ids'])}, bias_ids={len(cache['bias_ids'])}"
+                )
+
             self._nb_n_neurons[g_idx] = nn
             self._nb_n_eval[g_idx] = len(cache['eval_order'])
             self._nb_n_inputs[g_idx] = len(cache['input_ids'])
@@ -1131,7 +1140,17 @@ class NEATBatchedNetwork:
 
             # Evaluation order
             for i, nid in enumerate(cache['eval_order']):
-                self._nb_eval_order[g_idx, i] = id_to_idx[nid]
+                idx = id_to_idx.get(nid)
+                if idx is None:
+                    raise ValueError(
+                        f"Genome {g_idx}: eval_order contains neuron {nid} not in id_to_idx. "
+                        f"all_ids={all_ids}, eval_order={cache['eval_order']}"
+                    )
+                if idx >= max_neurons:
+                    raise ValueError(
+                        f"Genome {g_idx}: neuron {nid} has index {idx} >= max_neurons {max_neurons}"
+                    )
+                self._nb_eval_order[g_idx, i] = idx
 
             # Input/output/bias indices
             for i, nid in enumerate(cache['input_ids']):

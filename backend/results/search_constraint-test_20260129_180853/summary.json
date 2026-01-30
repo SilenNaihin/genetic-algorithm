@@ -1,0 +1,40 @@
+{
+  "study_name": "constraint-test",
+  "mode": "neat",
+  "n_trials": 5,
+  "generations": 3,
+  "seeds": [
+    42
+  ],
+  "completed_trials": 5,
+  "best_trial": 1,
+  "best_value": 35.51552963256836,
+  "best_params": {
+    "neat_initial_connectivity": "full",
+    "neat_add_connection_rate": 0.29208387155678067,
+    "neat_add_node_rate": 0.045391088104985856,
+    "neat_enable_rate": 0.04951769101112702,
+    "neat_disable_rate": 0.0034388521115218396,
+    "neat_max_hidden_nodes": 45,
+    "weight_mutation_rate": 0.5423289898800093,
+    "weight_mutation_magnitude": 0.5637655990477874,
+    "compatibility_threshold": 2.246844304357644,
+    "neat_excess_coefficient": 1.2801020317667162,
+    "neat_disjoint_coefficient": 1.3200654190149195,
+    "neat_weight_coefficient": 0.26636900997297436,
+    "min_species_size": 5,
+    "mutation_rate": 0.48756641168055725,
+    "mutation_magnitude": 0.4757995766256757,
+    "cull_percentage": 0.7474136752138244,
+    "crossover_rate": 0.5587399872866512,
+    "use_proprioception": true,
+    "proprioception_inputs": "ground",
+    "min_nodes": 3,
+    "max_nodes": 11,
+    "max_muscles": 12,
+    "bias_mode": "bias_node",
+    "neural_dead_zone": 0.02818484499495253,
+    "neural_output_bias": -0.09890150962298017,
+    "use_adaptive_mutation": false
+  }
+}

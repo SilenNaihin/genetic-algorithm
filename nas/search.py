@@ -34,6 +34,11 @@ def suggest_neat_params(trial: optuna.Trial) -> dict[str, Any]:
     - Canonical NEAT paper values
     - Our empirical testing
     - Domain knowledge about creature evolution
+
+    NEAT-REQUIRED CONSTRAINTS (enforced in objective, not searched):
+    - selection_method = 'speciation'  (protects structural innovations)
+    - use_fitness_sharing = False      (redundant with speciation)
+    - use_crossover = True             (enables meaningful topology crossover)
     """
     params = {}
 
@@ -100,27 +105,19 @@ def suggest_neat_params(trial: optuna.Trial) -> dict[str, Any]:
     )
 
     # =========================================================================
-    # SELECTION & POPULATION
+    # SELECTION (population_size excluded - more is always better)
     # =========================================================================
-    params['population_size'] = trial.suggest_int(
-        'population_size', 100, 500, step=50
-    )
     params['cull_percentage'] = trial.suggest_float(
         'cull_percentage', 0.3, 0.8
     )
 
     # =========================================================================
-    # CROSSOVER
+    # CROSSOVER (Required for NEAT - enables meaningful topology crossover)
     # =========================================================================
-    params['use_crossover'] = trial.suggest_categorical(
-        'use_crossover', [True, False]
+    params['use_crossover'] = True  # Fixed for NEAT (crossover is fundamental)
+    params['crossover_rate'] = trial.suggest_float(
+        'crossover_rate', 0.2, 0.8
     )
-    if params['use_crossover']:
-        params['crossover_rate'] = trial.suggest_float(
-            'crossover_rate', 0.2, 0.8
-        )
-    else:
-        params['crossover_rate'] = 0.0
 
     # =========================================================================
     # PROPRIOCEPTION (Important for body awareness!)
@@ -130,7 +127,7 @@ def suggest_neat_params(trial: optuna.Trial) -> dict[str, Any]:
     )
     if params['use_proprioception']:
         params['proprioception_inputs'] = trial.suggest_categorical(
-            'proprioception_inputs', ['all', 'lengths', 'velocities']
+            'proprioception_inputs', ['all', 'strain', 'velocity', 'ground']
         )
 
     # =========================================================================
@@ -143,6 +140,9 @@ def suggest_neat_params(trial: optuna.Trial) -> dict[str, Any]:
     # =========================================================================
     # NEURAL NETWORK SETTINGS
     # =========================================================================
+    params['time_encoding'] = trial.suggest_categorical(
+        'time_encoding', ['none', 'cyclic', 'sin', 'raw', 'sin_raw']
+    )
     params['bias_mode'] = trial.suggest_categorical(
         'bias_mode', ['node', 'bias_node']
     )
@@ -198,10 +198,7 @@ def suggest_pure_params(trial: optuna.Trial) -> dict[str, Any]:
         'mutation_magnitude', 0.1, 0.5
     )
 
-    # Selection
-    params['population_size'] = trial.suggest_int(
-        'population_size', 100, 500, step=50
-    )
+    # Selection (population_size excluded - more is always better)
     params['cull_percentage'] = trial.suggest_float(
         'cull_percentage', 0.3, 0.8
     )
@@ -228,7 +225,7 @@ def suggest_pure_params(trial: optuna.Trial) -> dict[str, Any]:
     )
     if params['use_proprioception']:
         params['proprioception_inputs'] = trial.suggest_categorical(
-            'proprioception_inputs', ['all', 'lengths', 'velocities']
+            'proprioception_inputs', ['all', 'strain', 'velocity', 'ground']
         )
 
     # Body constraints
@@ -258,6 +255,8 @@ def create_objective(
     device: str,
     results_dir: Path,
     report_interval: int = 10,
+    population_size: int = 300,
+    stagnation_limit: int = 50,
 ):
     """
     Create an Optuna objective function for the given mode.
@@ -269,16 +268,21 @@ def create_objective(
         device: PyTorch device
         results_dir: Where to save trial results
         report_interval: How often to report intermediate values (for pruning)
+        population_size: Fixed population size (not optimized)
+        stagnation_limit: Stop early if no improvement for N generations
     """
 
     def objective(trial: optuna.Trial) -> float:
         # Build config from base + suggested params
         config = BASE_CONFIG.copy()
         config['neural_mode'] = mode
+        config['population_size'] = population_size  # Fixed, not optimized
 
         if mode == 'neat':
-            config['selection_method'] = 'speciation'  # Required for NEAT
-            config['use_fitness_sharing'] = False      # Auto-disabled
+            # NEAT-REQUIRED CONSTRAINTS (do not search these)
+            config['selection_method'] = 'speciation'  # Protects structural innovations
+            config['use_fitness_sharing'] = False      # Redundant with speciation
+            # Note: use_crossover=True is set in suggest_neat_params (required for NEAT)
             params = suggest_neat_params(trial)
         else:
             params = suggest_pure_params(trial)
@@ -297,6 +301,7 @@ def create_objective(
                     seed=seed,
                     device=device,
                     verbose=False,
+                    stagnation_limit=stagnation_limit,
                 )
 
                 all_best_fitness.append(result.best_fitness)
@@ -350,6 +355,8 @@ def create_multi_objective(
     seeds: list[int],
     device: str,
     results_dir: Path,
+    population_size: int = 300,
+    stagnation_limit: int = 50,
 ):
     """
     Create a multi-objective function for Pareto optimization.
@@ -362,10 +369,13 @@ def create_multi_objective(
     def objective(trial: optuna.Trial) -> tuple[float, float]:
         config = BASE_CONFIG.copy()
         config['neural_mode'] = mode
+        config['population_size'] = population_size  # Fixed, not optimized
 
         if mode == 'neat':
-            config['selection_method'] = 'speciation'
-            config['use_fitness_sharing'] = False
+            # NEAT-REQUIRED CONSTRAINTS (do not search these)
+            config['selection_method'] = 'speciation'  # Protects structural innovations
+            config['use_fitness_sharing'] = False      # Redundant with speciation
+            # Note: time_encoding is searched via suggest_neat_params
             params = suggest_neat_params(trial)
         else:
             params = suggest_pure_params(trial)
@@ -383,6 +393,7 @@ def create_multi_objective(
                     seed=seed,
                     device=device,
                     verbose=False,
+                    stagnation_limit=stagnation_limit,
                 )
                 all_best.append(result.best_fitness)
                 final_avg = result.generations[-1].avg_fitness if result.generations else 0.0
@@ -428,7 +439,7 @@ def create_study(
     Args:
         study_name: Unique name for this study
         mode: 'neat' or 'pure'
-        storage: Database URL (e.g., 'sqlite:///nas.db') or None for in-memory
+        storage: Database URL or None for in-memory (results saved to JSON)
         multi_objective: If True, use NSGA-II for Pareto optimization
         load_if_exists: If True, resume existing study
     """
@@ -472,7 +483,9 @@ def run_search(
     storage: str | None = None,
     multi_objective: bool = False,
     results_dir: str | None = None,
-) -> optuna.Study:
+    population_size: int = 300,  # Fixed population (not optimized - more is always better)
+    stagnation_limit: int = 50,  # Stop early if no improvement for N generations
+) -> tuple[optuna.Study, Path]:
     """
     Run hyperparameter search.
 
@@ -486,9 +499,11 @@ def run_search(
         storage: Database URL for persistence (None = in-memory)
         multi_objective: Use NSGA-II for Pareto optimization
         results_dir: Directory for trial results
+        population_size: Fixed population size (not optimized - more is always better)
+        stagnation_limit: Stop trial early if no improvement for N generations (0 = disabled)
 
     Returns:
-        Completed Optuna study
+        Tuple of (completed Optuna study, results directory path)
     """
 
     # Setup results directory
@@ -515,6 +530,8 @@ def run_search(
             seeds=seeds,
             device=device,
             results_dir=results_dir,
+            population_size=population_size,
+            stagnation_limit=stagnation_limit,
         )
     else:
         objective = create_objective(
@@ -523,6 +540,8 @@ def run_search(
             seeds=seeds,
             device=device,
             results_dir=results_dir,
+            population_size=population_size,
+            stagnation_limit=stagnation_limit,
         )
 
     # Run optimization
@@ -530,6 +549,7 @@ def run_search(
     print(f"  Mode: {mode}")
     print(f"  Trials: {n_trials}")
     print(f"  Generations: {generations}")
+    print(f"  Population: {population_size}")
     print(f"  Seeds: {seeds}")
     print(f"  Device: {device}")
     print(f"  Results: {results_dir}")
@@ -548,6 +568,8 @@ def run_search(
         'n_trials': n_trials,
         'generations': generations,
         'seeds': seeds,
+        'population_size': population_size,
+        'multi_objective': multi_objective,
         'completed_trials': len(study.trials),
     }
 
@@ -555,11 +577,22 @@ def run_search(
         summary['best_trial'] = study.best_trial.number
         summary['best_value'] = study.best_value
         summary['best_params'] = study.best_params
+    else:
+        # Save Pareto front for multi-objective
+        pareto_trials = study.best_trials
+        summary['pareto_front'] = [
+            {
+                'trial': t.number,
+                'values': list(t.values),  # [best_fitness, avg_fitness]
+                'params': t.params,
+            }
+            for t in pareto_trials
+        ]
 
     with open(results_dir / 'summary.json', 'w') as f:
         json.dump(summary, f, indent=2)
 
-    return study
+    return study, results_dir
 
 
 # =============================================================================
@@ -622,3 +655,94 @@ def print_study_summary(study: optuna.Study, top_n: int = 10):
             print(f"  Trial {trial.number}: best={trial.values[0]:.1f}, avg={trial.values[1]:.1f}")
 
     print("\n" + "=" * 60)
+
+
+def run_champion_sparse(
+    study: optuna.Study,
+    mode: Literal['neat', 'pure'],
+    results_dir: Path,
+    device: str = 'cpu',
+    generations: int = 100,
+    population_size: int = 300,
+    seeds: list[int] | None = None,
+):
+    """
+    Run sparse-frame evolution with the best params from a completed search.
+
+    This creates replays for top 10 + bottom 10 creatures.
+    """
+    if seeds is None:
+        seeds = [42]
+
+    print("\n" + "=" * 60)
+    print("RUNNING CHAMPION SPARSE RUNS")
+    print("=" * 60)
+
+    # Get best params
+    if hasattr(study, 'best_params'):
+        # Single objective - one champion
+        champions = [('best_fitness', study.best_params, study.best_value)]
+    else:
+        # Multi-objective - Pareto front
+        pareto = study.best_trials
+        champions = []
+        # Best for each objective
+        if pareto:
+            best_obj1 = max(pareto, key=lambda t: t.values[0])
+            best_obj2 = max(pareto, key=lambda t: t.values[1])
+            champions.append(('best_fitness', best_obj1.params, best_obj1.values[0]))
+            if best_obj2 != best_obj1:
+                champions.append(('best_avg_fitness', best_obj2.params, best_obj2.values[1]))
+
+    champion_results = []
+
+    for name, params, score in champions:
+        print(f"\n[{name}] Score: {score:.1f}")
+        print(f"  Running {generations} generations with sparse frames...")
+
+        # Build config
+        config = BASE_CONFIG.copy()
+        config['neural_mode'] = mode
+        config['population_size'] = population_size
+        config['frame_storage_mode'] = 'sparse'
+        config['sparse_top_count'] = 10
+        config['sparse_bottom_count'] = 10
+
+        if mode == 'neat':
+            # NEAT-REQUIRED CONSTRAINTS (do not search these)
+            config['selection_method'] = 'speciation'  # Protects structural innovations
+            config['use_fitness_sharing'] = False      # Redundant with speciation
+
+        config.update(params)
+
+        # Run for each seed
+        for seed in seeds:
+            result = run_evolution(
+                config=config,
+                generations=generations,
+                seed=seed,
+                device=device,
+                verbose=False,
+            )
+
+            print(f"  Seed {seed}: best={result.best_fitness:.1f}")
+
+            # Save result
+            champion_result = {
+                'champion_type': name,
+                'search_score': score,
+                'seed': seed,
+                'best_fitness': result.best_fitness,
+                'params': params,
+                'generations': generations,
+                'population_size': population_size,
+            }
+            champion_results.append(champion_result)
+
+    # Save champion summary
+    with open(results_dir / 'champions.json', 'w') as f:
+        json.dump(champion_results, f, indent=2)
+
+    print(f"\nChampion results saved to: {results_dir / 'champions.json'}")
+
+    return champion_results

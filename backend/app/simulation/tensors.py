@@ -15,7 +15,7 @@ import torch
 
 # Maximum sizes for padding (matches TypeScript GenomeConstraints)
 MAX_NODES = 8
-MAX_MUSCLES = 15
+MAX_MUSCLES = 20  # Supports search space max_muscles 8-20
 
 
 @dataclass

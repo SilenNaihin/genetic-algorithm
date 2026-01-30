@@ -19,7 +19,7 @@ from app.schemas.simulation import (
     PelletResult,
 )
 from app.simulation.config import SimulationConfig as EngineConfig
-from app.simulation.tensors import creature_genomes_to_batch, get_center_of_mass
+from app.simulation.tensors import creature_genomes_to_batch, get_center_of_mass, MAX_MUSCLES
 from app.simulation.physics import (
     simulate_with_pellets,
     simulate_with_neural,
@@ -136,7 +136,7 @@ class PyTorchSimulator:
                 network = NEATBatchedNetwork.from_genome_dicts(
                     neat_genomes=neat_genomes,
                     num_muscles=num_muscles,
-                    max_muscles=15,
+                    max_muscles=MAX_MUSCLES,  # Use physics system constant for tensor compatibility
                     max_hidden=config.neat_max_hidden_nodes,
                     device=self.device,
                 )
