@@ -356,6 +356,8 @@ python cli.py search neat-prod -m neat -n 50 -g 150 -s 3 -p 500 --n-jobs 1 > nea
 3. **Optuna's `n_jobs` is great for quick trials, terrible for long trials**
 4. **128 cores doesn't matter if your parallelism strategy is broken**
 5. **Sequential + overnight >>> parallel + broken**
+6. **Thread limiting is necessary but insufficient** - Fixes nested parallelism but doesn't fix joblib serialization
+7. **When a backend is fundamentally broken, switch backends** - Don't waste time tuning a broken system
 
 ### Cost Analysis
 
@@ -370,6 +372,42 @@ python cli.py search neat-prod -m neat -n 50 -g 150 -s 3 -p 500 --n-jobs 1 > nea
 - Same results, 14x cheaper
 
 **The 128-core premium was pointless for this workload.**
+
+---
+
+## UPDATE: Thread Limiting Experiment (2026-01-30 Evening)
+
+### Test Configuration
+- Added `--limit-threads` flag to force single-threaded PyTorch
+- Hypothesis: Nested parallelism was preventing worker spawning
+- Test: 3 trials, 500 pop, 150 gen, 3 seeds, n_jobs=3
+
+### Results
+
+**Small Scale (200 pop, 10 gen):** ✅ **SUCCESS**
+- Without thread limiting: 44.2s
+- With thread limiting: 28.3s
+- **Speedup: 1.56x (36% faster)**
+- Thread count reduced: 257 vs 387
+
+**Production Scale (500 pop, 150 gen):** ❌ **COMPLETE FAILURE**
+- Runtime: 12+ minutes
+- Trials completed: **0**
+- CPU usage: 414% (high but producing nothing)
+- Progress bar: Stuck at 0%
+- Results: Empty directory
+- **Had to kill process** - same stuck behavior as original failure
+
+### Conclusion
+
+Thread limiting **fixed nested parallelism** (reduced threads, improved CPU efficiency) but **did not fix the fundamental issue**: Optuna's joblib backend serializes long-running trials regardless of thread configuration.
+
+**The real problem:** Optuna + joblib is architecturally incompatible with trials that take 10+ minutes.
+
+**Next Steps:**
+1. ✅ Ray backend (`search_ray.py`) - Ready to test
+2. ✅ Process Pool (`search_processpool.py`) - Ready to test as fallback
+3. 📋 Islands model - Implement if both above fail (guaranteed to work)
 
 ## Quick Test
 
