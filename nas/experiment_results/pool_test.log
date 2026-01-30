@@ -1,0 +1,5 @@
+Usage: search_processpool.py [OPTIONS] STUDY_NAME
+Try 'search_processpool.py --help' for help.
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ Got unexpected extra argument (pool-test)                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
