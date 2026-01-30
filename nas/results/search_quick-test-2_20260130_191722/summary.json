@@ -1,0 +1,33 @@
+{
+  "study_name": "quick-test-2",
+  "mode": "pure",
+  "n_trials": 2,
+  "generations": 10,
+  "seeds": [
+    42
+  ],
+  "population_size": 200,
+  "multi_objective": false,
+  "completed_trials": 2,
+  "best_trial": 0,
+  "best_value": 97.18640899658203,
+  "best_params": {
+    "neural_hidden_size": 12,
+    "weight_mutation_rate": 0.15466808733137324,
+    "weight_mutation_magnitude": 0.39485727165142304,
+    "mutation_rate": 0.17753338601232474,
+    "mutation_magnitude": 0.4442950060166475,
+    "cull_percentage": 0.47270542098525514,
+    "selection_method": "tournament",
+    "tournament_size": 4,
+    "use_crossover": true,
+    "crossover_rate": 0.5317722979977306,
+    "use_proprioception": true,
+    "proprioception_inputs": "ground",
+    "min_nodes": 3,
+    "max_nodes": 10,
+    "max_muscles": 10,
+    "neural_dead_zone": 0.18636762674528295,
+    "neural_output_bias": -0.419234847534021
+  }
+}

@@ -1,0 +1,72 @@
+
+Starting Hyperparameter Search
+  Study: quick-test-2
+  Mode: pure
+  Trials: 2
+  Generations: 10
+  Population: 200
+  Seeds: [42]
+  Device: cpu
+  Multi-objective: False
+  Parallel workers: 2
+  Thread limiting: ENABLED (prevents nested parallelism)
+  Early stop: 50 gens without improvement
+
+[I 2026-01-30 19:17:22,332] A new study created in memory with name: quick-test-2
+Thread limiting enabled: PyTorch forced to single-threaded mode
+  This prevents nested parallelism (PyTorch × Optuna)
+
+
+Starting search: quick-test-2
+  Mode: pure
+  Trials: 2
+  Generations: 10
+  Population: 200
+  Seeds: [42]
+  Device: cpu
+  Parallel workers: 2
+  Results: results/search_quick-test-2_20260130_191722
+
+  0%|          | 0/2 [00:00<?, ?it/s]                                       0%|          | 0/2 [00:26<?, ?it/s]Best trial: 0. Best value: 97.1864:   0%|          | 0/2 [00:26<?, ?it/s]Best trial: 0. Best value: 97.1864:  50%|█████     | 1/2 [00:26<00:26, 26.69s/it]                                                                                 Best trial: 0. Best value: 97.1864:  50%|█████     | 1/2 [00:26<00:26, 26.69s/it]Best trial: 0. Best value: 97.1864:  50%|█████     | 1/2 [00:26<00:26, 26.69s/it]Best trial: 0. Best value: 97.1864: 100%|██████████| 2/2 [00:26<00:00, 11.12s/it]Best trial: 0. Best value: 97.1864: 100%|██████████| 2/2 [00:26<00:00, 13.46s/it]
+[I 2026-01-30 19:17:49,020] Trial 0 finished with value: 97.18640899658203 and parameters: {'neural_hidden_size': 12, 'weight_mutation_rate': 0.15466808733137324, 'weight_mutation_magnitude': 0.39485727165142304, 'mutation_rate': 0.17753338601232474, 'mutation_magnitude': 0.4442950060166475, 'cull_percentage': 0.47270542098525514, 'selection_method': 'tournament', 'tournament_size': 4, 'use_crossover': True, 'crossover_rate': 0.5317722979977306, 'use_proprioception': True, 'proprioception_inputs': 'ground', 'min_nodes': 3, 'max_nodes': 10, 'max_muscles': 10, 'neural_dead_zone': 0.18636762674528295, 'neural_output_bias': -0.419234847534021}. Best is trial 0 with value: 97.18640899658203.
+[I 2026-01-30 19:17:49,247] Trial 1 finished with value: 51.25587463378906 and parameters: {'neural_hidden_size': 4, 'weight_mutation_rate': 0.1092201132382559, 'weight_mutation_magnitude': 0.33593466091104074, 'mutation_rate': 0.32805759306859095, 'mutation_magnitude': 0.4264909984645552, 'cull_percentage': 0.4498395077489187, 'selection_method': 'truncation', 'use_crossover': True, 'crossover_rate': 0.39694882918391816, 'use_proprioception': True, 'proprioception_inputs': 'all', 'min_nodes': 3, 'max_nodes': 7, 'max_muscles': 20, 'neural_dead_zone': 0.1341444401576348, 'neural_output_bias': -0.05435913590905872}. Best is trial 0 with value: 97.18640899658203.
+
+============================================================
+STUDY SUMMARY
+============================================================
+
+Trials: 2 completed, 0 pruned
+
+Best trial: #0
+Best fitness: 97.2
+
+Best parameters:
+  crossover_rate: 0.5317722979977306
+  cull_percentage: 0.47270542098525514
+  max_muscles: 10
+  max_nodes: 10
+  min_nodes: 3
+  mutation_magnitude: 0.4442950060166475
+  mutation_rate: 0.17753338601232474
+  neural_dead_zone: 0.18636762674528295
+  neural_hidden_size: 12
+  neural_output_bias: -0.419234847534021
+  proprioception_inputs: ground
+  selection_method: tournament
+  tournament_size: 4
+  use_crossover: True
+  use_proprioception: True
+  weight_mutation_magnitude: 0.39485727165142304
+  weight_mutation_rate: 0.15466808733137324
+
+Parameter importance (fANOVA):
+Warning: Could not compute importance: Tried to import 'sklearn' but failed. Please make sure that the package is installed correctly to use this feature. Actual error: No module named 'sklearn'.
+
+============================================================
+
+Search complete!
+Results saved to: results/search_quick-test-2_20260130_191722
+
+To generate analysis notebook, run:
+claude "Create nas_postmortem.ipynb following nas/post-mortem-nas.md. Results in
+results/search_quick-test-2_20260130_191722. Be thorough."

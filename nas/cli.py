@@ -421,6 +421,7 @@ def search(
     multi_objective: bool = typer.Option(False, "--multi-objective", "-mo", help="Use NSGA-II for Pareto optimization"),
     stagnation_limit: int = typer.Option(50, "--stagnation-limit", help="Stop trial early if no improvement for N generations (0 to disable)"),
     n_jobs: int = typer.Option(1, "--n-jobs", "-j", help="Parallel workers (1=sequential, -1=all cores, recommended: 15-20 for 128-core)"),
+    limit_threads: bool = typer.Option(False, "--limit-threads", help="Force single-threaded PyTorch (fixes nested parallelism when n_jobs > 1)"),
 ):
     """
     Run Optuna hyperparameter search.
@@ -455,6 +456,8 @@ def search(
     console.print(f"  Device: {torch_device}")
     console.print(f"  Multi-objective: {multi_objective}")
     console.print(f"  Parallel workers: {n_jobs if n_jobs > 0 else 'all cores'}")
+    if limit_threads:
+        console.print(f"  Thread limiting: ENABLED (prevents nested parallelism)")
     if stagnation_limit > 0:
         console.print(f"  Early stop: {stagnation_limit} gens without improvement")
     if storage:
@@ -473,6 +476,7 @@ def search(
         population_size=population_size,
         stagnation_limit=stagnation_limit,
         n_jobs=n_jobs,
+        limit_threads=limit_threads,
     )
 
     # Print summary

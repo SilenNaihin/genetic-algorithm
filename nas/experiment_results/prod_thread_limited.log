@@ -1,0 +1,30 @@
+
+Starting Hyperparameter Search
+  Study: prod-thread-test
+  Mode: pure
+  Trials: 3
+  Generations: 150
+  Population: 500
+  Seeds: [42, 123, 456]
+  Device: cpu
+  Multi-objective: False
+  Parallel workers: 3
+  Thread limiting: ENABLED (prevents nested parallelism)
+  Early stop: 50 gens without improvement
+
+[I 2026-01-30 19:20:49,524] A new study created in memory with name: prod-thread-test
+Thread limiting enabled: PyTorch forced to single-threaded mode
+  This prevents nested parallelism (PyTorch × Optuna)
+
+
+Starting search: prod-thread-test
+  Mode: pure
+  Trials: 3
+  Generations: 150
+  Population: 500
+  Seeds: [42, 123, 456]
+  Device: cpu
+  Parallel workers: 3
+  Results: results/search_prod-thread-test_20260130_192049
+
+  0%|          | 0/3 [00:00<?, ?it/s]

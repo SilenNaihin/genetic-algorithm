@@ -1,0 +1,65 @@
+
+Starting Hyperparameter Search
+  Study: quick-test-1
+  Mode: pure
+  Trials: 2
+  Generations: 10
+  Population: 200
+  Seeds: [42]
+  Device: cpu
+  Multi-objective: False
+  Parallel workers: 2
+  Early stop: 50 gens without improvement
+
+[I 2026-01-30 19:16:55,526] A new study created in memory with name: quick-test-1
+
+Starting search: quick-test-1
+  Mode: pure
+  Trials: 2
+  Generations: 10
+  Population: 200
+  Seeds: [42]
+  Device: cpu
+  Parallel workers: 2
+  Results: results/search_quick-test-1_20260130_191655
+
+  0%|          | 0/2 [00:00<?, ?it/s]                                       0%|          | 0/2 [00:25<?, ?it/s]Best trial: 0. Best value: 73.6744:   0%|          | 0/2 [00:25<?, ?it/s]Best trial: 0. Best value: 73.6744:  50%|█████     | 1/2 [00:25<00:25, 25.18s/it]                                                                                 Best trial: 0. Best value: 73.6744:  50%|█████     | 1/2 [00:25<00:25, 25.18s/it]Best trial: 1. Best value: 198.273:  50%|█████     | 1/2 [00:25<00:25, 25.18s/it]Best trial: 1. Best value: 198.273: 100%|██████████| 2/2 [00:25<00:00, 10.51s/it]Best trial: 1. Best value: 198.273: 100%|██████████| 2/2 [00:25<00:00, 12.71s/it]
+[I 2026-01-30 19:17:20,704] Trial 0 finished with value: 73.67440032958984 and parameters: {'neural_hidden_size': 20, 'weight_mutation_rate': 0.4535247747130454, 'weight_mutation_magnitude': 0.5556483708579404, 'mutation_rate': 0.2579629240238863, 'mutation_magnitude': 0.4576475105016319, 'cull_percentage': 0.734177751324901, 'selection_method': 'truncation', 'use_crossover': True, 'crossover_rate': 0.2788719206799825, 'use_proprioception': False, 'min_nodes': 4, 'max_nodes': 5, 'max_muscles': 20, 'neural_dead_zone': 0.036544039770951824, 'neural_output_bias': -0.3254704622433847}. Best is trial 0 with value: 73.67440032958984.
+[I 2026-01-30 19:17:20,951] Trial 1 finished with value: 198.27322387695312 and parameters: {'neural_hidden_size': 16, 'weight_mutation_rate': 0.3374606810042795, 'weight_mutation_magnitude': 0.5049383239681695, 'mutation_rate': 0.39167463554774085, 'mutation_magnitude': 0.37137077576887834, 'cull_percentage': 0.37226440478032363, 'selection_method': 'rank', 'use_crossover': False, 'use_proprioception': False, 'min_nodes': 3, 'max_nodes': 10, 'max_muscles': 15, 'neural_dead_zone': 0.10750264129074141, 'neural_output_bias': -0.48807047902821116}. Best is trial 1 with value: 198.27322387695312.
+
+============================================================
+STUDY SUMMARY
+============================================================
+
+Trials: 2 completed, 0 pruned
+
+Best trial: #1
+Best fitness: 198.3
+
+Best parameters:
+  cull_percentage: 0.37226440478032363
+  max_muscles: 15
+  max_nodes: 10
+  min_nodes: 3
+  mutation_magnitude: 0.37137077576887834
+  mutation_rate: 0.39167463554774085
+  neural_dead_zone: 0.10750264129074141
+  neural_hidden_size: 16
+  neural_output_bias: -0.48807047902821116
+  selection_method: rank
+  use_crossover: False
+  use_proprioception: False
+  weight_mutation_magnitude: 0.5049383239681695
+  weight_mutation_rate: 0.3374606810042795
+
+Parameter importance (fANOVA):
+Warning: Could not compute importance: Tried to import 'sklearn' but failed. Please make sure that the package is installed correctly to use this feature. Actual error: No module named 'sklearn'.
+
+============================================================
+
+Search complete!
+Results saved to: results/search_quick-test-1_20260130_191655
+
+To generate analysis notebook, run:
+claude "Create nas_postmortem.ipynb following nas/post-mortem-nas.md. Results in
+results/search_quick-test-1_20260130_191655. Be thorough."

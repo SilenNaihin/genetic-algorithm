@@ -1,0 +1,72 @@
+#!/bin/bash
+# Quick test to verify thread limiting works
+
+set -e
+
+cd /home/azureuser/genetic-algorithm/nas
+
+echo "======================================================================"
+echo "QUICK TEST: Thread Limiting Verification"
+echo "======================================================================"
+echo ""
+echo "Test 1: Small run WITHOUT thread limiting (2 trials, 200 pop, 10 gen, 2 workers)"
+echo "Expected: Should work fine (small trials parallelize successfully)"
+echo ""
+
+mkdir -p test_results/quick
+
+# Find python command
+if command -v python &> /dev/null; then
+    PY=python
+elif command -v python3 &> /dev/null; then
+    PY=python3
+else
+    echo "Error: Python not found"
+    exit 1
+fi
+
+echo "Using: $PY"
+echo ""
+
+# Test 1: Small without thread limiting
+echo "Starting test 1..."
+time $PY cli.py search quick-test-1 -m pure -n 2 -g 10 -s 1 -p 200 --n-jobs 2 2>&1 | tee test_results/quick/test1.log
+
+echo ""
+echo "Test 1 complete!"
+echo ""
+
+# Test 2: Small with thread limiting
+echo "======================================================================"
+echo "Test 2: Small run WITH thread limiting (2 trials, 200 pop, 10 gen, 2 workers)"
+echo "======================================================================"
+echo ""
+
+time $PY cli.py search quick-test-2 -m pure -n 2 -g 10 -s 1 -p 200 --n-jobs 2 --limit-threads 2>&1 | tee test_results/quick/test2.log
+
+echo ""
+echo "Test 2 complete!"
+echo ""
+
+# Compare
+echo "======================================================================"
+echo "COMPARISON"
+echo "======================================================================"
+echo ""
+
+TEST1_TIME=$(grep "real" test_results/quick/test1.log | awk '{print $2}' || echo "N/A")
+TEST2_TIME=$(grep "real" test_results/quick/test2.log | awk '{print $2}' || echo "N/A")
+
+echo "Test 1 (no thread limiting): $TEST1_TIME"
+echo "Test 2 (with thread limiting): $TEST2_TIME"
+echo ""
+
+if grep -q "Thread limiting enabled" test_results/quick/test2.log; then
+    echo "✅ Thread limiting flag recognized"
+else
+    echo "❌ Thread limiting flag NOT recognized"
+fi
+
+echo ""
+echo "If both tests completed in similar time (~20-30s), the flag is working."
+echo "Next step: Run production-scale test (500 pop, 150 gen)"

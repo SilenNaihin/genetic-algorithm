@@ -489,6 +489,7 @@ def run_search(
     population_size: int = 300,  # Fixed population (not optimized - more is always better)
     stagnation_limit: int = 50,  # Stop early if no improvement for N generations
     n_jobs: int = 1,  # Number of parallel workers (1=sequential, -1=all cores)
+    limit_threads: bool = False,  # Force single-threaded PyTorch to avoid nested parallelism
 ) -> tuple[optuna.Study, Path]:
     """
     Run hyperparameter search.
@@ -510,6 +511,16 @@ def run_search(
     Returns:
         Tuple of (completed Optuna study, results directory path)
     """
+
+    # Apply thread limiting if requested (prevents nested parallelism)
+    if limit_threads:
+        os.environ['OMP_NUM_THREADS'] = '1'
+        os.environ['MKL_NUM_THREADS'] = '1'
+        os.environ['OPENBLAS_NUM_THREADS'] = '1'
+        os.environ['NUMEXPR_NUM_THREADS'] = '1'
+        print("Thread limiting enabled: PyTorch forced to single-threaded mode")
+        print("  This prevents nested parallelism (PyTorch × Optuna)")
+        print()
 
     # Setup results directory
     if results_dir is None:
