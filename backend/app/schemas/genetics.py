@@ -66,7 +66,7 @@ class EvolutionConfig(BaseModel):
     constraints: GenomeConstraints = Field(default_factory=GenomeConstraints)
 
     # Speciation parameters (used when selection_method='speciation')
-    compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
+    compatibility_threshold: float = Field(default=3.0, ge=0.1, le=6.0)
     min_species_size: int = Field(default=2, ge=1, le=20)
 
     # Neural network

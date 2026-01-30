@@ -70,10 +70,10 @@ BASE_CONFIG: dict[str, Any] = {
     'time_encoding': 'none',  # 'none' for pure, 'cyclic' for hybrid
     'bias_mode': 'node',
 
-    # Neural weight mutation
-    'weight_mutation_rate': 0.2,
-    'weight_mutation_magnitude': 0.3,
-    'weight_mutation_decay': 'linear',
+    # Neural weight mutation (canonical NEAT values)
+    'weight_mutation_rate': 0.8,        # Per-weight probability
+    'weight_mutation_magnitude': 0.5,   # Perturbation power
+    'weight_mutation_decay': 'off',     # No decay for NEAT
 
     # Neural crossover
     'neural_crossover_method': 'sbx',
@@ -91,7 +91,7 @@ BASE_CONFIG: dict[str, Any] = {
     'sharing_radius': 0.5,
 
     # === SPECIATION (VARIABLE) ===
-    'compatibility_threshold': 1.0,
+    'compatibility_threshold': 3.0,  # Canonical NEAT value
     'min_species_size': 2,
 
     # === NEAT (VARIABLE - only when neural_mode='neat') ===
@@ -126,12 +126,13 @@ NEAT_BASELINE: dict[str, Any] = {
     'neural_mode': 'neat',
     'selection_method': 'speciation',  # Auto-enforced for NEAT
     'bias_mode': 'bias_node',  # Original NEAT style
+    # Canonical NEAT structural mutation rates
     'neat_initial_connectivity': 'full',
-    'neat_add_connection_rate': 0.5,
-    'neat_add_node_rate': 0.2,
-    'neat_max_hidden_nodes': 16,
-    'compatibility_threshold': 1.0,
-    'use_fitness_sharing': False,  # Auto-disabled for NEAT
+    'neat_add_connection_rate': 0.3,   # Canonical 0.2-0.5
+    'neat_add_node_rate': 0.1,         # Canonical 0.1-0.2
+    'neat_max_hidden_nodes': 24,       # Room to grow
+    'compatibility_threshold': 3.0,    # Canonical
+    'use_fitness_sharing': False,      # Auto-disabled for NEAT
 }
 
 NEAT_SPARSE: dict[str, Any] = {
@@ -151,32 +152,39 @@ NEAT_MINIMAL: dict[str, Any] = {
 
 NEAT_AGGRESSIVE: dict[str, Any] = {
     **NEAT_BASELINE,
-    'neat_add_connection_rate': 0.7,
-    'neat_add_node_rate': 0.4,  # More structural mutation
+    'neat_add_connection_rate': 0.5,
+    'neat_add_node_rate': 0.2,  # More structural mutation
     'neat_max_hidden_nodes': 32,  # Allow larger networks
-    'compatibility_threshold': 2.0,  # Looser speciation
+    'compatibility_threshold': 4.0,  # Looser speciation
 }
 
 NEAT_CONSERVATIVE: dict[str, Any] = {
     **NEAT_BASELINE,
-    'neat_add_connection_rate': 0.3,
-    'neat_add_node_rate': 0.1,
-    'compatibility_threshold': 0.5,  # Tighter speciation
-    'neat_max_hidden_nodes': 8,
+    'neat_add_connection_rate': 0.15,
+    'neat_add_node_rate': 0.05,
+    'compatibility_threshold': 2.0,  # Tighter speciation
+    'neat_max_hidden_nodes': 12,
 }
 
 NEAT_HIGH_MUTATION: dict[str, Any] = {
     **NEAT_BASELINE,
     'mutation_rate': 0.5,
-    'weight_mutation_rate': 0.4,
-    'weight_mutation_magnitude': 0.5,
+    'weight_mutation_rate': 0.9,       # Very high weight mutation
+    'weight_mutation_magnitude': 0.7,
 }
 
 NEAT_LOW_MUTATION: dict[str, Any] = {
     **NEAT_BASELINE,
     'mutation_rate': 0.15,
-    'weight_mutation_rate': 0.1,
-    'weight_mutation_magnitude': 0.1,
+    'weight_mutation_rate': 0.5,       # Still reasonable
+    'weight_mutation_magnitude': 0.3,
+}
+
+# NEAT with proprioception (important!)
+NEAT_PROPRIO: dict[str, Any] = {
+    **NEAT_BASELINE,
+    'use_proprioception': True,
+    'proprioception_inputs': 'all',
 }
 
 
@@ -278,6 +286,7 @@ CONFIGS: dict[str, dict[str, Any]] = {
     'neat_conservative': NEAT_CONSERVATIVE,
     'neat_high_mutation': NEAT_HIGH_MUTATION,
     'neat_low_mutation': NEAT_LOW_MUTATION,
+    'neat_proprio': NEAT_PROPRIO,
 
     # Pure variants (secondary)
     'pure_baseline': PURE_BASELINE,

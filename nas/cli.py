@@ -401,6 +401,123 @@ def benchmark(
 
 
 @app.command()
+def search(
+    study_name: str = typer.Argument(..., help="Unique name for this search study"),
+    mode: str = typer.Option("neat", "--mode", "-m", help="Mode: 'neat' or 'pure'"),
+    n_trials: int = typer.Option(50, "--trials", "-n", help="Number of trials to run"),
+    generations: int = typer.Option(30, "--generations", "-g", help="Generations per trial"),
+    seeds: int = typer.Option(2, "--seeds", "-s", help="Seeds per trial (more = more reliable)"),
+    device: Optional[str] = typer.Option(None, "--device", "-d", help="PyTorch device"),
+    storage: Optional[str] = typer.Option(None, "--storage", help="Optuna storage URL (e.g., sqlite:///nas.db)"),
+    multi_objective: bool = typer.Option(False, "--multi-objective", "-mo", help="Use NSGA-II for Pareto optimization"),
+):
+    """
+    Run Optuna hyperparameter search.
+
+    Examples:
+        # Quick screening (50 trials, 30 gens, 2 seeds)
+        nas search exp-001 --mode neat --trials 50 --generations 30 --seeds 2
+
+        # Deep search with persistence
+        nas search exp-002 -m neat -n 200 -g 50 -s 3 --storage sqlite:///nas.db
+
+        # Multi-objective Pareto search
+        nas search exp-003 -m neat -n 100 --multi-objective
+    """
+    import torch
+    from search import run_search, print_study_summary
+
+    # Parse device
+    torch_device = device or ('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    seed_list = [42, 123, 456, 789, 1337][:seeds]
+
+    console.print(f"\n[bold]Starting Hyperparameter Search[/bold]")
+    console.print(f"  Study: {study_name}")
+    console.print(f"  Mode: {mode}")
+    console.print(f"  Trials: {n_trials}")
+    console.print(f"  Generations: {generations}")
+    console.print(f"  Seeds: {seed_list}")
+    console.print(f"  Device: {torch_device}")
+    console.print(f"  Multi-objective: {multi_objective}")
+    if storage:
+        console.print(f"  Storage: {storage}")
+    console.print()
+
+    study = run_search(
+        study_name=study_name,
+        mode=mode,
+        n_trials=n_trials,
+        generations=generations,
+        seeds=seed_list,
+        device=torch_device,
+        storage=storage,
+        multi_objective=multi_objective,
+    )
+
+    # Print summary
+    print_study_summary(study)
+
+
+@app.command()
+def importance(
+    study_name: str = typer.Argument(..., help="Study name to analyze"),
+    storage: str = typer.Option("sqlite:///nas.db", "--storage", help="Optuna storage URL"),
+    top_n: int = typer.Option(15, "--top", "-n", help="Number of top parameters to show"),
+):
+    """
+    Show parameter importance from a completed search.
+
+    Uses fANOVA to analyze which parameters most affect fitness.
+
+    Example:
+        nas importance exp-001 --storage sqlite:///nas.db
+    """
+    import optuna
+    from search import get_param_importance
+
+    try:
+        study = optuna.load_study(study_name=study_name, storage=storage)
+    except Exception as e:
+        console.print(f"[red]Error loading study '{study_name}': {e}[/red]")
+        raise typer.Exit(1)
+
+    completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    console.print(f"\n[bold]Parameter Importance Analysis[/bold]")
+    console.print(f"  Study: {study_name}")
+    console.print(f"  Completed trials: {len(completed)}")
+
+    if len(completed) < 10:
+        console.print("[yellow]Warning: Need at least 10 completed trials for reliable importance analysis[/yellow]")
+
+    importance = get_param_importance(study)
+
+    if not importance:
+        console.print("[red]Could not compute parameter importance[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold]Top {top_n} Most Important Parameters:[/bold]\n")
+
+    # Sort by importance
+    sorted_params = sorted(importance.items(), key=lambda x: -x[1])[:top_n]
+
+    for name, score in sorted_params:
+        bar_len = int(score * 40)
+        bar = "█" * bar_len + "░" * (40 - bar_len)
+        console.print(f"  {name:35s} {score:.3f} {bar}")
+
+    # Best params
+    if hasattr(study, 'best_params'):
+        console.print(f"\n[bold]Best Trial Parameters:[/bold]")
+        console.print(f"  Best fitness: {study.best_value:.1f}")
+        for name, value in sorted(study.best_params.items()):
+            if name in [p[0] for p in sorted_params[:10]]:  # Highlight important ones
+                console.print(f"  [green]{name}[/green]: {value}")
+            else:
+                console.print(f"  {name}: {value}")
+
+
+@app.command()
 def parallel(
     configs_list: list[str] = typer.Argument(..., help="Config names to run in parallel"),
     generations: int = typer.Option(50, "--generations", "-g", help="Generations per config"),

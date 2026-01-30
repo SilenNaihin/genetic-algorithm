@@ -91,7 +91,7 @@ class SimulationConfig(BaseModel):
     sharing_radius: float = Field(default=0.5, ge=0.1, le=2.0)
 
     # Speciation parameters (used when selection_method='speciation')
-    compatibility_threshold: float = Field(default=1.0, ge=0.1, le=3.0)
+    compatibility_threshold: float = Field(default=3.0, ge=0.1, le=6.0)
     min_species_size: int = Field(default=2, ge=1, le=20)
 
     # NEAT (NeuroEvolution of Augmenting Topologies) - configured when neural_mode == 'neat'
