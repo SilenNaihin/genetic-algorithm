@@ -420,6 +420,7 @@ def search(
     storage: Optional[str] = typer.Option(None, "--storage", help="Optuna storage URL for fANOVA importance (optional)"),
     multi_objective: bool = typer.Option(False, "--multi-objective", "-mo", help="Use NSGA-II for Pareto optimization"),
     stagnation_limit: int = typer.Option(50, "--stagnation-limit", help="Stop trial early if no improvement for N generations (0 to disable)"),
+    n_jobs: int = typer.Option(1, "--n-jobs", "-j", help="Parallel workers (1=sequential, -1=all cores, recommended: 15-20 for 128-core)"),
 ):
     """
     Run Optuna hyperparameter search.
@@ -427,14 +428,14 @@ def search(
     Results saved to JSON in results/search_<study>_<timestamp>/.
 
     Examples:
-        # Quick screening (50 trials, 30 gens, 2 seeds)
+        # Quick screening (50 trials, 30 gens, 2 seeds) - sequential
         nas search exp-001 --mode neat --trials 50 --generations 30 --seeds 2
 
-        # Full search (recommended)
-        nas search neat-full -m neat -n 50 -g 50 -s 3 -p 200
+        # Full search with 20 parallel workers (recommended for 128-core)
+        nas search neat-full -m neat -n 50 -g 50 -s 3 -p 200 --n-jobs 20
 
-        # Multi-objective Pareto search
-        nas search exp-003 -m neat -n 100 --multi-objective
+        # Multi-objective Pareto search with parallelism
+        nas search exp-003 -m neat -n 100 --multi-objective --n-jobs 15
     """
     import torch
     from search import run_search, print_study_summary
@@ -453,6 +454,7 @@ def search(
     console.print(f"  Seeds: {seed_list}")
     console.print(f"  Device: {torch_device}")
     console.print(f"  Multi-objective: {multi_objective}")
+    console.print(f"  Parallel workers: {n_jobs if n_jobs > 0 else 'all cores'}")
     if stagnation_limit > 0:
         console.print(f"  Early stop: {stagnation_limit} gens without improvement")
     if storage:
@@ -470,6 +472,7 @@ def search(
         multi_objective=multi_objective,
         population_size=population_size,
         stagnation_limit=stagnation_limit,
+        n_jobs=n_jobs,
     )
 
     # Print summary

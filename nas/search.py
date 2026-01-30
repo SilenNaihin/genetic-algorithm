@@ -485,6 +485,7 @@ def run_search(
     results_dir: str | None = None,
     population_size: int = 300,  # Fixed population (not optimized - more is always better)
     stagnation_limit: int = 50,  # Stop early if no improvement for N generations
+    n_jobs: int = 1,  # Number of parallel workers (1=sequential, -1=all cores)
 ) -> tuple[optuna.Study, Path]:
     """
     Run hyperparameter search.
@@ -501,6 +502,7 @@ def run_search(
         results_dir: Directory for trial results
         population_size: Fixed population size (not optimized - more is always better)
         stagnation_limit: Stop trial early if no improvement for N generations (0 = disabled)
+        n_jobs: Number of parallel workers (1=sequential, -1=all cores)
 
     Returns:
         Tuple of (completed Optuna study, results directory path)
@@ -552,12 +554,14 @@ def run_search(
     print(f"  Population: {population_size}")
     print(f"  Seeds: {seeds}")
     print(f"  Device: {device}")
+    print(f"  Parallel workers: {n_jobs if n_jobs > 0 else 'all cores'}")
     print(f"  Results: {results_dir}")
     print()
 
     study.optimize(
         objective,
         n_trials=n_trials,
+        n_jobs=n_jobs,
         show_progress_bar=True,
     )
 
