@@ -318,6 +318,9 @@ def create_objective(
                 if trial.should_prune():
                     raise optuna.TrialPruned()
 
+            except optuna.TrialPruned:
+                # Re-raise pruning exception (don't catch it)
+                raise
             except Exception as e:
                 # If evolution fails, report very low fitness
                 print(f"Trial {trial.number} seed {seed} failed: {e}")

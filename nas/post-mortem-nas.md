@@ -67,24 +67,67 @@ results/search_<study-name>_<timestamp>/
 
 Create `backend/notebooks/nas_postmortem.ipynb` with the following analyses:
 
-### a) Load Results
+### a) Clean Up Trial Data (Run First!)
+
+Due to a pruning bug, some trials may have extra entries in fitness arrays. Run this cleanup before analysis:
+
 ```python
 import json
 from pathlib import Path
 
 results_dir = Path("../../nas/results/search_neat-full_XXXXXX")
+
+# Clean up trial JSONs (fix pruning bug that caused extra entries)
+print("Cleaning trial data...")
+fixed_count = 0
+for trial_file in sorted(results_dir.glob("trial_*.json")):
+    data = json.load(open(trial_file))
+    seeds = data['seeds']
+    num_seeds = len(seeds)
+
+    best = data['best_fitness_per_seed']
+    avg = data['avg_fitness_per_seed']
+
+    # Check if arrays have extra entries
+    if len(best) != num_seeds:
+        # Truncate arrays to actual seed count
+        best = best[:num_seeds]
+        avg = avg[:num_seeds]
+
+        # Recalculate means
+        data['best_fitness_per_seed'] = best
+        data['avg_fitness_per_seed'] = avg
+        data['mean_best_fitness'] = sum(best) / len(best) if best else 0
+        data['mean_avg_fitness'] = sum(avg) / len(avg) if avg else 0
+
+        # Save
+        with open(trial_file, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        print(f"  Fixed {trial_file.name}")
+        fixed_count += 1
+
+print(f"Cleaned {fixed_count} trials")
+```
+
+### b) Load Results
+
+```python
+# Load summary
 summary = json.load(open(results_dir / "summary.json"))
 
-# Load all trial results
+# Load all trial results (now cleaned)
 trials = []
 for f in sorted(results_dir.glob("trial_*.json")):
     trials.append(json.load(open(f)))
+
+print(f"Loaded {len(trials)} trials")
 
 # Get best params
 best_params = summary.get('best_params', {})
 ```
 
-### b) Parameter Importance Analysis
+### c) Parameter Importance Analysis
 
 1. **What parameters matter most?**
    - Rank parameters by variance in fitness they explain
@@ -94,31 +137,31 @@ best_params = summary.get('best_params', {})
 2. **Top 5 most impactful parameters**
    - Show distribution of values for top vs bottom 10 trials
 
-### c) Proprioception Analysis
+### d) Proprioception Analysis
 
 - Compare trials with `use_proprioception=True` vs `False`
 - Which `proprioception_inputs` mode works best? (all, strain, velocity, ground)
 - Box plots of fitness by proprioception config
 
-### d) Network Topology Patterns
+### e) Network Topology Patterns
 
 - Optimal `neat_max_hidden_nodes`
 - Best `neat_initial_connectivity` mode
 - Add node vs add connection rate sweet spots
 - Scatter: hidden nodes vs fitness (is bigger better?)
 
-### e) NEAT-Specific Settings
+### f) NEAT-Specific Settings
 
 - Optimal `compatibility_threshold`
 - Impact of distance coefficients (excess, disjoint, weight)
 - Speciation dynamics: how many species in best runs?
 
-### f) Time Encoding Analysis
+### g) Time Encoding Analysis
 
 - Compare fitness across `time_encoding` modes (none, cyclic, sin, raw, sin_raw)
 - Does adding time input help NEAT?
 
-### g) Trial Rankings
+### h) Trial Rankings
 
 ```python
 import pandas as pd
@@ -156,7 +199,7 @@ print(df.nlargest(10, 'learning_ratio')[['trial', 'mean_best', 'mean_avg', 'lear
 
 The notebook should output a command to run the best hyperparameters in the frontend, which stores results to PostgreSQL for visualization and replay.
 
-### g) Output Frontend Command
+### i) Output Frontend Command
 
 ```python
 # Generate URL with best params pre-filled
@@ -224,7 +267,7 @@ creatures_df['num_connections'] = creatures_df['neat_genome'].apply(
 )
 ```
 
-### i) Most Unique Creatures
+### j) Most Unique Creatures
 
 Find creatures with unusual but successful strategies (high-fitness outliers):
 
@@ -260,7 +303,7 @@ for cluster_id in creatures_df['cluster'].unique():
         print(top_in_cluster[['id', 'fitness', 'num_nodes', 'num_muscles']])
 ```
 
-### j) Most Efficient Creatures (High Fitness / Low Energy)
+### k) Most Efficient Creatures (High Fitness / Low Energy)
 
 **Goal:** Find creatures that achieve high fitness with minimum energy expenditure.
 
@@ -296,7 +339,7 @@ print("\nPareto-Optimal Creatures (fitness vs energy tradeoff):")
 print(pareto_creatures.head(10)[['id', 'fitness', 'total_activation', 'efficiency']])
 ```
 
-### k) Smallest Successful Creatures
+### l) Smallest Successful Creatures
 
 **Goal:** Find minimal body/brain that still performs well.
 
@@ -351,7 +394,7 @@ plt.tight_layout()
 plt.savefig('complexity_vs_fitness.png')
 ```
 
-### l) Highest Average Fitness Runs
+### m) Highest Average Fitness Runs
 
 Find which parameter configurations led to the best population-wide learning:
 
@@ -370,7 +413,7 @@ for _, row in top_avg.iterrows():
             print(f"  {param}: {row[param]}")
 ```
 
-### m) Body Plan Analysis
+### n) Body Plan Analysis
 
 ```python
 # What body shapes dominate in top performers?
@@ -402,7 +445,7 @@ print(f"  Nodes: {top_performers['num_nodes'].mean():.1f} vs {creatures_df['num_
 print(f"  Muscles: {top_performers['num_muscles'].mean():.1f} vs {creatures_df['num_muscles'].mean():.1f}")
 ```
 
-### n) Brain Complexity Sweet Spot
+### o) Brain Complexity Sweet Spot
 
 ```python
 # Is there an optimal brain size?
@@ -429,7 +472,7 @@ print("\nAverage fitness by hidden node count:")
 print(creatures_df.groupby(bins)['fitness'].agg(['mean', 'max', 'count']))
 ```
 
-### o) Replay Visualization
+### p) Replay Visualization
 
 ```python
 # For top creatures, generate movement visualizations

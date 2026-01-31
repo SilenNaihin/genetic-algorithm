@@ -1,0 +1,50 @@
+{
+  "trial_number": 80,
+  "params": {
+    "neat_initial_connectivity": "full",
+    "neat_add_connection_rate": 0.518190691194219,
+    "neat_add_node_rate": 0.29860739688997423,
+    "neat_enable_rate": 0.039490192072323245,
+    "neat_disable_rate": 0.07111220926528622,
+    "neat_max_hidden_nodes": 28,
+    "weight_mutation_rate": 0.5195192276977035,
+    "weight_mutation_magnitude": 0.625848508136834,
+    "compatibility_threshold": 3.3538725745515165,
+    "neat_excess_coefficient": 1.207113585277174,
+    "neat_disjoint_coefficient": 1.8161465360908893,
+    "neat_weight_coefficient": 0.7844491834117544,
+    "min_species_size": 1,
+    "mutation_rate": 0.44110282375642007,
+    "mutation_magnitude": 0.25539864861872263,
+    "cull_percentage": 0.7200854164920303,
+    "use_crossover": true,
+    "crossover_rate": 0.261632656397048,
+    "use_proprioception": false,
+    "min_nodes": 4,
+    "max_nodes": 6,
+    "max_muscles": 11,
+    "time_encoding": "none",
+    "bias_mode": "bias_node",
+    "neural_dead_zone": 0.0816313881204752,
+    "neural_output_bias": -0.2475506145769566,
+    "use_adaptive_mutation": false
+  },
+  "best_fitness_per_seed": [
+    303.999267578125,
+    223.0559844970703,
+    255.47633361816406
+  ],
+  "avg_fitness_per_seed": [
+    16.727488647699357,
+    13.645339030660688,
+    16.688161187544466
+  ],
+  "mean_best_fitness": 260.84386189778644,
+  "mean_avg_fitness": 15.686996288634838,
+  "generations": 150,
+  "seeds": [
+    42,
+    123,
+    456
+  ]
+}
