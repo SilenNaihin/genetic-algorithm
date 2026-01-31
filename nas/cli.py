@@ -605,7 +605,7 @@ def parallel(
 def store_trials(
     top_best: Optional[int] = typer.Option(None, "--top-best", help="Run top N by max fitness"),
     top_avg: Optional[int] = typer.Option(None, "--top-avg", help="Run top N by avg fitness"),
-    trials: Optional[list[int]] = typer.Option(None, "--trials", "-t", help="Run specific trial numbers"),
+    trials: Optional[str] = typer.Option(None, "--trials", "-t", help="Run specific trial numbers (comma-separated, e.g. 165,43,118)"),
     generations: int = typer.Option(50, "--generations", "-g", help="Number of generations"),
     population_size: int = typer.Option(100, "--population-size", "-p", help="Population size"),
     search: str = typer.Option("neat", "--search", "-s", help="Search to use: 'neat' or 'pure'"),
@@ -680,8 +680,10 @@ def store_trials(
             to_run.append((t, "top-avg"))
 
     if trials:
+        # Parse comma-separated trial numbers
+        trial_nums = [int(x.strip()) for x in trials.split(",")]
         # For manual trials, search all sources
-        for num in trials:
+        for num in trial_nums:
             found = False
             for t in all_trials:
                 if t["trial_number"] == num:
