@@ -1,0 +1,16 @@
+
+Auto-calculated threads_per_worker: 42 (128 cores ÷ 3 workers)
+
+Process Pool hyperparameter search: pure-full-200
+  Mode: pure
+  Trials: 200
+  Generations: 200
+  Population: 300
+  Seeds: [42]
+  Workers: 3
+  Threads per worker: 42 (prevents oversubscription)
+  Device: cpu
+  Results: results/search_pool_pure-full-200_20260131_100700
+
+Starting 200 trials with 3 workers...
+

@@ -1,0 +1,19 @@
+
+Process Pool hyperparameter search: thread-force-test
+  Mode: pure
+  Trials: 1
+  Generations: 50
+  Population: 200
+  Seeds: [42]
+  Workers: 3
+  Threads per worker: 42 (prevents oversubscription)
+  Device: cpu
+  Results: results/search_pool_thread-force-test_20260131_024828
+
+Starting 1 trials with 3 workers...
+
+
+Search complete!
+Best fitness: 370.0
+Best trial: #0
+Results saved to: results/search_pool_thread-force-test_20260131_024828

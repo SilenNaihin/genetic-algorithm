@@ -1,0 +1,33 @@
+{
+  "study_name": "thread-force-test",
+  "mode": "pure",
+  "n_trials": 1,
+  "generations": 50,
+  "seeds": [
+    42
+  ],
+  "population_size": 200,
+  "n_workers": 3,
+  "best_trial": 0,
+  "best_fitness": 370.0461120605469,
+  "best_params": {
+    "neural_hidden_size": 8,
+    "weight_mutation_rate": 0.2646746450338997,
+    "weight_mutation_magnitude": 0.12657293334693856,
+    "mutation_rate": 0.5431501214505524,
+    "mutation_magnitude": 0.4525677513666768,
+    "cull_percentage": 0.4117468874695878,
+    "selection_method": "rank",
+    "use_crossover": false,
+    "use_proprioception": true,
+    "proprioception_inputs": "ground",
+    "min_nodes": 4,
+    "max_nodes": 7,
+    "max_muscles": 10,
+    "neural_dead_zone": 0.1583661318264279,
+    "neural_output_bias": -0.4532178002593732
+  },
+  "all_fitness": [
+    370.0461120605469
+  ]
+}

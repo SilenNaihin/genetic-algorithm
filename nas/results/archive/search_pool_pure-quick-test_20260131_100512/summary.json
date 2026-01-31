@@ -1,0 +1,35 @@
+{
+  "study_name": "pure-quick-test",
+  "mode": "pure",
+  "n_trials": 3,
+  "generations": 30,
+  "seeds": [
+    42
+  ],
+  "population_size": 300,
+  "n_workers": 3,
+  "best_trial": 2,
+  "best_fitness": 208.90122985839844,
+  "best_params": {
+    "neural_hidden_size": 16,
+    "weight_mutation_rate": 0.44693402123525006,
+    "weight_mutation_magnitude": 0.5996405710768351,
+    "mutation_rate": 0.5802152301097544,
+    "mutation_magnitude": 0.3667343229188723,
+    "cull_percentage": 0.5098804287421059,
+    "selection_method": "truncation",
+    "use_crossover": false,
+    "use_proprioception": true,
+    "proprioception_inputs": "all",
+    "min_nodes": 3,
+    "max_nodes": 6,
+    "max_muscles": 13,
+    "neural_dead_zone": 0.03423754606628784,
+    "neural_output_bias": -0.1262071597693289
+  },
+  "all_fitness": [
+    107.98855590820312,
+    112.13027954101562,
+    208.90122985839844
+  ]
+}

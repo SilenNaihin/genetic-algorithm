@@ -1,0 +1,16 @@
+
+Auto-calculated threads_per_worker: 42 (128 cores ÷ 3 workers)
+
+Process Pool hyperparameter search: neat-full-50
+  Mode: neat
+  Trials: 50
+  Generations: 200
+  Population: 300
+  Seeds: [42, 123, 456]
+  Workers: 3
+  Threads per worker: 42 (prevents oversubscription)
+  Device: cpu
+  Results: results/search_pool_neat-full-50_20260131_013358
+
+Starting 50 trials with 3 workers...
+

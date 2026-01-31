@@ -10,6 +10,7 @@ Usage:
 
 import json
 import random
+import sys
 from datetime import datetime
 from multiprocessing import Pool
 from pathlib import Path
@@ -140,15 +141,23 @@ def run_single_trial(args):
     trial_id, config_params, generations, seeds, device, mode, population_size, stagnation_limit, threads_per_worker = args
 
     # CRITICAL: Set thread limits INSIDE worker before importing PyTorch
-    # This prevents thread oversubscription when multiple workers run in parallel
+    # Environment variables must be set BEFORE any torch import
     if threads_per_worker:
         os.environ['OMP_NUM_THREADS'] = str(threads_per_worker)
         os.environ['MKL_NUM_THREADS'] = str(threads_per_worker)
         os.environ['OPENBLAS_NUM_THREADS'] = str(threads_per_worker)
         os.environ['NUMEXPR_NUM_THREADS'] = str(threads_per_worker)
         os.environ['VECLIB_MAXIMUM_THREADS'] = str(threads_per_worker)
+        os.environ['OMP_WAIT_POLICY'] = 'PASSIVE'  # Prevent busy-waiting
 
-    # NOW import runner (which imports PyTorch) - it will respect env vars
+    # Import PyTorch - threading already configured via env vars above
+    import torch
+    if threads_per_worker:
+        torch.set_num_threads(threads_per_worker)
+        # NOTE: Don't call set_num_interop_threads() - it can only be called once
+        # and causes errors in multiprocessing. Rely on env var instead.
+
+    # NOW import runner
     from runner import run_evolution
 
     # Build full config
@@ -289,19 +298,29 @@ def run_processpool_search(
     print(f"Starting {n_trials} trials with {n_workers} workers...")
     print()
 
+    results = []
     if n_workers == 1:
         # Sequential (for comparison)
-        results = [run_single_trial(args) for args in trial_args]
+        for i, args in enumerate(trial_args):
+            result = run_single_trial(args)
+            results.append(result)
+            # Save immediately
+            result_file = results_dir / f"trial_{result['trial_id']:04d}.json"
+            with open(result_file, 'w') as f:
+                json.dump(result, f, indent=2)
+            print(f"Trial {i+1}/{n_trials} completed: fitness={result['mean_best_fitness']:.1f}")
+            sys.stdout.flush()
     else:
-        # Parallel
+        # Parallel with incremental results
         with Pool(processes=n_workers) as pool:
-            results = pool.map(run_single_trial, trial_args)
-
-    # Save individual trial results
-    for result in results:
-        result_file = results_dir / f"trial_{result['trial_id']:04d}.json"
-        with open(result_file, 'w') as f:
-            json.dump(result, f, indent=2)
+            for i, result in enumerate(pool.imap_unordered(run_single_trial, trial_args)):
+                results.append(result)
+                # Save immediately
+                result_file = results_dir / f"trial_{result['trial_id']:04d}.json"
+                with open(result_file, 'w') as f:
+                    json.dump(result, f, indent=2)
+                print(f"Trial {i+1}/{n_trials} completed: fitness={result['mean_best_fitness']:.1f}")
+            sys.stdout.flush()
 
     # Find best trial
     best_trial = max(results, key=lambda r: r['mean_best_fitness'])

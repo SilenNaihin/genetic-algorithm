@@ -1,0 +1,29 @@
+{
+  "trial_id": 9,
+  "params": {
+    "neural_hidden_size": 20,
+    "weight_mutation_rate": 0.2168412741218838,
+    "weight_mutation_magnitude": 0.5660925137458933,
+    "mutation_rate": 0.5074965929993293,
+    "mutation_magnitude": 0.36415338651508367,
+    "cull_percentage": 0.7609010633845351,
+    "selection_method": "tournament",
+    "tournament_size": 5,
+    "use_crossover": false,
+    "use_proprioception": true,
+    "proprioception_inputs": "ground",
+    "min_nodes": 3,
+    "max_nodes": 5,
+    "max_muscles": 12,
+    "neural_dead_zone": 0.010527927063995147,
+    "neural_output_bias": -0.3813012795464555
+  },
+  "best_fitness_per_seed": [
+    414.69635009765625
+  ],
+  "avg_fitness_per_seed": [
+    38.8988663165768
+  ],
+  "mean_best_fitness": 414.69635009765625,
+  "mean_avg_fitness": 38.8988663165768
+}

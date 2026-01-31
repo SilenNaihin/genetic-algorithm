@@ -1,0 +1,21 @@
+=== Starting Sequential NAS Searches ===
+Time: Sat Jan 31 02:01:21 UTC 2026
+
+=== Running Pure Mode Search (50 trials) ===
+
+Auto-calculated threads_per_worker: 42 (128 cores ÷ 3 workers)
+
+Process Pool hyperparameter search: pure-full-50
+  Mode: pure
+  Trials: 50
+  Generations: 200
+  Population: 300
+  Seeds: [42, 123, 456]
+  Workers: 3
+  Threads per worker: 42 (prevents oversubscription)
+  Device: cpu
+  Results: results/search_pool_pure-full-50_20260131_020121
+
+Starting 50 trials with 3 workers...
+
+Terminated

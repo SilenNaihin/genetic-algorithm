@@ -1,0 +1,16 @@
+
+Auto-calculated threads_per_worker: 64 (128 cores ÷ 2 workers)
+
+Process Pool hyperparameter search: two-workers-test
+  Mode: pure
+  Trials: 2
+  Generations: 200
+  Population: 300
+  Seeds: [42, 123, 456]
+  Workers: 2
+  Threads per worker: 64 (prevents oversubscription)
+  Device: cpu
+  Results: results/search_pool_two-workers-test_20260131_025927
+
+Starting 2 trials with 2 workers...
+

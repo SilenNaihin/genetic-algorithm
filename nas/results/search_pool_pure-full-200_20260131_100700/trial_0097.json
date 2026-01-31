@@ -1,0 +1,27 @@
+{
+  "trial_id": 97,
+  "params": {
+    "neural_hidden_size": 12,
+    "weight_mutation_rate": 0.3346105884174253,
+    "weight_mutation_magnitude": 0.30801158756494973,
+    "mutation_rate": 0.41651579795276306,
+    "mutation_magnitude": 0.472633665325051,
+    "cull_percentage": 0.6072351577596932,
+    "selection_method": "truncation",
+    "use_crossover": false,
+    "use_proprioception": false,
+    "min_nodes": 3,
+    "max_nodes": 11,
+    "max_muscles": 13,
+    "neural_dead_zone": 0.150240442763994,
+    "neural_output_bias": -0.28037507135306367
+  },
+  "best_fitness_per_seed": [
+    416.13018798828125
+  ],
+  "avg_fitness_per_seed": [
+    36.24857551972071
+  ],
+  "mean_best_fitness": 416.13018798828125,
+  "mean_avg_fitness": 36.24857551972071
+}
