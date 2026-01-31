@@ -189,6 +189,144 @@ NEAT_PROPRIO: dict[str, Any] = {
 
 
 # =============================================================================
+# NAS OPTIMIZED CONFIGURATIONS (from 237-trial hyperparameter search)
+# =============================================================================
+
+# Trial #64 (neat-200) - Best peak fitness (459.8)
+# Key: sparse_inputs, proprioception=strain, very low add_connection_rate
+NAS_OPTIMAL: dict[str, Any] = {
+    **BASE_CONFIG,
+    'neural_mode': 'neat',
+    'selection_method': 'speciation',
+    'bias_mode': 'bias_node',
+
+    # Optimized params from trial 64 (neat-200)
+    'neat_initial_connectivity': 'sparse_inputs',
+    'time_encoding': 'none',
+    'use_proprioception': True,
+    'proprioception_inputs': 'strain',
+    'use_adaptive_mutation': False,
+
+    # Genetic operators
+    'crossover_rate': 0.255,
+    'mutation_rate': 0.510,
+    'mutation_magnitude': 0.492,
+    'cull_percentage': 0.390,
+
+    # Weight mutation - very high
+    'weight_mutation_rate': 0.916,
+    'weight_mutation_magnitude': 0.699,
+
+    # NEAT structural - very low add_connection!
+    'neat_add_connection_rate': 0.060,
+    'neat_add_node_rate': 0.261,
+    'neat_enable_rate': 0.040,
+    'neat_disable_rate': 0.078,
+    'neat_max_hidden_nodes': 17,
+
+    # Speciation
+    'compatibility_threshold': 3.857,
+    'neat_excess_coefficient': 1.856,
+    'neat_disjoint_coefficient': 1.354,
+    'neat_weight_coefficient': 0.644,
+    'min_species_size': 3,
+
+    # Creature constraints
+    'min_nodes': 3,
+    'max_nodes': 10,
+    'max_muscles': 17,
+
+    # Neural
+    'neural_dead_zone': 0.034,
+    'neural_output_bias': -0.302,
+}
+
+# Trial #42 from Pure GA search - Best fitness (798.6)
+# Key: crossover OFF, proprioception ON, conservative weight mutation
+PURE_OPTIMAL: dict[str, Any] = {
+    **BASE_CONFIG,
+    'neural_mode': 'pure',
+    'selection_method': 'rank',
+
+    # Critical: NO crossover, mutation-only
+    'use_crossover': False,
+    'crossover_rate': 0.0,
+
+    # Proprioception enabled (all sensors)
+    'use_proprioception': True,
+    'proprioception_inputs': 'all',
+
+    # Neural settings
+    'neural_hidden_size': 8,
+    'time_encoding': 'none',
+
+    # Weight mutation: CONSERVATIVE
+    'weight_mutation_rate': 0.12,
+    'weight_mutation_magnitude': 0.44,
+
+    # Body mutation: AGGRESSIVE
+    'mutation_rate': 0.58,
+    'mutation_magnitude': 0.19,
+
+    # Selection: aggressive culling
+    'cull_percentage': 0.78,
+
+    # Body constraints
+    'min_nodes': 3,
+    'max_nodes': 9,
+    'max_muscles': 14,
+}
+
+# Balanced config - Better population learning (~19% ratio) but lower peak (~213)
+# Use this for watching evolution (more creatures visibly improve)
+NAS_BALANCED: dict[str, Any] = {
+    **BASE_CONFIG,
+    'neural_mode': 'neat',
+    'selection_method': 'speciation',
+    'bias_mode': 'node',
+
+    # Key differences from optimal
+    'neat_initial_connectivity': 'sparse_inputs',  # Start sparse
+    'time_encoding': 'sin',                        # Time signal helps population
+    'use_proprioception': False,
+    'use_adaptive_mutation': False,
+
+    # More moderate genetic operators
+    'crossover_rate': 0.35,        # Higher - more gene sharing
+    'mutation_rate': 0.4,
+    'mutation_magnitude': 0.3,
+    'cull_percentage': 0.5,        # Standard culling
+
+    # Weight mutation
+    'weight_mutation_rate': 0.5,
+    'weight_mutation_magnitude': 0.3,
+
+    # NEAT structural
+    'neat_add_connection_rate': 0.4,
+    'neat_add_node_rate': 0.2,
+    'neat_enable_rate': 0.02,
+    'neat_disable_rate': 0.01,
+    'neat_max_hidden_nodes': 32,
+
+    # Speciation
+    'compatibility_threshold': 3.0,
+    'neat_excess_coefficient': 1.0,
+    'neat_disjoint_coefficient': 1.0,
+    'neat_weight_coefficient': 0.4,
+    'min_species_size': 2,
+
+    # Creature constraints
+    'min_nodes': 3,
+    'max_nodes': 9,
+    'max_muscles': 15,
+
+    # Neural
+    'neural_dead_zone': 0.1,
+    'neural_output_bias': -0.1,
+}
+
+
+# =============================================================================
 # PURE NEURAL CONFIGURATIONS (fixed topology)
 # =============================================================================
 
@@ -278,6 +416,11 @@ SELECT_TRUNCATION: dict[str, Any] = {
 # =============================================================================
 
 CONFIGS: dict[str, dict[str, Any]] = {
+    # NAS optimized (from hyperparameter searches)
+    'nas_optimal': NAS_OPTIMAL,      # NEAT Trial #68 (441.2)
+    'pure_optimal': PURE_OPTIMAL,    # Pure Trial #42 (798.6)
+    'nas_balanced': NAS_BALANCED,
+
     # NEAT variants (primary focus)
     'neat_baseline': NEAT_BASELINE,
     'neat_sparse': NEAT_SPARSE,

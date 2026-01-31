@@ -601,5 +601,382 @@ def parallel(
     console.print("Use 'nas results' to see results or 'nas compare' to compare them.")
 
 
+@app.command(name="store-trials")
+def store_trials(
+    top_best: Optional[int] = typer.Option(None, "--top-best", help="Run top N by max fitness"),
+    top_avg: Optional[int] = typer.Option(None, "--top-avg", help="Run top N by avg fitness"),
+    trials: Optional[list[int]] = typer.Option(None, "--trials", "-t", help="Run specific trial numbers"),
+    generations: int = typer.Option(50, "--generations", "-g", help="Number of generations"),
+    population_size: int = typer.Option(100, "--population-size", "-p", help="Population size"),
+    search: str = typer.Option("neat", "--search", "-s", help="Search to use: 'neat' or 'pure'"),
+):
+    """
+    Run NAS trials with database storage.
+
+    Runs specific trials from hyperparameter searches and stores
+    results in PostgreSQL for viewing in the frontend.
+
+    Examples:
+        # Run top 5 NEAT by max fitness
+        nas store-trials --top-best 5 --generations 100 --search neat
+
+        # Run top 5 Pure by max fitness
+        nas store-trials --top-best 5 --generations 100 --search pure
+
+        # Run specific trials
+        nas store-trials --trials 68 57 90 --generations 50
+    """
+    import httpx
+    import json
+    import time
+    from pathlib import Path
+
+    API_BASE = "http://localhost:8000"
+
+    # Select search directories
+    if search == "neat":
+        # Combine both NEAT searches (100 + 137 = 237 trials)
+        RESULTS_DIRS = [
+            Path(__file__).parent / "results" / "search_neat-full_20260129_190418",
+            Path(__file__).parent / "results" / "search_pool_neat-full-200_20260131_100700",
+        ]
+        mode_name = "NEAT"
+    elif search == "pure":
+        RESULTS_DIRS = [
+            Path(__file__).parent / "results" / "search_pool_pure-full-200_20260131_100700",
+        ]
+        mode_name = "Pure"
+    else:
+        console.print(f"[red]Error: Unknown search '{search}'. Use 'neat' or 'pure'.[/red]")
+        raise typer.Exit(1)
+
+    # Load trials from all directories
+    all_trials = []
+    for results_dir in RESULTS_DIRS:
+        source = results_dir.name
+        for f in results_dir.glob("trial_*.json"):
+            with open(f) as fp:
+                trial = json.load(fp)
+                # Normalize trial_id vs trial_number
+                trial["trial_number"] = trial.get("trial_number") or trial.get("trial_id")
+                trial["source"] = source  # Track which search it came from
+                all_trials.append(trial)
+
+    # Create unique keys combining source + trial number
+    trial_map = {(t["source"], t["trial_number"]): t for t in all_trials}
+    console.print(f"  Loaded {len(all_trials)} trials from {len(RESULTS_DIRS)} search(es)")
+
+    # Determine which trials to run
+    to_run = []
+
+    if top_best:
+        sorted_trials = sorted(all_trials, key=lambda t: t["mean_best_fitness"], reverse=True)[:top_best]
+        for t in sorted_trials:
+            to_run.append((t, "top-best"))
+
+    if top_avg:
+        sorted_trials = sorted(all_trials, key=lambda t: t["mean_avg_fitness"], reverse=True)[:top_avg]
+        for t in sorted_trials:
+            to_run.append((t, "top-avg"))
+
+    if trials:
+        # For manual trials, search all sources
+        for num in trials:
+            found = False
+            for t in all_trials:
+                if t["trial_number"] == num:
+                    to_run.append((t, "manual"))
+                    found = True
+                    break
+            if not found:
+                console.print(f"[yellow]Warning: Trial {num} not found[/yellow]")
+
+    if not to_run:
+        console.print("[red]Error: Must specify --top-best, --top-avg, or --trials[/red]")
+        raise typer.Exit(1)
+
+    # Deduplicate by (source, trial_number) to handle same trial numbers across searches
+    seen = set()
+    unique_runs = []
+    for trial, category in to_run:
+        key = (trial["source"], trial["trial_number"])
+        if key not in seen:
+            seen.add(key)
+            unique_runs.append((trial, category))
+
+    console.print(f"\n[bold]Running {len(unique_runs)} {mode_name} trials with database storage[/bold]")
+    console.print(f"  Generations: {generations}")
+    console.print(f"  Population: {population_size}")
+    console.print(f"  Frame storage: sparse (top 10 + bottom 5)")
+
+    # Check backend
+    with httpx.Client() as client:
+        try:
+            response = client.get(f"{API_BASE}/api/health", timeout=5)
+            response.raise_for_status()
+            health = response.json()
+            console.print(f"[green]Backend connected:[/green] {health.get('device', 'unknown')} mode\n")
+        except Exception:
+            console.print(f"[red]Error: Backend not available at {API_BASE}[/red]")
+            console.print(f"  Start it with: cd backend && uvicorn app.main:app --reload --port 8000")
+            raise typer.Exit(1)
+
+        results = []
+        for trial, category in unique_runs:
+            trial_num = trial["trial_number"]
+            source = trial["source"]
+            # Shorten source name for display
+            source_short = "n100" if "20260129" in source else "n200" if "neat" in source.lower() else "p200"
+            run_name = f"{mode_name} {source_short} #{trial_num} ({category})"
+            params = trial["params"]
+
+            # Handle different fitness key names
+            expected_fitness = trial.get("mean_best_fitness") or trial.get("best_fitness", 0)
+            console.print(f"[cyan]Starting {source_short} Trial {trial_num}[/cyan] - expected best: {expected_fitness:.1f}")
+
+            # Build base config
+            cfg = {
+                "gravity": -9.8,
+                "ground_friction": 0.5,
+                "time_step": 1/30,
+                "simulation_duration": 30,  # Match original NAS search
+                "muscle_velocity_cap": 5.0,
+                "muscle_damping_multiplier": 1.0,
+                "max_extension_ratio": 2.0,
+                "population_size": population_size,
+                "tournament_size": 3,
+                "elite_count": 5,
+                "pellet_count": 3,
+                "arena_size": 10,
+                "fitness_pellet_points": 20,
+                "fitness_progress_max": 80,
+                "fitness_distance_per_unit": 3,
+                "fitness_distance_traveled_max": 20,
+                "fitness_regression_penalty": 20,
+                "use_neural_net": True,
+                "neural_activation": "tanh",
+                "weight_mutation_decay": "linear",
+                "fitness_efficiency_penalty": 0.1,
+                "neural_update_hz": 10,
+                "output_smoothing_alpha": 0.15,
+                "stagnation_threshold": 20,
+                "adaptive_mutation_boost": 2.0,
+                "max_adaptive_boost": 8.0,
+                "improvement_threshold": 5.0,
+                "neural_crossover_method": "sbx",
+                "sbx_eta": 2.0,
+                "use_fitness_sharing": False,
+                "sharing_radius": 0.5,
+                "frame_storage_mode": "sparse",
+                "frame_rate": 15,
+                "sparse_top_count": 10,
+                "sparse_bottom_count": 5,
+                # Common trial params
+                "neural_hidden_size": params.get("neural_hidden_size", 8),
+                "weight_mutation_rate": params.get("weight_mutation_rate", 0.5),
+                "weight_mutation_magnitude": params.get("weight_mutation_magnitude", 0.3),
+                "mutation_rate": params.get("mutation_rate", 0.3),
+                "mutation_magnitude": params.get("mutation_magnitude", 0.3),
+                "cull_percentage": params.get("cull_percentage", 0.5),
+                "use_crossover": params.get("use_crossover", True),
+                "crossover_rate": params.get("crossover_rate", 0.5),
+                "use_proprioception": params.get("use_proprioception", False),
+                "proprioception_inputs": params.get("proprioception_inputs", "all"),
+                "min_nodes": params.get("min_nodes", 3),
+                "max_nodes": params.get("max_nodes", 8),
+                "max_muscles": params.get("max_muscles", 15),
+                "neural_dead_zone": params.get("neural_dead_zone", 0.1),
+                "neural_output_bias": params.get("neural_output_bias", -0.1),
+                "use_adaptive_mutation": params.get("use_adaptive_mutation", False),
+            }
+
+            # Mode-specific settings
+            if search == "neat":
+                cfg.update({
+                    "neural_mode": "neat",
+                    "selection_method": "speciation",
+                    "bias_mode": params.get("bias_mode", "bias_node"),
+                    "time_encoding": params.get("time_encoding", "none"),
+                    "neat_initial_connectivity": params.get("neat_initial_connectivity", "full"),
+                    "neat_add_connection_rate": params.get("neat_add_connection_rate", 0.5),
+                    "neat_add_node_rate": params.get("neat_add_node_rate", 0.2),
+                    "neat_enable_rate": params.get("neat_enable_rate", 0.02),
+                    "neat_disable_rate": params.get("neat_disable_rate", 0.01),
+                    "neat_max_hidden_nodes": params.get("neat_max_hidden_nodes", 32),
+                    "compatibility_threshold": params.get("compatibility_threshold", 3.0),
+                    "neat_excess_coefficient": params.get("neat_excess_coefficient", 1.0),
+                    "neat_disjoint_coefficient": params.get("neat_disjoint_coefficient", 1.0),
+                    "neat_weight_coefficient": params.get("neat_weight_coefficient", 0.4),
+                    "min_species_size": params.get("min_species_size", 2),
+                })
+            else:  # pure
+                cfg.update({
+                    "neural_mode": "pure",
+                    "selection_method": params.get("selection_method", "rank"),
+                    "time_encoding": "none",
+                })
+
+            # Create run
+            response = client.post(
+                f"{API_BASE}/api/runs",
+                json={"name": run_name, "config": cfg},
+                timeout=30,
+            )
+            response.raise_for_status()
+            run_id = response.json()["id"]
+
+            # Run generations
+            start_time = time.time()
+            best_fitness = 0.0
+
+            for gen in range(generations):
+                response = client.post(
+                    f"{API_BASE}/api/evolution/{run_id}/step",
+                    timeout=120,
+                )
+                response.raise_for_status()
+                result = response.json()
+                best_fitness = max(best_fitness, result["best_fitness"])
+
+                if gen % 10 == 0 or gen == generations - 1:
+                    console.print(f"  Gen {gen+1:3d}/{generations}: "
+                                 f"best={result['best_fitness']:6.1f} "
+                                 f"avg={result['avg_fitness']:5.1f}")
+
+            total_time = time.time() - start_time
+            console.print(f"  [green]Done![/green] Best: {best_fitness:.1f} in {total_time:.1f}s\n")
+
+            results.append({
+                "trial": trial_num,
+                "source": source_short,
+                "category": category,
+                "run_id": run_id,
+                "best_fitness": best_fitness,
+                "expected_best": expected_fitness,
+                "time": total_time,
+            })
+
+        # Summary
+        console.print(f"\n[bold]Summary[/bold]")
+        for r in results:
+            console.print(f"  {r['source']} #{r['trial']:3d} ({r['category']:8s}): "
+                         f"actual={r['best_fitness']:6.1f} "
+                         f"expected={r['expected_best']:6.1f} "
+                         f"run_id={r['run_id']}")
+
+        console.print(f"\n[cyan]View runs in browser:[/cyan] http://localhost:3001")
+
+
+@app.command()
+def store(
+    config: str = typer.Option("nas_optimal", "--config", "-c", help="Config name"),
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Run name (default: config name)"),
+    generations: int = typer.Option(50, "--generations", "-g", help="Number of generations"),
+    population_size: Optional[int] = typer.Option(None, "--population-size", "-p", help="Override population size"),
+    sparse_store: bool = typer.Option(True, "--sparse-store/--no-store", help="Store frames for top 10 + bottom 5"),
+):
+    """
+    Run evolution with database storage via backend API.
+
+    This stores everything in PostgreSQL for viewing in the frontend.
+
+    Examples:
+        nas store --config nas_optimal --generations 50
+        nas store -c nas_balanced -g 100 -n "My Balanced Run"
+        nas store --config neat_baseline --population-size 200 --no-store
+    """
+    import httpx
+    import time
+    from configs import get_config
+
+    API_BASE = "http://localhost:8000"
+
+    # Get config
+    try:
+        cfg = get_config(config)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Apply overrides
+    if population_size:
+        cfg['population_size'] = population_size
+
+    # Frame storage
+    if sparse_store:
+        cfg['frame_storage_mode'] = 'sparse'
+        cfg['sparse_top_count'] = 10
+        cfg['sparse_bottom_count'] = 5
+    else:
+        cfg['frame_storage_mode'] = 'none'
+
+    run_name = name or f"NAS: {config}"
+
+    console.print(f"\n[bold]Running with Database Storage[/bold]")
+    console.print(f"  Config: {config}")
+    console.print(f"  Name: {run_name}")
+    console.print(f"  Generations: {generations}")
+    console.print(f"  Population: {cfg['population_size']}")
+    console.print(f"  Mode: {cfg.get('neural_mode', 'pure')}")
+    console.print(f"  Frame storage: {cfg['frame_storage_mode']}")
+    console.print()
+
+    # Check backend is running
+    with httpx.Client() as client:
+        try:
+            response = client.get(f"{API_BASE}/api/health", timeout=5)
+            response.raise_for_status()
+            health = response.json()
+            console.print(f"[green]Backend connected:[/green] {health.get('device', 'unknown')} mode")
+        except Exception as e:
+            console.print(f"[red]Error: Backend not available at {API_BASE}[/red]")
+            console.print(f"  Start it with: cd backend && uvicorn app.main:app --reload --port 8000")
+            raise typer.Exit(1)
+
+        # Create run
+        console.print(f"\n[blue]Creating run...[/blue]")
+        response = client.post(
+            f"{API_BASE}/api/runs",
+            json={"name": run_name, "config": cfg},
+            timeout=30,
+        )
+        response.raise_for_status()
+        run_data = response.json()
+        run_id = run_data["id"]
+        console.print(f"  Run ID: {run_id}")
+
+        # Run generations
+        console.print(f"\n[blue]Running {generations} generations...[/blue]")
+        start_time = time.time()
+        best_fitness = 0.0
+
+        for gen in range(generations):
+            gen_start = time.time()
+
+            response = client.post(
+                f"{API_BASE}/api/evolution/{run_id}/step",
+                timeout=120,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            gen_time = time.time() - gen_start
+            best_fitness = max(best_fitness, result["best_fitness"])
+
+            if gen % 10 == 0 or gen == generations - 1:
+                console.print(f"  Gen {gen+1:3d}/{generations}: "
+                             f"best={result['best_fitness']:6.1f} "
+                             f"avg={result['avg_fitness']:5.1f} "
+                             f"time={gen_time:.1f}s")
+
+        total_time = time.time() - start_time
+
+        console.print(f"\n[bold green]Complete![/bold green]")
+        console.print(f"  Best fitness: {best_fitness:.1f}")
+        console.print(f"  Total time: {total_time:.1f}s")
+        console.print(f"  Run ID: {run_id}")
+        console.print(f"\n[cyan]View in browser:[/cyan] http://localhost:3001/run/{run_id}")
+
+
 if __name__ == "__main__":
     app()
