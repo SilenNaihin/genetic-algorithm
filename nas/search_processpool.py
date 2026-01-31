@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from configs import BASE_CONFIG
-from runner import run_evolution
+# NOTE: Don't import runner here - it loads PyTorch with default threading
+# Import inside worker after setting thread limits
 
 
 # Parameter sampling functions (same ranges as Optuna version)
@@ -129,12 +130,26 @@ def run_single_trial(args):
     This function is called in parallel by multiprocessing.Pool.
 
     Args:
-        args: Tuple of (trial_id, config_params, generations, seeds, device, mode, population_size, stagnation_limit)
+        args: Tuple of (trial_id, config_params, generations, seeds, device, mode, population_size, stagnation_limit, threads_per_worker)
 
     Returns:
         Dict with trial results
     """
-    trial_id, config_params, generations, seeds, device, mode, population_size, stagnation_limit = args
+    import os
+
+    trial_id, config_params, generations, seeds, device, mode, population_size, stagnation_limit, threads_per_worker = args
+
+    # CRITICAL: Set thread limits INSIDE worker before importing PyTorch
+    # This prevents thread oversubscription when multiple workers run in parallel
+    if threads_per_worker:
+        os.environ['OMP_NUM_THREADS'] = str(threads_per_worker)
+        os.environ['MKL_NUM_THREADS'] = str(threads_per_worker)
+        os.environ['OPENBLAS_NUM_THREADS'] = str(threads_per_worker)
+        os.environ['NUMEXPR_NUM_THREADS'] = str(threads_per_worker)
+        os.environ['VECLIB_MAXIMUM_THREADS'] = str(threads_per_worker)
+
+    # NOW import runner (which imports PyTorch) - it will respect env vars
+    from runner import run_evolution
 
     # Build full config
     config = BASE_CONFIG.copy()
@@ -196,12 +211,14 @@ def run_processpool_search(
     population_size: int = 300,
     stagnation_limit: int = 50,
     n_workers: int = 1,
+    threads_per_worker: int | None = None,
     results_dir: str | None = None,
 ) -> Path:
     """
     Run hyperparameter search using simple multiprocessing.Pool.
 
-    This is a control experiment to test if Optuna's joblib backend is the bottleneck.
+    This version properly controls threading to prevent oversubscription.
+    Key fix: Sets OMP_NUM_THREADS inside each worker process.
 
     Args:
         study_name: Unique identifier
@@ -226,6 +243,15 @@ def run_processpool_search(
         results_dir = Path(results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
+    # Calculate optimal threads per worker
+    if threads_per_worker is None and n_workers > 1:
+        import os
+        cpu_count = os.cpu_count() or 1
+        threads_per_worker = max(1, cpu_count // n_workers)
+        print(f"\nAuto-calculated threads_per_worker: {threads_per_worker} ({cpu_count} cores ÷ {n_workers} workers)")
+    elif threads_per_worker is None:
+        threads_per_worker = 0  # Let PyTorch use default for single worker
+
     print(f"\nProcess Pool hyperparameter search: {study_name}")
     print(f"  Mode: {mode}")
     print(f"  Trials: {n_trials}")
@@ -233,6 +259,8 @@ def run_processpool_search(
     print(f"  Population: {population_size}")
     print(f"  Seeds: {seeds}")
     print(f"  Workers: {n_workers}")
+    if threads_per_worker > 0:
+        print(f"  Threads per worker: {threads_per_worker} (prevents oversubscription)")
     print(f"  Device: {device}")
     print(f"  Results: {results_dir}")
     print()
@@ -254,6 +282,7 @@ def run_processpool_search(
             mode,
             population_size,
             stagnation_limit,
+            threads_per_worker,
         ))
 
     # Run trials in parallel
@@ -316,10 +345,16 @@ if __name__ == "__main__":
         seeds: int = typer.Option(2, "--seeds", "-s"),
         population_size: int = typer.Option(300, "--population-size", "-p"),
         n_workers: int = typer.Option(5, "--n-workers", "-w"),
+        threads_per_worker: int = typer.Option(None, "--threads-per-worker", "-t"),
         device: str = typer.Option("cpu", "--device", "-d"),
         stagnation_limit: int = typer.Option(50, "--stagnation-limit"),
     ):
-        """Run Process Pool hyperparameter search (Optuna bypass)."""
+        """
+        Run Process Pool hyperparameter search with proper thread control.
+
+        Key feature: Prevents thread oversubscription by limiting threads per worker.
+        If --threads-per-worker not specified, auto-calculates as: cpu_count / n_workers
+        """
         seed_list = [42, 123, 456, 789, 1337][:seeds]
 
         run_processpool_search(
@@ -332,6 +367,7 @@ if __name__ == "__main__":
             population_size=population_size,
             stagnation_limit=stagnation_limit,
             n_workers=n_workers,
+            threads_per_worker=threads_per_worker,
         )
 
     app()

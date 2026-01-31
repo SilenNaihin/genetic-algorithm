@@ -1,0 +1,34 @@
+{
+  "study_name": "pool-optimized-v2",
+  "mode": "pure",
+  "n_trials": 3,
+  "generations": 150,
+  "seeds": [
+    42
+  ],
+  "population_size": 500,
+  "n_workers": 3,
+  "best_trial": 1,
+  "best_fitness": 381.74066162109375,
+  "best_params": {
+    "neural_hidden_size": 16,
+    "weight_mutation_rate": 0.16089903530559424,
+    "weight_mutation_magnitude": 0.5474371106283755,
+    "mutation_rate": 0.4289535366455419,
+    "mutation_magnitude": 0.13172690421203673,
+    "cull_percentage": 0.42804840211916395,
+    "selection_method": "rank",
+    "use_crossover": false,
+    "use_proprioception": false,
+    "min_nodes": 4,
+    "max_nodes": 11,
+    "max_muscles": 14,
+    "neural_dead_zone": 0.020114756280940973,
+    "neural_output_bias": -0.24711908710674862
+  },
+  "all_fitness": [
+    193.74215698242188,
+    381.74066162109375,
+    212.57424926757812
+  ]
+}
