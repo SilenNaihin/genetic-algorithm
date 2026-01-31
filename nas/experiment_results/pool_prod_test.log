@@ -1,0 +1,13 @@
+
+Process Pool hyperparameter search: pool-prod-test
+  Mode: pure
+  Trials: 3
+  Generations: 150
+  Population: 500
+  Seeds: [42]
+  Workers: 3
+  Device: cpu
+  Results: results/search_pool_pool-prod-test_20260131_000119
+
+Starting 3 trials with 3 workers...
+

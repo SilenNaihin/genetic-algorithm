@@ -1,0 +1,137 @@
+=== MONITORING POOL TEST ===
+Start time: Sat Jan 31 00:01:58 UTC 2026
+
+--- Minute 1: Sat Jan 31 00:01:58 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 18% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4149% CPU, 0.0 mem, 27:23 time
+  PID 60478: 4305% CPU, 0.0 mem, 28:25 time
+  PID 60479: 4150% CPU, 0.0 mem, 27:23 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 2: Sat Jan 31 00:03:58 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 5% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4057% CPU, 0.0 mem, 108:06 time
+  PID 60478: 4368% CPU, 0.0 mem, 116:22 time
+  PID 60479: 4212% CPU, 0.0 mem, 112:14 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 3: Sat Jan 31 00:05:59 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 3% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4069% CPU, 0.0 mem, 189:54 time
+  PID 60478: 4345% CPU, 0.0 mem, 202:48 time
+  PID 60479: 4225% CPU, 0.0 mem, 197:13 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 4: Sat Jan 31 00:07:59 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 2% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4093% CPU, 0.0 mem, 273:05 time
+  PID 60478: 4344% CPU, 0.0 mem, 289:49 time
+  PID 60479: 4200% CPU, 0.0 mem, 280:12 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 5: Sat Jan 31 00:09:59 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 1% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4075% CPU, 0.0 mem, 353:30 time
+  PID 60478: 4318% CPU, 0.0 mem, 374:35 time
+  PID 60479: 4217% CPU, 0.0 mem, 365:52 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 6: Sat Jan 31 00:11:59 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 1% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4079% CPU, 0.0 mem, 435:39 time
+  PID 60478: 4310% CPU, 0.0 mem, 460:19 time
+  PID 60479: 4219% CPU, 0.0 mem, 450:36 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 7: Sat Jan 31 00:13:59 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 1% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4081% CPU, 0.0 mem, 517:38 time
+  PID 60478: 4305% CPU, 0.0 mem, 545:59 time
+  PID 60479: 4223% CPU, 0.0 mem, 535:34 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 8: Sat Jan 31 00:16:00 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 1% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4075% CPU, 0.0 mem, 598:32 time
+  PID 60478: 4299% CPU, 0.0 mem, 631:25 time
+  PID 60479: 4232% CPU, 0.0 mem, 621:34 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 9: Sat Jan 31 00:18:00 UTC 2026 ---
+Processes running: 5
+Worker CPU usage:
+  PID 60401: 0% CPU, 0.0 mem, 0:00 time
+  PID 60402: 1% CPU, 0.1 mem, 0:07 time
+  PID 60477: 4072% CPU, 0.0 mem, 679:42 time
+  PID 60478: 4298% CPU, 0.0 mem, 717:24 time
+  PID 60479: 4243% CPU, 0.0 mem, 708:12 time
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
+--- Minute 10: Sat Jan 31 00:20:00 UTC 2026 ---
+Processes running: 0
+Trials completed: 0 / 3
+Recent log output:
+  
+  Starting 3 trials with 3 workers...
+  
+
