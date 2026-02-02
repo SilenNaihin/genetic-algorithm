@@ -4,50 +4,76 @@
 
 - [README.md](../README.md) - Project overview and usage
 - [CHANGELOG.md](../CHANGELOG.md) - Version history and changes
+- [CLAUDE.md](../CLAUDE.md) - Development conventions and quick reference
 
 ## Core Concepts
 
-### Creatures
+### Creatures & Genomes
 - [GENOME.md](./GENOME.md) - Complete genome specification, perception, volition
 
-### Control Systems
-- **Oscillator** (default) - Sinusoidal muscle contraction with modulation
-- **Neural Network** (optional) - Learned input→output mappings
-
-### Neural Network Documentation
-- [NEURAL.md](./NEURAL.md) - Neural network evolution overview
-- [NEURAL_IMPLEMENTATION.md](./NEURAL_IMPLEMENTATION.md) - Implementation checklist
-- [NEAT_FUTURE.md](./NEAT_FUTURE.md) - Topology evolution roadmap
-
-### Simulation & Fitness
+### Physics & Simulation
+- [PHYSICS.md](./PHYSICS.md) - Physics system documentation
 - [FITNESS.md](./FITNESS.md) - Fitness calculation system, known gotchas, and past bugs
+
+### Evolution & Genetics
+- [EVOLUTION.md](./EVOLUTION.md) - Evolution system overview
+- [ADAPTIVE_MUTATION.md](./ADAPTIVE_MUTATION.md) - Adaptive mutation rates
+
+### Neural Networks
+- [NEURAL.md](./NEURAL.md) - Neural network evolution overview (pure/hybrid modes)
+- [NEAT.md](./NEAT.md) - NEAT (NeuroEvolution of Augmenting Topologies) technical reference
+
+### Experiments
+- [NAS.md](./NAS.md) - Neural Architecture Search experiments
+- [NAS-CLI.md](./NAS-CLI.md) - NAS CLI documentation
+- [optimized-runs.md](./optimized-runs.md) - Optimized run configurations
+
 
 ## Architecture
 
 ```
-src/
-├── core/           - Creature, Genome, Pellet entities
-├── genetics/       - Selection, Crossover, Mutation operators
-├── neural/         - Neural network controller (planned)
-├── physics/        - Cannon.js physics wrapper
-├── rendering/      - Three.js visualization
-├── simulation/     - BatchSimulator (headless physics)
-├── storage/        - IndexedDB persistence
-├── types/          - TypeScript interfaces
-├── ui/             - UI components
-└── main.ts         - Application entry point
+app/                    # Next.js React application
+├── components/         # React components (grid, menu, modals, ui)
+├── hooks/              # React hooks (useSimulation)
+├── stores/             # Zustand state management
+├── menu/               # /menu route - configuration screen
+└── run/[runId]/        # /run/[runId] route - evolution view
+
+src/                    # Core simulation modules (shared)
+├── core/               # Domain models (Genome)
+├── neural/             # Neural network types and initialization
+├── rendering/          # Three.js visualization
+├── services/           # SimulationService, StorageService
+├── simulation/         # BatchSimulator (headless)
+├── storage/            # IndexedDB persistence
+├── types/              # TypeScript interfaces
+├── ui/                 # Shared UI components
+└── utils/              # Math, ID utilities
+
+backend/                # Python backend (FastAPI + PyTorch)
+├── app/
+│   ├── api/            # FastAPI routes
+│   ├── genetics/       # Selection, mutation, crossover
+│   ├── neural/         # BatchedNeuralNetwork, NEAT
+│   ├── schemas/        # Pydantic models
+│   ├── services/       # PyTorchSimulator
+│   └── simulation/     # Batched tensor physics
+└── fixtures/           # Test genomes
+
+nas/                    # Neural Architecture Search
 ```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `main.ts` | Main application class (EvolutionApp) with UI, state, rendering |
-| `simulation/BatchSimulator.ts` | Headless physics simulation, fitness calculation |
-| `genetics/Selection.ts` | Fitness-based selection |
-| `genetics/Mutation.ts` | Genome mutation operators |
-| `genetics/Crossover.ts` | Genetic crossover operators |
-| `storage/RunStorage.ts` | IndexedDB persistence layer |
+| `app/stores/evolutionStore.ts` | Zustand state management for evolution runs |
+| `app/hooks/useSimulation.ts` | React hook for simulation lifecycle |
+| `src/simulation/BatchSimulator.ts` | Headless physics simulation bridge |
+| `src/storage/RunStorage.ts` | IndexedDB persistence layer |
+| `backend/app/genetics/` | Selection, mutation, crossover operators |
+| `backend/app/simulation/physics.py` | PyTorch batched physics engine |
+| `backend/app/neural/neat_network.py` | NEAT network implementation |
 
 ## Fitness Function
 

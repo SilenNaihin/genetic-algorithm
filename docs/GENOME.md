@@ -408,8 +408,7 @@ Neural networks replace the oscillator-based control with learned input→output
 
 **See also:**
 - [NEURAL.md](./NEURAL.md) - Full neural network documentation
-- [NEURAL_IMPLEMENTATION.md](./NEURAL_IMPLEMENTATION.md) - Implementation checklist
-- [NEAT_FUTURE.md](./NEAT_FUTURE.md) - Topology evolution roadmap
+- [NEAT.md](./NEAT.md) - NEAT (NeuroEvolution of Augmenting Topologies) technical reference
 
 ---
 
@@ -421,11 +420,11 @@ Neural networks replace the oscillator-based control with learned input→output
 | Reflex Arcs | High | Medium-High | Medium | Future |
 | Behavioral Modes | Very High | High | Slow | Future |
 | Neural Networks (Fixed) | High | Medium | Medium | **Complete** |
-| Neural Networks (NEAT) | Unlimited | Very High | Slow | Planned |
+| Neural Networks (NEAT) | Unlimited | Very High | Slow | **Complete** |
 
-**Current focus:** Fixed-topology neural networks with hybrid/pure control modes.
+**Current focus:** Neural networks with three modes - fixed-topology (pure/hybrid) and NEAT (variable topology).
 
-**Recommended future order:** Phase Coupling → Reflex Arcs → NEAT → Behavioral Modes
+**Recommended future order:** Phase Coupling → Reflex Arcs → Behavioral Modes
 
 ---
 

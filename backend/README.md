@@ -66,7 +66,7 @@ pytest --cov=app
 pytest app/simulation/test_physics.py
 ```
 
-**285 tests** covering: physics, neural networks, fitness, genetics, API integration.
+**1384 tests** covering: physics, neural networks, fitness, genetics, API, parity, integration, NEAT connectivity modes.
 
 ## API Documentation
 

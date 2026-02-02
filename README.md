@@ -2,25 +2,43 @@
 
 A browser-based genetic algorithm simulator where soft-bodied creatures evolve to collect pellets. Watch populations of creatures develop movement strategies over generations through mutation, crossover, and natural selection.
 
-![Demo](assets/demo.gif)
+![Demo](best-creature.gif)
 
 ## Features
 
 - **Soft-body Physics**: Creatures are made of nodes (spheres) connected by oscillating muscles (springs)
-- **Pellet Collection**: Creatures are rewarded for collecting pellets that progressively spawn further away and higher up
+- **Pellet Collection**: Creatures are rewarded for collecting pellets that progressively spawn further away
 - **Genetic Evolution**: Population evolves through selection, mutation, and crossover
-- **Configurable Fitness Function**: Customize how creatures are evaluated
+- **Neural Networks**: Three modes for muscle control - Pure, Hybrid, and NEAT (topology evolution)
+- **Brain Evolution Visualization**: Watch neural network weights evolve across generations
+- **Family Tree**: Trace creature ancestry back to generation 0, including crossover parents
+- **Config Presets**: Save and load evolution configurations
 - **Generation History**: Auto-saves all runs to IndexedDB, navigate through past generations
 - **Visual Replay**: Click any creature to watch its simulation replay
 
 ## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Python 3.10+
+- PostgreSQL
+
+### Frontend
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:3001` in your browser.
+
+### Backend
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
 ## How It Works
 
@@ -29,6 +47,17 @@ Open `http://localhost:5173` in your browser.
 1. **Mutate**: The bottom 50% of creatures are culled. Survivors reproduce with mutation to fill the population.
 2. **Simulate**: Each creature runs in a physics simulation for the configured duration, attempting to collect pellets.
 3. **Sort**: Creatures are ranked by fitness score.
+
+### Neural Network Modes
+
+| Mode | Description |
+|------|-------------|
+| **None** | Muscles oscillate based on genome parameters only |
+| **Pure** | Neural network has full control over muscle activation (7 inputs) |
+| **Hybrid** | Neural network modulates base oscillation (8 inputs with time phase) |
+| **NEAT** | Evolves network topology - adds/removes nodes and connections over generations |
+
+Neural inputs include proprioception (body-sensing): muscle lengths, velocities, and ground contact.
 
 ### Creature Anatomy
 
@@ -57,13 +86,11 @@ Creatures are scored using an edge-based, ground-distance system:
 **Key mechanics:**
 - All distances measured on XZ plane (ground only, Y/height ignored for progress)
 - Distance measured from creature's nearest **edge**, not center
-- Creature radius calculated from genome with 1.3x buffer for muscle extension
-- Progress capped at 80 to incentivize actually collecting (reaching correct height)
+- Progress is banked when pellet collected, not reset to 0
 
 **Anti-luck pellet spawning:**
-- Pellets spawn in opposite 180° arc from previous pellet direction
-- Progressive distances from creature's edge: 7-8 units (1st), 8-9 units (2nd-3rd), 9-10 units (4th+)
-- Extra distance accounts for full muscle extension (chains of muscles can reach far)
+- Pellets spawn in opposite 180 degree arc from previous pellet direction
+- Progressive distances: 7-8 units (1st), 8-9 units (2nd-3rd), 9-10 units (4th+)
 - Ensures creatures must change direction to collect successive pellets
 
 ### Simulation Parameters
@@ -76,19 +103,15 @@ Creatures are scored using an edge-based, ground-distance system:
 | Sim Duration | Seconds per creature simulation | 8 |
 | Max Nodes | Maximum nodes per creature | 8 |
 | Max Muscles | Maximum muscles per creature | 15 |
-
-### Persistence
-
-- **Auto-save**: Every generation is automatically saved to IndexedDB
-- **Load Runs**: Access previous runs from the main menu
-- **Navigation**: Use arrows in the stats panel to browse generation history
-- **Fitness Settings**: Saved to localStorage and persist across sessions
+| Physics FPS | Simulation steps per second | 60 |
 
 ## Controls
 
 ### Main Menu
 - Adjust simulation parameters with sliders
-- Expand "Fitness Function Settings" to customize scoring
+- Choose neural network mode (None, Pure, Hybrid, NEAT)
+- Enable/disable crossover
+- Load config presets or save your own
 - Click "Start Evolution" to begin a new run
 - Click "Load Run" to continue a previous run
 
@@ -96,62 +119,83 @@ Creatures are scored using an edge-based, ground-distance system:
 - **Next Step**: Advance to the next evolution step
 - **1x/10x/100x**: Auto-run multiple generations
 - **Graph**: Toggle fitness history graph
+- **Brain**: View brain evolution visualization (neural modes only)
 - **Reset**: Return to main menu
-- Click any creature card to watch its replay
+- Click any creature card to watch its replay and view ancestry
 
 ### Generation Navigation
 - **< >**: Navigate through saved generations
 - Click the generation number to jump to a specific generation
-- Click the total to return to the current generation
 
 ## Project Structure
 
 ```
-src/
-├── __tests__/              # Test suite (Vitest)
-│   ├── genetics.test.ts    # Selection, crossover, mutation, population tests
-│   ├── genome.test.ts      # Genome generation tests
-│   ├── math.test.ts        # Math utility tests
-│   ├── simulation.test.ts  # BatchSimulator tests
-│   └── storage.test.ts     # IndexedDB storage tests
-├── core/                   # Domain models
-│   ├── Creature.ts         # Creature entity (genome + physics + rendering)
-│   ├── Genome.ts           # Genome generation utilities
-│   └── Pellet.ts           # Pellet entity for collection
-├── genetics/               # Evolutionary algorithm
-│   ├── Crossover.ts        # Genetic crossover operators
-│   ├── Mutation.ts         # Mutation operators
-│   ├── Population.ts       # Population management
-│   └── Selection.ts        # Selection operators
-├── physics/                # Physics engine
-│   ├── BodyFactory.ts      # Creates physics bodies for creatures
-│   └── PhysicsWorld.ts     # Cannon.js world wrapper
-├── rendering/              # 3D visualization
-│   ├── CreatureRenderer.ts # Three.js mesh creation for creatures
-│   └── SceneManager.ts     # Three.js scene setup
-├── simulation/             # Simulation engine
-│   └── BatchSimulator.ts   # Headless creature simulation
-├── storage/                # Persistence
-│   └── RunStorage.ts       # IndexedDB storage for runs/generations
-├── types/                  # TypeScript interfaces
-│   ├── genome.ts           # Genome type definitions
-│   ├── index.ts            # Re-exports
-│   └── simulation.ts       # Simulation config types
-├── ui/                     # UI components
-│   └── GraphPanel.ts       # Fitness history graph
-├── utils/                  # Shared utilities
-│   ├── id.ts               # ID generation
-│   └── math.ts             # Math utilities (distance, lerp, clamp)
-└── main.ts                 # Application entry point
+app/                    # Next.js React application
+├── components/         # React components
+│   ├── common/         # Shared UI components
+│   ├── grid/           # Grid view (CreatureGrid, ControlPanel, StatsPanel)
+│   ├── menu/           # Menu screen components
+│   └── modals/         # Modal dialogs (Replay, LoadRuns, BrainEvolution)
+├── hooks/              # React hooks (useSimulation)
+├── stores/             # Zustand state management
+├── menu/               # /menu route
+└── run/[runId]/        # /run/[runId] dynamic route
+
+src/                    # Core simulation modules
+├── core/               # Domain models (Genome)
+├── neural/             # Neural network types and initialization
+├── rendering/          # Three.js visualization
+├── services/           # Service layer (SimulationService, StorageService)
+├── storage/            # IndexedDB persistence
+├── types/              # TypeScript interfaces
+├── ui/                 # Shared UI (GraphPanel, NeuralVisualizer, BrainEvolutionPanel)
+└── utils/              # Shared utilities (math, id)
+
+backend/                # Python backend (FastAPI + PyTorch)
+├── app/
+│   ├── api/            # FastAPI routes (runs, generations, simulation, genetics)
+│   ├── genetics/       # Selection, mutation, crossover, speciation
+│   ├── neural/         # Neural networks (fixed topology + NEAT)
+│   ├── schemas/        # Pydantic models
+│   ├── services/       # PyTorchSimulator
+│   └── simulation/     # Batched tensor physics
+└── tests/
+
+nas/                    # Neural Architecture Search (experimental)
+├── cli.py              # NAS CLI tool
+├── configs.py          # Predefined search configurations
+├── search.py           # Optuna-based hyperparameter search
+└── results/            # Experiment results
 ```
 
-## Technologies
+## Tech Stack
 
-- **TypeScript** - Type-safe development
-- **Three.js** - 3D rendering
-- **Cannon-ES** - Physics simulation
-- **Vite** - Build tool
-- **IndexedDB** - Persistent storage
+### Frontend
+- **Framework**: Next.js 16 + React 19
+- **State**: Zustand
+- **3D**: Three.js (rendering only - physics runs on backend)
+- **Storage**: IndexedDB
+- **Styling**: Tailwind CSS v4
+- **Testing**: Vitest + happy-dom
+
+### Backend
+- **Framework**: FastAPI
+- **Physics**: PyTorch (batched tensor simulation)
+- **Database**: PostgreSQL + SQLAlchemy
+- **Testing**: pytest
+
+## Testing
+
+```bash
+# Frontend
+npm test
+
+# Backend
+cd backend && pytest
+```
+
+- 312 frontend tests covering genome, storage, neural networks, brain evolution
+- 600+ backend tests covering physics, neural, fitness, genetics, API, NEAT
 
 ## License
 

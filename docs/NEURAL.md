@@ -11,21 +11,22 @@
 8. [Selection Methods](#selection-methods)
 9. [Configuration](#configuration)
 10. [Visualization](#visualization)
-11. [Future: NEAT](#future-neat)
+11. [NEAT Mode](#neat-mode)
 12. [References](#references)
 
 ---
 
 ## Overview
 
-Evolution Lab supports two creature control systems:
+Evolution Lab supports three neural evolution modes:
 
-| System | Description | When to Use |
-|--------|-------------|-------------|
-| **Oscillator** (default) | Muscles contract via sinusoidal oscillation with direction/velocity/distance modulation | Quick experiments, baseline comparison |
-| **Neural Network** (optional) | A neural network maps sensory inputs to muscle activations | Complex behaviors, research |
+| Mode | Description | When to Use |
+|------|-------------|-------------|
+| **Hybrid** (default) | Neural network modulates base oscillator | Quick experiments, stable learning |
+| **Pure** | Neural network directly controls muscles | Full expressiveness, harder to bootstrap |
+| **NEAT** | NeuroEvolution of Augmenting Topologies - evolves both weights AND structure | Complex behaviors, automatic topology discovery |
 
-Both systems use **genetic algorithms** for optimization - no gradient descent involved.
+All modes use **genetic algorithms** for optimization - no gradient descent involved.
 
 ---
 
@@ -742,46 +743,59 @@ interface SimulationFrame {
 
 ---
 
-## Future: NEAT
+## NEAT Mode
+
+NEAT (NeuroEvolution of Augmenting Topologies) is the third neural mode, evolving both network **weights AND structure**. Unlike Hybrid and Pure modes which use fixed-topology networks, NEAT discovers optimal network architecture automatically.
 
 ### What is NEAT?
 
-**NEAT** (NeuroEvolution of Augmenting Topologies) evolves both network **weights AND structure**:
+NEAT starts with minimal networks and evolves complexity:
 
-- Start with minimal networks (no hidden nodes)
-- Mutations can add nodes and connections
-- Crossover aligns networks by "innovation numbers"
-- Speciation protects novel topologies
+- **Minimal initialization**: Direct input-to-output connections only (configurable via `initial_connectivity`)
+- **Structural mutations**: Add nodes (split connections) and add connections over generations
+- **Innovation tracking**: Each structural change gets a unique ID enabling meaningful crossover
+- **Speciation**: Networks grouped by structural similarity, protecting novel topologies
 
-### Key Innovations
+### Key Concepts
 
-1. **Historical Markings**: Each connection gets a unique global ID when created. This enables meaningful crossover between networks with different structures.
+1. **Historical Markings**: Each connection gets a globally unique innovation ID when created. When two creatures independently evolve the same connection (e.g., input 3 → hidden 1), they get the same innovation ID, enabling proper gene alignment during crossover.
 
-2. **Speciation**: Networks are grouped into species by structural similarity. Competition happens within species, protecting innovation.
+2. **Speciation**: Networks are grouped into species by structural similarity using a compatibility distance metric. Competition happens within species first, protecting innovative but initially less-fit topologies.
 
-3. **Minimal Initialization**: Start with direct input→output connections only. Complexity grows only when beneficial.
+3. **Topology Growth**: Networks start minimal and grow only when beneficial. This avoids the "wasted parameters" problem of fixed-topology networks.
 
-### Migration Path
+### Comparison to Fixed Topology
 
-Our fixed-topology implementation is designed for easy NEAT migration:
+| Fixed Topology (Hybrid/Pure) | NEAT |
+|------------------------------|------|
+| Manual hidden size choice (e.g., 8 neurons) | Topology evolves to fit problem |
+| All creatures have identical structure | Each creature can have unique architecture |
+| Cannot grow beyond initial capacity | Starts minimal, grows as needed |
+| Wasted parameters for simple behaviors | Only active connections stored |
 
-| Current (Fixed) | Future (NEAT) |
-|-----------------|---------------|
-| Flat weight array | Connection genes with innovation numbers |
-| Fixed forward pass | Dynamic topology evaluation |
-| Weight mutation only | Add structural mutations |
-| Single population | Speciated population |
+### Configuration
 
-### Implementation Notes
+When NEAT is enabled:
+- **Speciation auto-enabled** (required for NEAT's diversity protection)
+- **Fitness sharing auto-disabled** (redundant with speciation)
+- **Hidden size ignored** (topology evolves)
 
-When implementing NEAT:
-1. Add `innovation_number` to each connection
-2. Track global innovation counter
-3. Implement `add_node` and `add_connection` mutations
-4. Implement species distance metric
-5. Implement speciated selection
+Key NEAT parameters:
+- `initial_connectivity`: `full` | `sparse_inputs` | `sparse_outputs` | `none`
+- `neat_add_connection_rate`: Probability of adding new connections (default 0.05)
+- `neat_add_node_rate`: Probability of adding new hidden nodes (default 0.03)
+- `neat_max_hidden_neurons`: Topology complexity limit (default 16)
 
-See `docs/NEAT_IMPLEMENTATION.md` (future) for details.
+### Technical Details
+
+For full implementation details including:
+- Gene representation (NeuronGene, ConnectionGene)
+- Innovation counter management
+- Crossover with gene alignment
+- Compatibility distance calculation
+- Body-neural topology adaptation
+
+See **`docs/NEAT.md`** for the complete technical reference.
 
 ---
 
@@ -836,11 +850,16 @@ See `docs/NEAT_IMPLEMENTATION.md` (future) for details.
 | Component | File |
 |-----------|------|
 | Network class | `backend/app/neural/network.py` |
+| NEAT network | `backend/app/neural/neat_network.py` |
 | Sensor gathering | `backend/app/neural/sensors.py` |
 | Proprioception inputs | `backend/app/neural/sensors.py` |
 | Genome storage | `backend/app/schemas/genome.py` |
+| NEAT genome schema | `backend/app/schemas/neat.py` |
 | Weight mutation | `backend/app/genetics/mutation.py` |
+| NEAT mutation | `backend/app/genetics/neat_mutation.py` |
 | Weight crossover | `backend/app/genetics/crossover.py` |
+| NEAT crossover | `backend/app/genetics/neat_crossover.py` |
+| NEAT distance | `backend/app/genetics/neat_distance.py` |
 | Physics integration | `backend/app/simulation/physics.py` |
 
 Uses **batched PyTorch tensors** for parallel neural network evaluation across all creatures simultaneously.
