@@ -724,9 +724,16 @@ def evolve_population(
                 'reproductionType': reproduction_type,
             })
 
-        # Limit chain length to avoid bloat (keep last 100 ancestors)
-        if len(chain) > 100:
-            chain = chain[-100:]
+        # Only truncate if we have a Gen 0 ancestor (full lineage preserved)
+        # This ensures "traced to Gen 0" until the chain gets too long
+        has_gen_zero = any(a.get('generation', -1) == 0 for a in chain)
+        if has_gen_zero and len(chain) > 100:
+            # Keep the Gen 0 ancestor(s) and most recent ancestors
+            gen_zero_ancestors = [a for a in chain if a.get('generation', -1) == 0]
+            recent_ancestors = chain[-99:]  # Leave room for at least one Gen 0
+            # Merge: Gen 0 ancestors first, then recent (deduplicated)
+            chain = gen_zero_ancestors + [a for a in recent_ancestors if a not in gen_zero_ancestors]
+            chain = chain[-100:]  # Final cap
 
         child['ancestryChain'] = chain
 

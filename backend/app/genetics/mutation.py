@@ -520,6 +520,7 @@ def mutate_genome(
         'generation': genome.get('generation', 0),  # Mutation doesn't change generation
         'parentIds': genome.get('parentIds', genome.get('parent_ids', [])),
         'survivalStreak': genome.get('survivalStreak', genome.get('survival_streak', 0)),
+        'ancestryChain': genome.get('ancestryChain', []),  # Preserve ancestry chain
         'nodes': new_nodes,
         'muscles': new_muscles,
         'globalFrequencyMultiplier': genome.get('globalFrequencyMultiplier', genome.get('global_frequency_multiplier', 1.0)),
@@ -771,6 +772,7 @@ def _mutate_body_only_with_tracking(
         'generation': genome.get('generation', 0),
         'parentIds': genome.get('parentIds', genome.get('parent_ids', [])),
         'survivalStreak': genome.get('survivalStreak', genome.get('survival_streak', 0)),
+        'ancestryChain': genome.get('ancestryChain', []),  # Preserve ancestry chain
         'nodes': new_nodes,
         'muscles': new_muscles,
         'globalFrequencyMultiplier': genome.get('globalFrequencyMultiplier', genome.get('global_frequency_multiplier', 1.0)),

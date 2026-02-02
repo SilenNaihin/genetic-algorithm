@@ -404,25 +404,73 @@ export function ReplayModal() {
     };
 
     // Build parent chain from ancestry (reverse order - most recent parent first)
+    // Handle crossover parents as siblings (two consecutive entries with reproductionType='crossover')
     let currentNode = tree;
-    for (let i = ancestryChain.length - 1; i >= 0; i--) {
+    let i = ancestryChain.length - 1;
+    while (i >= 0) {
       const ancestor = ancestryChain[i];
-      const parentNode: FamilyTreeNode = {
-        creature: {
-          id: `ancestor-${i}`,
-          generation: ancestor.generation,
-          fitness: ancestor.fitness,
-          pelletsCollected: 0,
-          nodeCount: ancestor.nodeCount,
-          muscleCount: ancestor.muscleCount,
-          color: ancestor.color || { h: 0.5, s: 0.7, l: 0.5 },
-          parentIds: i > 0 ? [`ancestor-${i - 1}`] : [],
-          reproductionType: ancestor.reproductionType,
-        },
-        parents: [],
-      };
-      currentNode.parents.push(parentNode);
-      currentNode = parentNode;
+
+      // Check if this and the previous entry are crossover parents (siblings)
+      const isCrossover = ancestor.reproductionType === 'crossover';
+      const prevAncestor = i > 0 ? ancestryChain[i - 1] : null;
+      const prevIsCrossover = prevAncestor?.reproductionType === 'crossover';
+
+      // Two consecutive crossover entries = sibling parents
+      if (isCrossover && prevIsCrossover && prevAncestor) {
+        // Add both as parents of current node
+        const parent1Node: FamilyTreeNode = {
+          creature: {
+            id: `ancestor-${i}`,
+            generation: ancestor.generation,
+            fitness: ancestor.fitness,
+            pelletsCollected: 0,
+            nodeCount: ancestor.nodeCount,
+            muscleCount: ancestor.muscleCount,
+            color: ancestor.color || { h: 0.5, s: 0.7, l: 0.5 },
+            parentIds: [],
+            reproductionType: ancestor.reproductionType,
+          },
+          parents: [],
+        };
+        const parent2Node: FamilyTreeNode = {
+          creature: {
+            id: `ancestor-${i - 1}`,
+            generation: prevAncestor.generation,
+            fitness: prevAncestor.fitness,
+            pelletsCollected: 0,
+            nodeCount: prevAncestor.nodeCount,
+            muscleCount: prevAncestor.muscleCount,
+            color: prevAncestor.color || { h: 0.5, s: 0.7, l: 0.5 },
+            parentIds: [],
+            reproductionType: prevAncestor.reproductionType,
+          },
+          parents: [],
+        };
+        currentNode.parents.push(parent1Node, parent2Node);
+        // Continue from the earlier ancestor's parent (skip both crossover entries)
+        // The next entry after both crossover parents becomes their shared parent
+        currentNode = parent1Node; // Continue lineage through first parent
+        i -= 2;
+      } else {
+        // Single parent (mutation or clone)
+        const parentNode: FamilyTreeNode = {
+          creature: {
+            id: `ancestor-${i}`,
+            generation: ancestor.generation,
+            fitness: ancestor.fitness,
+            pelletsCollected: 0,
+            nodeCount: ancestor.nodeCount,
+            muscleCount: ancestor.muscleCount,
+            color: ancestor.color || { h: 0.5, s: 0.7, l: 0.5 },
+            parentIds: i > 0 ? [`ancestor-${i - 1}`] : [],
+            reproductionType: ancestor.reproductionType,
+          },
+          parents: [],
+        };
+        currentNode.parents.push(parentNode);
+        currentNode = parentNode;
+        i--;
+      }
     }
 
     setFamilyTree(tree);
