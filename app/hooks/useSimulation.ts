@@ -9,12 +9,12 @@ import type { CreatureSimulationResult, DisqualificationReason } from '../../src
 // Get showError from store for non-hook context
 const showError = (message: string) => useEvolutionStore.getState().showError(message);
 
-// Animation timing constants (matches vanilla app)
-const MARK_DEAD_DELAY = 600;
-const FADE_OUT_DELAY = 400;
-const REPOSITION_DELAY = 450; // Survivors moving to new positions
-const SPAWN_DELAY = 600;
-const SORT_DELAY = 700;
+// Animation timing constants - tuned for smooth ease-in-out transitions
+const MARK_DEAD_DELAY = 700;      // Phase 1: Show red border (wait for 0.5s transition + pause)
+const FADE_OUT_DELAY = 600;       // Phase 2: Fade out completely (0.5s transition + buffer)
+const REPOSITION_DELAY = 700;     // Survivors moving to new positions (0.6s transition + buffer)
+const SPAWN_DELAY = 800;          // Offspring pop in from parent (0.6s position + 0.5s scale)
+const SORT_DELAY = 700;           // Sort animation completes (0.6s transition + buffer)
 
 // Helper: delay function
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -353,10 +353,15 @@ export function useSimulation() {
     });
 
     // Build map of OLD positions for all creatures (needed for survivor repositioning)
-    // Current results are sorted by fitness, so index = grid position
+    // Cards are displayed in sorted order (by fitness), so we need to sort to get correct positions
+    const sortedCurrentResults = [...currentResults].sort((a, b) => {
+      const aFit = isNaN(a.finalFitness) ? -Infinity : a.finalFitness;
+      const bFit = isNaN(b.finalFitness) ? -Infinity : b.finalFitness;
+      return bFit - aFit;
+    });
     const oldPositionMap = new Map<string, { x: number; y: number }>();
-    currentResults.forEach((result, index) => {
-      const pos = getGridPosition(index);
+    sortedCurrentResults.forEach((result, sortedIndex) => {
+      const pos = getGridPosition(sortedIndex);
       // Map by _apiCreatureId since that's consistent between old and new results
       if (result.genome._apiCreatureId) {
         oldPositionMap.set(result.genome._apiCreatureId, pos);

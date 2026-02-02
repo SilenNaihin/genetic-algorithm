@@ -54,10 +54,10 @@ export function CreatureGrid() {
     prevStepRef.current = evolutionStep;
 
     if (evolutionStep === 'mutate' && prevStep === 'idle') {
-      // Entering mutate from idle - keep sorted (don't flicker)
+      // Entering mutate from idle - keep sorted during death animation
       // Cards stay in place while death animation plays
     } else if (evolutionStep === 'simulate' && prevStep === 'mutate') {
-      // Entering simulate from mutate - now show unsorted
+      // Entering simulate from mutate - show unsorted
       // New offspring have replaced dead creatures
       setIsSorted(false);
     } else if (evolutionStep === 'idle' && prevStep === 'sort') {
@@ -320,14 +320,6 @@ export function CreatureGrid() {
           const posInfo = positionMap.get(result.genome.id);
           const sortedIndex = posInfo?.sortedIndex ?? originalIndex;
 
-          // Calculate visual position based on sort state
-          const visualIndex = isSorted ? sortedIndex : originalIndex;
-          const pos = getGridPosition(visualIndex);
-
-          // Elite status is based on sorted position
-          const isElite = sortedIndex < eliteCount;
-          const rank = sortedIndex + 1;
-
           // Get animation state for this card
           const animState = cardAnimationStates.get(result.genome.id);
           const isDead = animState?.isDead ?? false;
@@ -336,7 +328,16 @@ export function CreatureGrid() {
           const isSpawning = animState?.isSpawning ?? false;
           const isRepositioning = animState?.isRepositioning ?? false;
 
-          // Use spawn position if spawning OR repositioning (for survivors moving to new positions)
+          // Calculate visual position based on sort state
+          // When repositioning, always use originalIndex (survivors animate to unsorted grid positions)
+          const visualIndex = isRepositioning ? originalIndex : (isSorted ? sortedIndex : originalIndex);
+          const pos = getGridPosition(visualIndex);
+
+          // Elite status is based on sorted position
+          const isElite = sortedIndex < eliteCount;
+          const rank = sortedIndex + 1;
+
+          // Use spawn position if spawning OR repositioning with valid spawn coordinates
           const useSpawnPos = (isSpawning || isRepositioning) && animState?.spawnFromX != null;
           const displayX = useSpawnPos ? animState.spawnFromX! : pos.x;
           const displayY = useSpawnPos && animState?.spawnFromY != null ? animState.spawnFromY : pos.y;
