@@ -544,7 +544,8 @@ def adapt_neat_topology(
                 ))
 
             # Add bias connection if using bias_node mode
-            if bias_node is not None:
+            # Only add if we didn't already pick bias_node as the random source
+            if bias_node is not None and (not sources or source.id != bias_node.id):
                 if innovation_counter is not None:
                     inn_id = innovation_counter.get_connection_innovation(bias_node.id, new_id)
                 else:
@@ -851,7 +852,7 @@ def get_network_depth(genome: NEATGenome) -> int:
     Returns:
         Maximum path length from any input to any output
     """
-    input_ids = {n.id for n in genome.neurons if n.type == 'input'}
+    input_ids = {n.id for n in genome.neurons if n.type in ('input', 'bias')}
 
     # Build adjacency
     outgoing: dict[int, set[int]] = {n.id: set() for n in genome.neurons}
@@ -887,7 +888,7 @@ def get_neuron_depths(genome: NEATGenome) -> dict[int, int]:
     Returns:
         Dictionary mapping neuron ID to depth
     """
-    input_ids = {n.id for n in genome.neurons if n.type == 'input'}
+    input_ids = {n.id for n in genome.neurons if n.type in ('input', 'bias')}
     output_ids = {n.id for n in genome.neurons if n.type == 'output'}
 
     outgoing: dict[int, set[int]] = {n.id: set() for n in genome.neurons}

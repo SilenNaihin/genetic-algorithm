@@ -636,11 +636,13 @@ export function useSimulation() {
 
       try {
         let history = useEvolutionStore.getState().fitnessHistory;
+        // Track previousResults locally to avoid stale state during auto-run
+        // (store is only updated on final iteration for performance)
+        let previousResults = useEvolutionStore.getState().simulationResults;
 
         for (let i = 0; i < generations; i++) {
           if (!autoRunning) break;
 
-          const previousResults = useEvolutionStore.getState().simulationResults;
           const currentGen = useEvolutionStore.getState().generation;
 
           // Run evolution step first to get actual culled_ids
@@ -724,6 +726,9 @@ export function useSimulation() {
           if (i === generations - 1 || !autoRunning) {
             setSimulationResults(results);
           }
+
+          // Update local previousResults for next iteration's dying creature detection
+          previousResults = results;
         }
       } finally {
         autoRunning = false;

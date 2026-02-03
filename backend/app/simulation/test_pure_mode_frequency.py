@@ -189,7 +189,7 @@ class TestPureModeFrequencyDisqualification:
         # Should NOT be disqualified for HIGH_FREQUENCY
         # (may be disqualified for other reasons like physics_explosion)
         result = results[0]
-        assert result.disqualified_reason != 'high_frequency', (
+        assert result.disqualified_reason != 'frequency_exceeded', (
             f"Pure mode creature should NOT be disqualified for high_frequency. "
             f"Got disqualified_reason: {result.disqualified_reason}"
         )
@@ -220,4 +220,4 @@ class TestHybridModeFrequencyDisqualification:
         assert result.disqualified, (
             "Hybrid mode creature SHOULD be disqualified for high frequency"
         )
-        assert result.disqualified_reason == 'high_frequency'
+        assert result.disqualified_reason == 'frequency_exceeded'

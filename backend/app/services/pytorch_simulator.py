@@ -228,7 +228,7 @@ class PyTorchSimulator:
 
             if freq_violations[i]:
                 disqualified = True
-                disqualified_reason = "high_frequency"
+                disqualified_reason = "frequency_exceeded"
             elif torch.any(torch.isnan(result['final_positions'][i])):
                 disqualified = True
                 disqualified_reason = "physics_explosion"

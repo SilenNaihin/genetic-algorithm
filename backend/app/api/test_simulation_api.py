@@ -190,7 +190,7 @@ class TestSimulationBatchEndpoint:
         data = response.json()
         result = data["results"][0]
         assert result["disqualified"] == True
-        assert result["disqualified_reason"] == "high_frequency"
+        assert result["disqualified_reason"] == "frequency_exceeded"
         assert result["fitness"] == 0.0
 
 

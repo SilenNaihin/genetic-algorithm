@@ -115,7 +115,7 @@ class TestMainMenuConfig:
         assert response_low.status_code == 200
         results_low = extract_results(response_low)
         assert results_low[0]["disqualified"] == True
-        assert results_low[0]["disqualified_reason"] == "high_frequency"
+        assert results_low[0]["disqualified_reason"] == "frequency_exceeded"
 
 
 class TestFitnessPanelConfig:
