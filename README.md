@@ -2,6 +2,8 @@
 
 A browser-based genetic algorithm simulator where soft-bodied creatures evolve to collect pellets. Watch populations of creatures develop movement strategies over generations through mutation, crossover, and natural selection.
 
+**Read the full writeup: [I spent 2 weeks playing god using genetic algorithms](https://blog.silennai.com/genetic-algorithm)**
+
 ![Demo](best-creature.gif)
 
 ## Features
